@@ -2,7 +2,7 @@ Attribute VB_Name = "common"
 Option Compare Text
 Option Base 1
 
-Public Const common_version As String = "2.1"
+Public Const common_version As String = "2.2"
 
 Public Function GetLeghtByID(id As String, table As Range, n_col_id As Integer, n_col_l As Integer) As Variant
     Sum_l = 0
@@ -282,8 +282,83 @@ Function ArraySelectParam(ByVal array_in As Variant, ByVal param1 As _
     Erase array_in
 End Function
 
-Function ArraySort(ByVal array_in As Variant, ByVal nCol As Integer) As Variant
-    If IsEmpty(array_in) Then ArraySort = Empty: Exit Function
+Function ArraySort(ByVal array_in As Variant, Optional ByVal nCol As Integer = 1) As Variant
+    If IsEmpty(array_in) Then
+        ArraySort = Empty
+        Exit Function
+    End If
+    Dim array_in_str As Variant
+    Dim array_in_num As Variant
+    If ArrayIsSecondDim(array_in) Then
+        n_row = UBound(array_in, 1)
+        n_col = UBound(array_in, 2)
+        If LBound(array_in, 1) = 0 Then n_row = n_row + 1
+        If LBound(array_in, 2) = 0 Then n_col = n_col + 1
+        ReDim array_in_str(n_col, n_row)
+        ReDim array_in_num(n_col, n_row)
+        n_str = 0
+        n_num = 0
+        For i = LBound(array_in, 1) To UBound(array_in, 1)
+            If IsNumeric(array_in(i, nCol)) Then
+                n_num = n_num + 1
+                For j = LBound(array_in, 2) To UBound(array_in, 2)
+                    array_in_num(j, n_num) = array_in(i, j)
+                Next j
+            Else
+                n_str = n_str + 1
+                For j = LBound(array_in, 2) To UBound(array_in, 2)
+                    array_in_str(j, n_str) = array_in(i, j)
+                Next j
+            End If
+        Next i
+        If n_num > 0 Then
+            ReDim Preserve array_in_num(n_col, n_num)
+            array_in_num = ArraySortNum(ArrayTranspose(array_in_num), nCol)
+        End If
+        If n_str > 0 Then
+            ReDim Preserve array_in_str(n_col, n_str)
+            array_in_str = ArraySortABC(ArrayTranspose(array_in_str), nCol)
+            If n_num > 0 Then
+                array_in = ArrayCombine(array_in_num, array_in_str)
+            Else
+                array_in = array_in_str
+            End If
+        Else
+            array_in = array_in_num
+        End If
+    Else
+        n_row = UBound(array_in)
+        If LBound(array_in) = 0 Then n_row = n_row + 1
+        ReDim array_in_str(n_row)
+        ReDim array_in_num(n_row)
+        n_str = 0
+        n_num = 0
+        For i = LBound(array_in) To UBound(array_in)
+            If IsNumeric(array_in(i)) Then
+                n_num = n_num + 1
+                array_in_num(n_num) = array_in(i)
+            Else
+                n_str = n_str + 1
+                array_in_str(n_str) = array_in(i)
+            End If
+        Next i
+        If n_num > 0 Then
+            ReDim Preserve array_in_num(n_num)
+            array_in_num = ArraySortNum(array_in_num, nCol)
+        End If
+        If n_str > 0 Then
+            ReDim Preserve array_in_str(n_str)
+            array_in_str = ArraySortABC(array_in_str, nCol)
+            If n_num > 0 Then
+                array_in = ArrayCombine(array_in_num, array_in_str)
+            Else
+                array_in = array_in_str
+            End If
+        Else
+            array_in = array_in_num
+        End If
+    End If
+    ArraySort = array_in
 End Function
 
 Function ArraySortABC(ByVal array_in As Variant, ByVal nCol As Integer) As _
@@ -292,7 +367,7 @@ Function ArraySortABC(ByVal array_in As Variant, ByVal nCol As Integer) As _
     If ArrayIsSecondDim(array_in) Then
         Dim tempArray As Variant: ReDim tempArray(1, UBound(array_in, 2))
         k = UBound(array_in, 1)
-        For j = 1 To UBound(array_in, 1) - 1
+        For j = LBound(array_in, 1) To UBound(array_in, 1) - 1
             For i = 2 To k
                 If array_in(i - 1, nCol) <> Empty And array_in(i, nCol) <> _
                     Empty Then
@@ -310,7 +385,7 @@ Function ArraySortABC(ByVal array_in As Variant, ByVal nCol As Integer) As _
         Next j
     Else
         k = UBound(array_in)
-        For j = 1 To UBound(array_in) - 1
+        For j = LBound(array_in) To UBound(array_in) - 1
             For i = 2 To k
                 If Not IsEmpty(array_in(i - 1)) And Not _
                     IsEmpty(array_in(i)) Then
@@ -443,11 +518,7 @@ Function ArrayUniqValColumn(ByVal array_in As Variant, ByVal cols As Long) _
         Next
     End If
     ReDim Preserve array_out(n_un)
-    If (n_num > n_str) Then
-        array_out = ArraySortNum(array_out, 1)
-    Else
-        array_out = ArraySortABC(array_out, 1)
-    End If
+    array_out = ArraySort(array_out, 1)
     ArrayUniqValColumn = array_out
     Erase array_out
 End Function
@@ -504,6 +575,10 @@ Function SpecGetType(ByVal nm As String) As String
                     spec = 11
                 Case "экспл"
                     spec = 12
+                Case "грс"
+                    spec = 13
+                Case Else
+                    spec = 2
                 End Select
         Else
             spec = 3

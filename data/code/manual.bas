@@ -352,7 +352,7 @@ Function FormatManual(ByVal nm As String) As Boolean
         row = GetSizeSheet(subpos_sheet)(1)
         pos = subpos_sheet.Range(subpos_sheet.Cells(3, 1), subpos_sheet.Cells(row, 1))
         If IsArray(pos) Then
-            un_pos = ArraySortABC(ArrayUniqValColumn(pos, 1), 1)
+            un_pos = ArraySort(ArrayUniqValColumn(pos, 1), 1)
         Else
             un_pos = Array(pos)
         End If

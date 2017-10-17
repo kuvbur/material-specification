@@ -34,6 +34,11 @@ Private Sub CommandButtonPOL_Click()
     r = Spec_Select(lastfilespec, suffix)
 End Sub
 
+Private Sub CommandButtonSB_Click()
+    suffix = "_грс"
+    r = Spec_Select(lastfilespec, suffix)
+End Sub
+
 Private Sub UserForm_Initialize()
     MaterialPath = CheckPath(MaterialPatht.Text)
     SortamentPath = CheckPath(SortamentPatht.Text)
@@ -100,6 +105,7 @@ Function ExportAllMod() As Boolean
     ExportMod ("calc")
     ExportMod ("common")
     ExportMod ("manual")
+    ExportMod ("surf")
     ExportMod ("UserForm2")
 End Function
 
@@ -115,6 +121,9 @@ End Sub
 
 Sub FormRebild()
     calc_ver.Caption = macro_version
+    com_ver.Caption = common_version
+    man_ver.Caption = manual_version
+    surf_ver.Caption = surf_version
     form_ver.Caption = "2.1"
     symb_diam = ChrW(8960)
     remat
@@ -174,12 +183,13 @@ Sub remat()
     Dim listadd: ReDim listadd(1): n_add = 0
     listsheet = GetListOfSheet(ThisWorkbook)
     For Each sheet In listsheet
-        If SpecGetType(sheet) = 7 Then
+        type_spec = SpecGetType(sheet)
+        If type_spec = 7 Then
             n_man = n_man + 1
             ReDim Preserve listspec(n_man)
             listspec(n_man) = sheet
         End If
-        If SpecGetType(sheet) = 9 Then
+        If type_spec = 9 Then
             n_add = n_add + 1
             ReDim Preserve listadd(n_add)
             listadd(n_add) = sheet
