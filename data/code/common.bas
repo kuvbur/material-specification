@@ -12,14 +12,22 @@ Public Function GetLeghtByID(id As String, table As Range, n_col_id As Integer, 
     GetLeghtByID = Sum_l
 End Function
 
+Sub Показать_зависимости()
+    r = OutPrepare()
+    For Each rn In Range("E1:H500")
+        rn.ShowPrecedents
+    Next
+    r = OutEnded()
+End Sub
+
 Function GetHeightSheet() As Double
-    Set sh = Application.ThisWorkbook.ActiveSheet
-    sh.ResetAllPageBreaks
-    lsize = GetSizeSheet(sh)
+    Set Sh = Application.ThisWorkbook.ActiveSheet
+    Sh.ResetAllPageBreaks
+    lsize = GetSizeSheet(Sh)
     n_row = lsize(1)
     h_sheet = 0
     For i = 1 To n_row
-        h_row_point = sh.Rows(i).RowHeight
+        h_row_point = Sh.Rows(i).RowHeight
         h_row_mm = h_row_point / 72 * 25.4
         h_sheet = h_sheet + h_row_mm
     Next i
@@ -28,26 +36,26 @@ End Function
 
 Function SetPageBreaks(ByVal h_list As Double, Optional ByVal n_first As Integer) As Boolean
     If GetHeightSheet() > h_list Then
-        Set sh = Application.ThisWorkbook.ActiveSheet
-        sh.ResetAllPageBreaks
-        lsize = GetSizeSheet(sh)
+        Set Sh = Application.ThisWorkbook.ActiveSheet
+        Sh.ResetAllPageBreaks
+        lsize = GetSizeSheet(Sh)
         n_row = lsize(1)
         n_col = lsize(2)
-        sh.VPageBreaks.Add Before:=sh.Cells(1, n_col)
+        Sh.VPageBreaks.Add Before:=Sh.Cells(1, n_col)
         h_dop = 0
         For i = 1 To n_first
-            h_row_point = sh.Rows(i).RowHeight
+            h_row_point = Sh.Rows(i).RowHeight
             h_row_mm = h_row_point / 72 * 25.4
             h_dop = h_dop + h_row_mm
         Next i
         h_max = h_list + h_dop
         h_t = 0
         For i = 1 To n_row + 1
-            h_row_point = sh.Rows(i).RowHeight
+            h_row_point = Sh.Rows(i).RowHeight
             h_row_mm = h_row_point / 72 * 25.4
             h_t = h_t + h_row_mm
             If h_t >= h_max Then
-                sh.HPageBreaks.Add Before:=sh.Range(sh.Cells(i, 1).MergeArea(1).Address)
+                Sh.HPageBreaks.Add Before:=Sh.Range(Sh.Cells(i, 1).MergeArea(1).Address)
                 h_t = 0
             End If
         Next i
@@ -329,6 +337,10 @@ Function ArraySort(ByVal array_in As Variant, Optional ByVal nCol As Integer = 1
     Else
         n_row = UBound(array_in)
         If LBound(array_in) = 0 Then n_row = n_row + 1
+        If n_row <= 0 Then
+            ArraySort = Empty
+            Exit Function
+        End If
         ReDim array_in_str(n_row)
         ReDim array_in_num(n_row)
         n_str = 0

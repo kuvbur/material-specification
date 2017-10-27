@@ -37,7 +37,7 @@ Public Const col_s_areal_l As Integer = 30
 Public Const col_s_areaniz_l As Integer = 31
 Public Const col_s_areapl_l As Integer = 32
 Public Const max_s_col As Integer = 32
-Public Const n_round_area As Integer = 3
+Public Const n_round_area As Integer = 1
 
 Function DataIsOtd(ByVal array_in As Variant) As Boolean
     n_col = UBound(array_in, 2)
@@ -375,6 +375,7 @@ Function GetRules(ByVal nm As String) As Variant
         lsize = GetSizeSheet(rule_sheet)
         n_row = lsize(1)
         n_col = lsize(2)
+        If n_row = 1 Then n_row = 2
         Set Data_out = rule_sheet.Range(rule_sheet.Cells(1, 1), rule_sheet.Cells(n_row, n_col))
         Worksheets(nm_rule).Activate
         r = FormatClear()
@@ -389,8 +390,30 @@ Function GetRules(ByVal nm As String) As Variant
         Erase rules
     Else
         GetRules = Empty
+        r = NewListRules(nm)
         MsgBox ("Не найден лист с правилами отделки (оканчивается на '_правила')")
     End If
+End Function
+
+Function NewListRules(ByVal nm As String) As Boolean
+    ThisWorkbook.Worksheets.Add.Name = nm & "_правила"
+    Worksheets(nm & "_правила").Activate
+    Cells(1, 1).Value = "Имя многослойной конструкции (целиком или часть имени)"
+    Cells(1, 2).Value = "Слой"
+    Cells(1, 3).Value = "Черновая отделка"
+    
+    Cells(2, 1).Value = "ЖБ"
+    Cells(2, 2).Value = "Колонны"
+    Cells(2, 3).Value = "Затирка, шпатлёвка ж/б колонн"
+    
+    Cells(3, 1).Value = "П1"
+    Cells(3, 2).Value = "Потолки"
+    Cells(3, 3).Value = "Армстронг; Без отделки"
+    
+    Columns("A:A").ColumnWidth = 50
+    Columns("B:B").ColumnWidth = 30
+    Columns("C:C").ColumnWidth = 60
+    Rows("1:1").EntireRow.AutoFit
 End Function
 
 Function AddRules(ByVal nm As String, ByVal add_rule As Variant) As Boolean
@@ -426,6 +449,7 @@ Function AddRules(ByVal nm As String, ByVal add_rule As Variant) As Boolean
         AddRules = True
     Else
         AddRules = False
+        r = NewListRules(nm)
         MsgBox ("Не найден лист с правилами отделки (оканчивается на '_правила')")
     End If
 End Function

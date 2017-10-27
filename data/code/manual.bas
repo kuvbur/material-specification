@@ -538,8 +538,8 @@ End Function
 
 Function ReadPrSortament()
     r = OutPrepare()
-    Set sh = Application.ThisWorkbook.Sheets("!System") 'На этом скрытом листе будем хранить данные для списков
-    sh.Cells.Clear
+    Set Sh = Application.ThisWorkbook.Sheets("!System") 'На этом скрытом листе будем хранить данные для списков
+    Sh.Cells.Clear
     Set tpr_adress = CreateObject("Scripting.Dictionary") 'В этом словаре будем хранить адреса
     'Сначала - металл
     SortamentPath = SetPath()
@@ -548,17 +548,17 @@ Function ReadPrSortament()
     f_list_file = ArrayCol(f_list_sort, 3)
     f_list_gost = ArrayCol(f_list_sort, 2)
     n_sort = UBound(f_list_file)
-    tpr_adress.Item("ГОСТпрокат") = "'!System'!" & sh.Range(sh.Cells(1, 1), sh.Cells(1, n_sort)).Address
+    tpr_adress.Item("ГОСТпрокат") = "'!System'!" & Sh.Range(Sh.Cells(1, 1), Sh.Cells(1, n_sort)).Address
     Dim tmp_arr(3)
     For n_col = 2 To n_sort
         file = f_list_file(n_col)
-        sh.Cells(1, n_col - 1) = file
+        Sh.Cells(1, n_col - 1) = file
         f_prof = ReadTxt(SortamentPath & file & ".txt", 1, vbTab, vbNewLine)
         f_list_prof = ArrayCol(f_prof, 2)
         f_list_weight = ArrayCol(f_prof, 3)
         n_prof = UBound(f_list_prof) + 1
-        sh.Range(sh.Cells(2, n_col - 1), sh.Cells(n_prof, n_col - 1)) = ArrayTranspose(f_list_prof)
-        tmp_arr(1) = "'!System'!" & sh.Range(sh.Cells(3, n_col - 1), sh.Cells(n_prof, n_col - 1)).Address
+        Sh.Range(Sh.Cells(2, n_col - 1), Sh.Cells(n_prof, n_col - 1)) = ArrayTranspose(f_list_prof)
+        tmp_arr(1) = "'!System'!" & Sh.Range(Sh.Cells(3, n_col - 1), Sh.Cells(n_prof, n_col - 1)).Address
         tmp_arr(2) = f_list_gost(n_col)
         tpr_adress.Item(file) = tmp_arr
         For j = 2 To n_prof - 1
@@ -577,16 +577,16 @@ Function ReadPrSortament()
     f_klass = ArrayUniqValColumn(f_list_sort, 2)
     n_klass = UBound(f_klass)
     n_end = n_start + n_klass
-    tpr_adress.Item("Классы") = "'!System'!" & sh.Range(sh.Cells(1, n_start + 1), sh.Cells(1, n_end)).Address
+    tpr_adress.Item("Классы") = "'!System'!" & Sh.Range(Sh.Cells(1, n_start + 1), Sh.Cells(1, n_end)).Address
     For i = 1 To n_klass
         klass = f_klass(i)
         If klass <> "Класс" Then
-            sh.Cells(1, n_start + i) = klass
+            Sh.Cells(1, n_start + i) = klass
             row = ArrayGetRowIndex(f_list_sort, klass, 2)
             diam = ArrayTranspose(ArrayUniqValColumn(ArraySelectParam(f_list_sort, klass, 2), 3))
             n_diam = UBound(diam)
-            sh.Range(sh.Cells(2, n_start + i), sh.Cells(n_diam + 1, n_start + i)) = diam
-            tpr_adress.Item(klass) = "'!System'!" & sh.Range(sh.Cells(2, n_start + i), sh.Cells(n_diam + 1, n_start + i)).Address
+            Sh.Range(Sh.Cells(2, n_start + i), Sh.Cells(n_diam + 1, n_start + i)) = diam
+            tpr_adress.Item(klass) = "'!System'!" & Sh.Range(Sh.Cells(2, n_start + i), Sh.Cells(n_diam + 1, n_start + i)).Address
         End If
     Next
     
@@ -596,21 +596,21 @@ Function ReadPrSortament()
     f_list_stal = ReadTxt(file, 1, vbTab, vbNewLine)
     n_stal = UBound(f_list_stal, 1)
     n_end = n_start + n_stal + 1
-    tpr_adress.Item("Марки стали") = "'!System'!" & sh.Range(sh.Cells(1, n_start + 1), sh.Cells(1, n_end)).Address
+    tpr_adress.Item("Марки стали") = "'!System'!" & Sh.Range(Sh.Cells(1, n_start + 1), Sh.Cells(1, n_end)).Address
     For i = 1 To n_stal
         stal = f_list_stal(i, 1)
-        sh.Cells(1, n_start + i) = stal
-        sh.Cells(2, n_start + i) = f_list_stal(i, 2)
+        Sh.Cells(1, n_start + i) = stal
+        Sh.Cells(2, n_start + i) = f_list_stal(i, 2)
         tpr_adress.Item(stal) = f_list_stal(i, 2)
     Next
     
     n_start = n_end + 1
     'Теперь всякие вспомогательные элементы
-    sh.Cells(1, n_start) = "*"
-    sh.Cells(2, n_start) = "п.м."
-    sh.Cells(3, n_start) = "кв.м."
-    sh.Cells(4, n_start) = "куб.м."
-    tpr_adress.Item("Примечания") = "'!System'!" & sh.Range(sh.Cells(1, n_start), sh.Cells(4, n_start)).Address
+    Sh.Cells(1, n_start) = "*"
+    Sh.Cells(2, n_start) = "п.м."
+    Sh.Cells(3, n_start) = "кв.м."
+    Sh.Cells(4, n_start) = "куб.м."
+    tpr_adress.Item("Примечания") = "'!System'!" & Sh.Range(Sh.Cells(1, n_start), Sh.Cells(4, n_start)).Address
     
     r = OutEnded()
     Set pr_adress = tpr_adress

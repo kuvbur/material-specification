@@ -65,11 +65,6 @@ Public symb_diam As String 'Символ диаметра в спецификацию
 Public w_format As String 'Формат выводав техничку
 Public pos_data As Variant
 
-Sub test()
-    suffix = "_об"
-    r = Spec_Select("Входные площадки", suffix)
-End Sub
-
 Function ControlSumAddVar(ByVal var As Variant) As String
     If IsNumeric(var) Then var = Trim(Str(var))
     If var = "_" Then
@@ -222,6 +217,10 @@ End Function
 Function DataAddNullSubpos(ByVal array_in As Variant) As Variant
     'TODO переделать под новую систему
     'Если в массиве есть элементы, состоящие в сборках, но маркировки сборок (t_subpos) нет - добавляет строки маркировок сборок
+    If IsEmpty(array_in) Then
+        DataAddNullSubpos = Empty
+        Exit Function
+    End If
     Dim add_subpos
     Dim out_subpos
     Set name_subpos = DataNameSubpos(exist_subpos) 'Получим для них имена
@@ -348,17 +347,19 @@ Function DataIsShort(ByVal array_in As Variant) As Boolean
     For j = 1 To col_type_el + 1
         n = 0
         For i = 1 To n_row
-            If t_arm = array_in(1, j) Then n = n + 1
-            If t_izd = array_in(1, j) Then n = n + 1
-            If t_subpos = array_in(1, j) Then n = n + 1
-            If t_mat = array_in(1, j) Then n = n + 1
-            If t_prokat = array_in(1, j) Then n = n + 1
-            If t_else = array_in(1, j) Then n = n + 1
-            If t_mat_spc = array_in(1, j) Then n = n + 1
+            If t_arm = array_in(i, j) Then n = n + 1
+            If t_izd = array_in(i, j) Then n = n + 1
+            If t_subpos = array_in(i, j) Then n = n + 1
+            If t_mat = array_in(i, j) Then n = n + 1
+            If t_prokat = array_in(i, j) Then n = n + 1
+            If t_else = array_in(i, j) Then n = n + 1
+            If t_mat_spc = array_in(i, j) Then n = n + 1
         Next i
-        If n >= n_row Then colum = j
+        If n > 0 And colum = 0 Then colum = j
     Next j
-    If colum <> col_type_el Then DataIsShort = True Else DataIsShort = False
+    res = False
+    If colum <> col_type_el Then res = True
+    DataIsShort = res
 End Function
 
 Function DataNameSubpos(ByVal sub_pos_arr As Variant) As Object
@@ -429,48 +430,46 @@ Function DataRead(ByVal nm As String) As Variant
             Else
                 'Читаем из файла
                 out_data = ReadFile(file(1, 1) & ".txt")
+                if instr(out_data(1,1), ""
             End If
     End Select
     If IsEmpty(out_data) Then DataRead = Empty: Exit Function
     If errread Then
         MsgBox ("Лист или файл отсутствуют")
     Else
-        Select Case SpecGetType(nm)
-            Case Else
-                If DataIsShort(out_data) Then out_data = DataShort(out_data)
-                Dim out: ReDim out(UBound(out_data, 1), max_col)
-                For i = 1 To UBound(out_data, 1)
-                    For j = 1 To max_col
-                        If j <= UBound(out_data, 2) Then
-                            out(i, j) = out_data(i, j)
-                        End If
-                    Next j
-                Next i
-                out_data = out
-                Erase out
-                If Not DataIsSpec(out_data) Then
-                    MsgBox ("Неверный формат файла")
-                    DataRead = Empty
-                    Exit Function
+        If DataIsShort(out_data) Then out_data = DataShort(out_data)
+        Dim out: ReDim out(UBound(out_data, 1), max_col)
+        For i = 1 To UBound(out_data, 1)
+            For j = 1 To max_col
+                If j <= UBound(out_data, 2) Then
+                    out(i, j) = out_data(i, j)
                 End If
-                out_data = DataCheck(out_data) 'Проверяем и корректируем
-                add_subpos = DataAddNullSubpos(out_data)
-                If Not IsEmpty(add_subpos) Then out_data = ArrayCombine(add_subpos, out_data)
-                out_data = DataSumByControlSum(out_data) 'Объединяем все позиции с одинаковой контрольной суммой
-                Set pos_data = DataUniqParent(ArraySelectParam(out_data, t_subpos, col_type_el))
-                Set pos_data.Item("weight") = DataWeightSubpos(out_data)
-                If Not IsEmpty(ArraySelectParam(out_data, "-", col_sub_pos)) Then
-                    If pos_data.exists("-") Then
-                        pos_data.Item("-").Item("-") = 1
-                    Else
-                        Set dfirst = CreateObject("Scripting.Dictionary")
-                        dfirst.Item("-") = 1
-                        Set pos_data.Item("-") = dfirst
-                    End If
-                End If
-                DataRead = out_data
-                Erase out_data
-        End Select
+            Next j
+        Next i
+        out_data = out
+        Erase out
+        If Not DataIsSpec(out_data) And SpecGetType(nm) <> "7" Then
+            MsgBox ("Неверный формат файла")
+            DataRead = Empty
+            Exit Function
+        End If
+        out_data = DataCheck(out_data) 'Проверяем и корректируем
+        add_subpos = DataAddNullSubpos(out_data)
+        If Not IsEmpty(add_subpos) Then out_data = ArrayCombine(add_subpos, out_data)
+        out_data = DataSumByControlSum(out_data) 'Объединяем все позиции с одинаковой контрольной суммой
+        Set pos_data = DataUniqParent(ArraySelectParam(out_data, t_subpos, col_type_el))
+        Set pos_data.Item("weight") = DataWeightSubpos(out_data)
+        If Not IsEmpty(ArraySelectParam(out_data, "-", col_sub_pos)) Then
+            If pos_data.exists("-") Then
+                pos_data.Item("-").Item("-") = 1
+            Else
+                Set dfirst = CreateObject("Scripting.Dictionary")
+                dfirst.Item("-") = 1
+                Set pos_data.Item("-") = dfirst
+            End If
+        End If
+        DataRead = out_data
+        If Not IsEmpty(out_data) Then Erase out_data
     End If
 End Function
 
@@ -504,6 +503,10 @@ End Function
 
 Function DataSumByControlSum(ByVal array_in As Variant)
     'Суммирует количество элементов с одинаковой контрольной суммой
+    If IsEmpty(array_in) Then
+        DataSumByControlSum = Empty
+        Exit Function
+    End If
     n_row = UBound(array_in, 1)
     n_col = UBound(array_in, 2)
     Dim out_data
@@ -664,17 +667,17 @@ End Function
 Function DebugOut(ByVal pos_out As Variant, Optional ByVal module_name As String) As Boolean
     sh_name = "DEBUG"
     If SheetExist(sh_name) Then
-        Set sh = Application.ThisWorkbook.Sheets("DEBUG")
+        Set Sh = Application.ThisWorkbook.Sheets("DEBUG")
         If module_name = "clear" Then
-            sh.Cells.Clear
-            sh.Cells.ClearFormats
-            sh.Cells.ClearContents
-            sh.Cells.NumberFormat = "@"
+            Sh.Cells.Clear
+            Sh.Cells.ClearFormats
+            Sh.Cells.ClearContents
+            Sh.Cells.NumberFormat = "@"
         Else
-            lsize = GetSizeSheet(sh)
+            lsize = GetSizeSheet(Sh)
             n_row_s = lsize(1)
             n_col_s = lsize(2)
-            sh.Cells(n_row_s + 2, 1) = module_name
+            Sh.Cells(n_row_s + 2, 1) = module_name
             If Not IsEmpty(pos_out) Then
                 If ArrayIsSecondDim(pos_out) Then
                     n_row_a = UBound(pos_out, 1)
@@ -683,9 +686,9 @@ Function DebugOut(ByVal pos_out As Variant, Optional ByVal module_name As String
                     n_row_a = 1
                     n_col_a = UBound(pos_out)
                 End If
-                sh.Range(sh.Cells(n_row_s + 3, 1), sh.Cells(n_row_s + n_row_a + 2, n_col_a)) = pos_out
+                Sh.Range(Sh.Cells(n_row_s + 3, 1), Sh.Cells(n_row_s + n_row_a + 2, n_col_a)) = pos_out
             Else
-                sh.Cells(n_row_s + 2, 3) = "EMPTY"
+                Sh.Cells(n_row_s + 2, 3) = "EMPTY"
             End If
         End If
     End If
@@ -912,24 +915,34 @@ Function FormatSpec_KZH(ByVal Data_out As Range, ByVal n_row As Integer, ByVal n
         Range(Data_out.Cells(1, i), Data_out.Cells(n_row, i)).ColumnWidth = 1.5 * koeff
     Next i
     r = FormatFont(Data_out, n_row, n_col)
+    Range(Data_out.Cells(n_row, 1), Data_out.Cells(n_row, n_col)).Select
+    Selection.Font.Bold = True
+    Data_out.Cells(n_row, n_col).Select
+    With Selection.Interior
+        .Pattern = xlSolid
+        .PatternColorIndex = xlAutomatic
+        .ThemeColor = xlThemeColorAccent3
+        .TintAndShade = 0.599993896298105
+        .PatternTintAndShade = 0
+    End With
 End Function
 
 Function FormatTable(Optional ByVal pos_out As Variant) As Boolean
     r = OutPrepare()
-    Set sh = Application.ThisWorkbook.ActiveSheet
+    Set Sh = Application.ThisWorkbook.ActiveSheet
     If IsError(pos_out) Then
-        lsize = GetSizeSheet(sh)
+        lsize = GetSizeSheet(Sh)
         n_row = lsize(1)
         n_col = lsize(2)
-        Set Data_out = sh.Range(sh.Cells(1, 1), sh.Cells(n_row, n_col))
+        Set Data_out = Sh.Range(Sh.Cells(1, 1), Sh.Cells(n_row, n_col))
     Else
         n_row = UBound(pos_out, 1)
         n_col = UBound(pos_out, 2)
         pos_out = ArrayEmp2Space(pos_out)
-        sh.Range(sh.Cells(1, 1), sh.Cells(n_row, n_col)) = pos_out
-        Set Data_out = sh.Range(sh.Cells(1, 1), sh.Cells(n_row, n_col))
+        Sh.Range(Sh.Cells(1, 1), Sh.Cells(n_row, n_col)) = pos_out
+        Set Data_out = Sh.Range(Sh.Cells(1, 1), Sh.Cells(n_row, n_col))
     End If
-    type_spec = SpecGetType(sh.Name)
+    type_spec = SpecGetType(Sh.Name)
     If type_spec <> 7 Then r = FormatClear()
     Select Case type_spec
         Case 1
@@ -1057,7 +1070,7 @@ Function ManualAdd(ByVal lastfileadd As String) As Boolean
     End If
     
     add_array = DataSumByControlSum(add_array)
-    man_arr = ManualSpec(nm)
+    man_arr = DataRead(nm)
 
     For Each t_el In Array(t_arm, t_prokat, t_mat, t_izd, t_subpos)
         t = ManualDiff(add_array, man_arr, t_el)
@@ -1073,7 +1086,25 @@ Function ManualAdd(ByVal lastfileadd As String) As Boolean
             Next j
         Next i
     End If
-    r = ManualSpec(nm, add_array)
+    sub_pos_arr = ArraySelectParam(add_array, t_subpos, col_type_el)
+    Dim array_out(): ReDim array_out(UBound(add_array, 1), UBound(add_array, 2))
+    n_row = 0
+    For i = 1 To UBound(sub_pos_arr, 1)
+        n_row = n_row + 1
+        For k = 1 To UBound(add_array, 2)
+            array_out(n_row, k) = sub_pos_arr(i, k)
+        Next k
+        
+        For j = 1 To UBound(add_array, 1)
+            If add_array(j, col_sub_pos) = sub_pos_arr(i, col_sub_pos) And add_array(j, col_type_el) <> t_subpos Then
+                n_row = n_row + 1
+                For k = 1 To UBound(add_array, 2)
+                    array_out(n_row, k) = add_array(j, k)
+                Next k
+            End If
+        Next j
+    Next i
+    r = ManualSpec(nm, array_out)
     ManualAdd = True
 End Function
 
@@ -1200,8 +1231,10 @@ Function ManualSpec(ByVal nm As String, Optional ByVal add_array As Variant) As 
                 ReDim param(max_col)
                 param = ArrayRow(pos_out, n_row_out)
                 current_sum = ControlSumEl(param)
+                current_sum = Split(current_sum, "_")(0) & Split(current_sum, "_")(2)
                 For kk = 1 To UBound(mod_array, 1)
-                    If mod_array(kk, col_chksum) = current_sum Then
+                    mod_sum = Split(mod_array(kk, col_chksum), "_")(0) & Split(mod_array(kk, col_chksum), "_")(2)
+                    If mod_sum = current_sum Then
                         r = CeilSetValue(spec_sheet.Cells(i, col_man_qty), mod_array(kk, col_qty), "mod")
                     End If
                 Next kk
@@ -1349,15 +1382,15 @@ End Function
 
 Function Paste2Sheet(ByRef array_in As Variant) As Boolean
     r = OutPrepare()
-    Set sh = Application.ThisWorkbook.ActiveSheet
-    If SpecGetType(sh.Name) <> 7 Then
+    Set Sh = Application.ThisWorkbook.ActiveSheet
+    If SpecGetType(Sh.Name) <> 7 Then
         MsgBox ("Перейдите на лист с ручной спецификацией (заканчивается на _спец) и повторите")
         Paste2Sheet = False
         Exit Function
     End If
-    startpos = GetSizeSheet(sh)(1) + 2
+    startpos = GetSizeSheet(Sh)(1) + 2
     endpos = startpos + UBound(array_in, 1) - 1
-    sh.Range(sh.Cells(startpos, 1), sh.Cells(endpos, max_col_man)) = array_in
+    Sh.Range(Sh.Cells(startpos, 1), Sh.Cells(endpos, max_col_man)) = array_in
     r = OutEnded()
     r = ManualCheck()
 End Function
@@ -1551,11 +1584,11 @@ Function SheetExport()
     r = OutPrepare()
     nm = ActiveWorkbook.ActiveSheet.Name
     If SpecGetType(nm) <> 7 Then
-        Set sh = ActiveWorkbook.ActiveSheet
-        lsize = GetSizeSheet(sh)
+        Set Sh = ActiveWorkbook.ActiveSheet
+        lsize = GetSizeSheet(Sh)
         n_row = lsize(1)
         n_col = lsize(2)
-        Set Data_out = sh.Range(sh.Cells(1, 1), sh.Cells(n_row, n_col))
+        Set Data_out = Sh.Range(Sh.Cells(1, 1), Sh.Cells(n_row, n_col))
         filename$ = ThisWorkbook.path & "\list\Спец_" & nm & ".pdf"
         type_print = 0
         h = GetHeightSheet()
@@ -2172,7 +2205,9 @@ Function SpecProkat(ByVal prokat As Variant, ByVal n_prokat As Integer, _
                                 pos_out(i, 3) = name_pr & " " & prokat(j, col_pr_prof) & " L = п.м."
                             End If
                             pos_out(i, 4) = pos_out(i, 4) + (l * n_el)
-                            If pos_out(i, 5) <> we And pos_out(i, 5) > 0 Then MsgBox (pos_out(i, 5))
+                            If pos_out(i, 5) <> we And pos_out(i, 5) > 0 Then
+                                hh = 1
+                            End If
                             pos_out(i, 5) = we
                             pos_out(i, 6) = pos_out(i, 6) + Round_w((l * n_el * we), n_round_w)
                         Else
@@ -2395,6 +2430,7 @@ Function Spec_AS(ByRef all_data As Variant, ByVal type_spec As Integer) As Varia
                 nSubPos = GetNSubpos(subpos, type_spec)
                 pos_out(2, n_col_sb) = subpos & vbLf & "(" & nSubPos & "шт)"
             Else
+                nSubPos = 1
                 pos_out(2, n_col_sb) = subpos
             End If
             pos_out_tmp = SpecOneSubpos(all_data, subpos, type_spec)
@@ -2677,7 +2713,6 @@ Function Spec_KM(ByRef all_data As Variant) As Variant
                     obozn = mat(j, col_m_obozn): If obozn <> "" Then obozn = " по " & obozn
                     ed = mat(j, col_m_edizm)
                     qty = mat(j, col_qty)
-                    
                     usl = 0
                     For Each n In naen_mat
                         usl = usl + InStr(naen, n)
@@ -2701,10 +2736,11 @@ End Function
 
 
 Function Spec_KZH(ByRef all_data As Variant) As Variant
-
     Set name_subpos = pos_data.Item("name") 'Словарь с именами сборок
     un_child = ArraySort(pos_data.Item("child").keys())
     un_parent = ArraySort(pos_data.Item("parent").keys())
+    If IsEmpty(un_child) Then un_child = Array()
+    If IsEmpty(un_parent) Then un_parent = Array()
     'Выясняем - какие диаметры и какие классы арматуры есть для всех сборок
     'заодно отсортируем арматуру в закладных деталях и прокат
     n_row = UBound(all_data, 1)
@@ -2760,9 +2796,10 @@ Function Spec_KZH(ByRef all_data As Variant) As Variant
 
     'Сформируем общую таблицу диаметров и классов арматуры
     n_row = 5
-    If UBound(un_parent) >= 0 Then n_row = n_row + UBound(un_parent) + 1
+    If UBound(un_parent) >= 0 Then n_row = n_row + UBound(un_parent)
     If pos_data.exists("-") Then n_row = n_row + 1
-    Dim pos_out: ReDim pos_out(n_row, 1)
+    sum_row = 0: If n_row - 5 > 1 Then sum_row = 1
+    Dim pos_out: ReDim pos_out(n_row + sum_row, 1)
     For j = 1 To 4
         If Not IsEmpty(arm_arr(4 + j)) Then
             If ((j = 1) Or (j = 2)) Then
@@ -2779,7 +2816,7 @@ Function Spec_KZH(ByRef all_data As Variant) As Variant
                     un_diam = ArrayUniqValColumn(arm_current_class, col_diametr)
                     n_diam = UBound(un_diam, 1)
                     current_size = UBound(pos_out, 2)
-                    ReDim Preserve pos_out(n_row, current_size + n_diam + 1)
+                    ReDim Preserve pos_out(n_row + sum_row, current_size + n_diam + 1)
                     For k = 1 To n_diam + 1
                         pos_out(1, current_size + k) = n_type
                         pos_out(2, current_size + k) = "Арматура класса"
@@ -2829,7 +2866,7 @@ Function Spec_KZH(ByRef all_data As Variant) As Variant
             If ((n_prokat_z) And (j = 4)) Then flag = 1
             If flag Then
                 current_size = UBound(pos_out, 2)
-                ReDim Preserve pos_out(n_row, current_size + 1)
+                ReDim Preserve pos_out(n_row + sum_row, current_size + 1)
                 pos_out(1, current_size + 1) = n_type
                 For kk = 2 To 5
                     pos_out(kk, current_size + 1) = "Всего"
@@ -2838,7 +2875,7 @@ Function Spec_KZH(ByRef all_data As Variant) As Variant
         End If
     Next j
     current_size = UBound(pos_out, 2)
-    ReDim Preserve pos_out(n_row, current_size + 1)
+    ReDim Preserve pos_out(n_row + sum_row, current_size + 1)
     For kk = 1 To 5
         pos_out(kk, current_size + 1) = "Всего"
     Next kk
@@ -2853,11 +2890,11 @@ Function Spec_KZH(ByRef all_data As Variant) As Variant
     Set weight_index = CreateObject("Scripting.Dictionary")
     weight_index.comparemode = 1
     For k = 6 To n_row
-        If (pos_data.exists("-") And k = n_row) Or (UBound(un_parent) < 0) Then
+        If (pos_data.exists("-") And k = n_row) Or (UBound(un_parent) <= 0) Then
             subpos = "-"
             nSubPos = 1
         Else
-            subpos = un_parent(k - 6)
+            subpos = un_parent(k - 5)
             nSubPos = pos_data.Item("qty").Item("-_" & subpos)
             If nSubPos < 1 Then
                 MsgBox ("Не определено кол-во сборок " & subpos & ", принято 1 шт.")
@@ -2945,6 +2982,14 @@ Function Spec_KZH(ByRef all_data As Variant) As Variant
             End If
         Next j
     Next i
+    If sum_row Then
+        pos_out(n_row + sum_row, 1) = "Итого"
+        For i = 2 To UBound(pos_out, 2)
+            For j = 6 To n_row
+                pos_out(n_row + sum_row, i) = pos_out(n_row + sum_row, i) + pos_out(j, i)
+            Next
+        Next
+    End If
     For i = 2 To UBound(pos_out, 2)
         For j = 6 To n_row
             If IsEmpty(pos_out(j, i)) Then pos_out(j, i) = "-"
