@@ -2,7 +2,7 @@ Attribute VB_Name = "calc"
 Option Compare Text
 Option Base 1
 
-Public Const macro_version As String = "2.5"
+Public Const macro_version As String = "2.6"
 'Тип округления
 ' 1 - округление в большую сторону
 ' 2 - округление стандартным round
@@ -96,6 +96,9 @@ Function ControlSumEl(ByVal array_in As Variant) As String
     qty = array_in(col_qty)
     chksum = array_in(col_chksum)
     sparent = array_in(col_parent)
+    If sparent = 0 Then sparent = "-"
+    If subpos = 0 Then subpos = "-"
+    If pos = 0 Then pos = "-"
     Select Case type_el
         Case t_arm
             isel = 1
@@ -227,7 +230,7 @@ Function DataAddNullSubpos(ByVal array_in As Variant) As Variant
     arr_subpos = ArrayUniqValColumn(array_in, col_sub_pos)
     add_txt = Empty
     For Each current_subpos In arr_subpos
-        If InStr(current_subpos, "-") = 0 Then
+        If current_subpos <> "-" Then
             'Проеряем - есть ли маркировка для главных сборок
             seach_subpos = ArraySelectParam(array_in, current_subpos, col_sub_pos, t_subpos, col_type_el)
             If IsEmpty(seach_subpos) Then
@@ -247,7 +250,7 @@ Function DataAddNullSubpos(ByVal array_in As Variant) As Variant
                 add_subpos(1, col_sub_pos) = current_subpos
                 add_subpos(1, col_type_el) = t_subpos
                 add_subpos(1, col_pos) = current_subpos
-                add_subpos(1, col_m_naen) = naen
+                add_subpos(1, col_m_naen) = Replace(naen, "@", ".")
                 add_subpos(1, col_m_obozn) = obozn
                 add_subpos(1, col_qty) = 1
                 add_subpos(1, col_chksum) = ControlSumEl(add_subpos)
@@ -298,13 +301,19 @@ Function DataCheck(ByVal array_in As Variant) As Variant
                 array_in(i, col_type_el) = t_mat
                 array_in(i, col_m_weight) = "-"
             End If
+
             If type_el <> Empty Then
                 If array_in(i, col_sub_pos) = "" Then array_in(i, col_sub_pos) = "-"
                 If array_in(i, col_sub_pos) = " " Then array_in(i, col_sub_pos) = "-"
                 If array_in(i, col_sub_pos) = 0 Then array_in(i, col_sub_pos) = "-"
                 If array_in(i, col_sub_pos) = "-" Then array_in(i, col_parent) = "-"
                 If IsEmpty(array_in(i, col_parent)) Then array_in(i, col_parent) = "-"
+                array_in(i, col_sub_pos) = Replace(array_in(i, col_sub_pos), "@", ".")
+                array_in(i, col_parent) = Replace(array_in(i, col_parent), "@", ".")
+                array_in(i, col_marka) = Replace(array_in(i, col_marka), "@", ".")
+                array_in(i, col_pos) = Replace(array_in(i, col_pos), "@", ".")
             End If
+            
             'Вычисление и проверка контрольных сумм
             array_in(i, col_chksum) = ControlSumEl(ArrayRow(array_in, i))
             n_row = n_row + 1
@@ -344,7 +353,7 @@ Function DataIsShort(ByVal array_in As Variant) As Boolean
 'Если номер столбца с типами элементов отличается от col_type_el - то первый столбец, скорее всего - количество элементов
     colum = 0
     n_row = Int(UBound(array_in, 1) / 2) + 1
-    For j = 1 To col_type_el + 1
+    For j = col_type_el To col_type_el + 1
         n = 0
         For i = 1 To n_row
             If t_arm = array_in(i, j) Then n = n + 1
@@ -395,6 +404,41 @@ Function DataNameSubpos(ByVal sub_pos_arr As Variant) As Object
     Set DataNameSubpos = name_subpos
 End Function
 
+Function DataIsWall(ByVal nm As String) As Variant
+    array_in = ReadTxt(ThisWorkbook.path & "\import\" & nm, 1, vbTab, vbNewLine)
+    n_row = UBound(array_in, 1)
+    Dim pos_out: ReDim pos_out(n_row - 1, max_col)
+    For i = 2 To n_row
+        subpos = Replace(array_in(i, 1), ".", "@")
+        naen = array_in(i, 2)
+        obozn = "-"
+        p_start = 0
+        If InStr(naen, "(ТУ") Then p_start = InStr(naen, "(ТУ") - 1
+        If InStr(naen, "(ГОСТ") Then p_start = InStr(naen, "(ГОСТ") - 1
+        If p_start > 0 Then
+            p_end = InStr(naen, ")") + 1
+            t_start = Trim(Mid(naen, 1, p_start))
+            t_end = Trim(Mid(naen, p_end, Len(naen)))
+            obozn = Trim(Mid(naen, p_start + 2, p_end - p_start - 3))
+            naen = t_start & " " & t_end
+        End If
+        t_sl = array_in(i, 3)
+        If t_sl > 0.1 Then naen = naen & " t=" & Str(t_sl) & "мм."
+        qty = array_in(i, 4)
+        prim = "кв.м."
+        
+        n_row_out = i - 1
+        pos_out(n_row_out, col_sub_pos) = subpos
+        pos_out(n_row_out, col_type_el) = t_mat
+        pos_out(n_row_out, col_qty) = qty
+        pos_out(n_row_out, col_m_obozn) = obozn
+        pos_out(n_row_out, col_m_naen) = naen
+        pos_out(n_row_out, col_m_weight) = "-"
+        pos_out(n_row_out, col_m_edizm) = prim
+    Next i
+    DataIsWall = pos_out
+End Function
+
 Function DataRead(ByVal nm As String) As Variant
     errread = 0
     Select Case SpecGetType(nm)
@@ -430,7 +474,9 @@ Function DataRead(ByVal nm As String) As Variant
             Else
                 'Читаем из файла
                 out_data = ReadFile(file(1, 1) & ".txt")
-                if instr(out_data(1,1), ""
+                If InStr(out_data(1, 1), "Площадь Слоя/Компонента") Then
+                    out_data = DataIsWall(file(1, 1) & ".txt")
+                End If
             End If
     End Select
     If IsEmpty(out_data) Then DataRead = Empty: Exit Function
@@ -1146,10 +1192,6 @@ Function ManualSpec(ByVal nm As String, Optional ByVal add_array As Variant) As 
     Else
         flag_add = 0
         mod_array = Empty
-        'If Not ManualCheck() Then
-            'ManualSpec = Empty
-            'Exit Function
-        'End If
     End If
     Set spec_sheet = Application.ThisWorkbook.Sheets(nm)
     sheet_size = GetSizeSheet(spec_sheet)
@@ -1161,8 +1203,8 @@ Function ManualSpec(ByVal nm As String, Optional ByVal add_array As Variant) As 
     For i = istart To n_row
         row = ArrayRow(spec, i)
 
-        subpos = row(col_man_subpos)  ' Марка элемента
-        pos = row(col_man_pos)  ' Поз.
+        subpos = Replace(row(col_man_subpos), ".", "@")  ' Марка элемента
+        pos = Replace(row(col_man_pos), ".", "@")  ' Поз.
         obozn = row(col_man_obozn) ' Обозначение
         naen = row(col_man_naen) ' Наименование
         qty = row(col_man_qty) ' Кол-во на один элемент
@@ -1231,9 +1273,8 @@ Function ManualSpec(ByVal nm As String, Optional ByVal add_array As Variant) As 
                 ReDim param(max_col)
                 param = ArrayRow(pos_out, n_row_out)
                 current_sum = ControlSumEl(param)
-                current_sum = Split(current_sum, "_")(0) & Split(current_sum, "_")(2)
                 For kk = 1 To UBound(mod_array, 1)
-                    mod_sum = Split(mod_array(kk, col_chksum), "_")(0) & Split(mod_array(kk, col_chksum), "_")(2)
+                    mod_sum = mod_array(kk, col_chksum)
                     If mod_sum = current_sum Then
                         r = CeilSetValue(spec_sheet.Cells(i, col_man_qty), mod_array(kk, col_qty), "mod")
                     End If
@@ -1717,7 +1758,7 @@ Function SpecArm(ByVal arm As Variant, ByVal n_arm As Integer, _
                 If UserForm2.arm_pm_CB.Value Then fon = 1
                 mp = arm(j, col_mp)
                 gnut = arm(j, col_gnut)
-                prim = "": If arm(j, col_gnut) Then prim = "*"
+                prim = "": If arm(j, col_gnut) And Not UserForm2.arm_pm_CB.Value Then prim = "*"
                 qty = arm(j, col_qty)
                 n_el = qty / nSubPos
                 length_pos = arm(j, col_length) / 1000
@@ -1726,7 +1767,7 @@ Function SpecArm(ByVal arm As Variant, ByVal n_arm As Integer, _
                 Case 1
                     pos_out(i, 1) = arm(j, col_sub_pos) & n_txt
                     If (UserForm2.keep_pos_CB.Value And UserForm2.arm_pm_CB.Value) Or Not (UserForm2.arm_pm_CB.Value) Then
-                        pos_out(i, 2) = arm(j, col_pos) & prim
+                        pos_out(i, 2) = arm(j, col_pos)
                     Else
                         pos_out(i, 2) = " "
                     End If
@@ -1742,18 +1783,18 @@ Function SpecArm(ByVal arm As Variant, ByVal n_arm As Integer, _
                     End If
                 Case Else
                     If (UserForm2.keep_pos_CB.Value And UserForm2.arm_pm_CB.Value) Or Not (UserForm2.arm_pm_CB.Value) Then
-                        pos_out(i, 1) = arm(j, col_pos) & prim
+                        pos_out(i, 1) = arm(j, col_pos)
                     Else
                         pos_out(i, 1) = " "
                     End If
                     pos_out(i, 2) = GetGOSTForKlass(klass)
                     If fon Then
-                        pos_out(i, 3) = symb_diam & diametr & " " & klass & " L= п.м."
+                        pos_out(i, 3) = symb_diam & diametr & " " & klass & " L= п.м." & prim
                         pos_out(i, 4) = pos_out(i, 4) + l_spec
                         pos_out(i, 5) = weight_pm
                         pos_out(i, 6) = pos_out(i, 6) + l_spec * weight_pm
                     Else
-                        pos_out(i, 3) = symb_diam & diametr & " " & klass & " L=" & length_pos * 1000 & "мм."
+                        pos_out(i, 3) = symb_diam & diametr & " " & klass & " L=" & length_pos * 1000 & "мм." & prim
                         pos_out(i, 4) = pos_out(i, 4) + n_el
                         pos_out(i, 5) = Round_w(weight_pm * length_pos, n_round_w)
                         pos_out(i, 6) = pos_out(i, 6) + n_el * pos_out(i, 5)
@@ -2490,6 +2531,14 @@ Function Spec_AS(ByRef all_data As Variant, ByVal type_spec As Integer) As Varia
             End If
         Next i
     End If
+    
+    n_col_naen = 3: If type_spec = 1 Then n_col_naen = 2
+    For i = 2 To UBound(pos_out, 1)
+        If (Right(Trim(UCase(pos_out(i, n_col_naen))), 1) = "*") Then
+            pos_out(i, n_col_naen) = Left(pos_out(i, n_col_naen), Len(pos_out(i, n_col_naen)) - 1)
+            pos_out(i, 1) = pos_out(i, 1) & "*"
+        End If
+    Next i
     Spec_AS = pos_out
 End Function
 

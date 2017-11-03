@@ -101,20 +101,6 @@ Private Sub CommandButtonUpdate_Click()
     r = Spec_Select(sNameSheet, "")
 End Sub
 
-Function ExportAllMod() As Boolean
-    ExportMod ("calc")
-    ExportMod ("common")
-    ExportMod ("manual")
-    ExportMod ("surf")
-    ExportMod ("UserForm2")
-End Function
-
-Function ExportMod(ByVal namemod As String) As Boolean
-    On Error Resume Next
-    ThisWorkbook.VBProject.VBComponents.Item(namemod).Export CodePath & _
-        namemod & ".bas"
-End Function
-
 Private Sub FormatButton_Click()
     r = FormatTable()
 End Sub
@@ -124,7 +110,7 @@ Sub FormRebild()
     com_ver.Caption = common_version
     man_ver.Caption = manual_version
     surf_ver.Caption = surf_version
-    form_ver.Caption = "2.1"
+    form_ver.Caption = "2.3"
     symb_diam = ChrW(8960)
     remat
 End Sub
@@ -225,14 +211,15 @@ Private Sub SortamentPatht_Change()
     SortamentPath = CheckPath(SortamentPatht.Text)
 End Sub
 
-Private Sub UserForm_QueryClose(Cancel As Integer, CloseMode As Integer)
-    If CloseMode = 0 Then
-        FormRebild
-        Cancel = 1
-    End If
-End Sub
+'Private Sub UserForm_QueryClose(Cancel As Integer, CloseMode As Integer)
+    'If CloseMode = 0 Then
+        'FormRebild
+        'Cancel = 1
+    'End If
+'End Sub
 
 Function ReadConstr()
+    If IsModEx("calc") Then
     Set materialbook = GetObject(MaterialPath & "constr.xlsm")
     Set constr_index = CreateObject("Scripting.Dictionary")
     constr_index.comparemode = 1
@@ -286,5 +273,6 @@ Function ReadConstr()
         constr_index.Item(sheet_name & "constr") = constr_list
     Next
     Set ReadConstr = constr_index
+    End If
 End Function
 

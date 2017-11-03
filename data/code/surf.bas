@@ -2,7 +2,7 @@ Attribute VB_Name = "surf"
 Option Compare Text
 Option Base 1
 
-Public Const surf_version As String = "0.4"
+Public Const surf_version As String = "0.5"
 
 Public Const col_s_numb_zone As Integer = 1
 Public Const col_s_name_zone As Integer = 2

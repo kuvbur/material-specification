@@ -1,7 +1,7 @@
 Attribute VB_Name = "manual"
 Option Compare Text
 Option Base 1
-Public Const manual_version As String = "2.0"
+Public Const manual_version As String = "2.1"
 '-------------------------------------------------------
 'Описание файла сортамента
 Public Const col_gost_spec As Integer = 1
