@@ -2,7 +2,7 @@ Attribute VB_Name = "surf"
 Option Compare Text
 Option Base 1
 
-Public Const surf_version As String = "0.5"
+Public Const surf_version As String = "0.9"
 
 Public Const col_s_numb_zone As Integer = 1
 Public Const col_s_name_zone As Integer = 2
@@ -150,6 +150,14 @@ Function FormatSpec_Ved(ByVal Data_out As Range, ByVal n_row As Integer, ByVal n
     Range(Data_out.Cells(1, 3), Data_out.Cells(1, n_col - 1)).Merge
     Range(Data_out.Cells(1, n_col), Data_out.Cells(2, n_col)).Merge
 
+    For i = 1 To n_row
+        If InStr(Data_out.Cells(i, 1), "Общяя площадь отделки, кв.м.") > 0 Then
+            n_all = n_row
+            n_row = i - 1
+            n_start_all = i
+        End If
+    Next i
+
     n_start = 3
     n_end = 3
     For i = 3 To n_row
@@ -187,13 +195,42 @@ Function FormatSpec_Ved(ByVal Data_out As Range, ByVal n_row As Integer, ByVal n
             End If
         Next i
     Next n_c
-    s_mat = 45
-    s_ar = 10
-    s1 = 15
-    s2 = 35
-    sp = 20
+
+    For n_c = 3 To n_col - 1
+        If InStr(Data_out.Cells(2, n_c), "Площадь") = 0 And InStr(Data_out.Cells(2, n_c), "Высота") = 0 Then
+            temp_1 = Data_out.Cells(n_start, n_c).Value
+            n_start = 3
+            n_end = 3
+            For i = 3 To n_row
+                temp_2 = Data_out.Cells(i, n_c).Value
+                If temp_1 <> temp_2 And temp_2 <> Empty Then
+                    temp_1 = temp_2
+                    If n_end > n_start Then Range(Data_out.Cells(n_start, n_c), Data_out.Cells(n_end, n_c)).Merge
+                    n_start = i
+                Else
+                    n_end = i
+                End If
+                If i = n_row And temp_1 = temp_2 And temp_2 <> Empty Then
+                    n_end = i
+                    Range(Data_out.Cells(n_start, n_c), Data_out.Cells(n_end, n_c)).Merge
+                End If
+            Next i
+        End If
+    Next n_c
+    
+    Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_start_all, 4)).Merge
+    For i = n_start_all + 1 To n_all
+        Range(Data_out.Cells(i, 1), Data_out.Cells(i, 3)).Merge
+    Next i
+    
+    s_mat = 200
+    s_ar = 30
+    s1 = 30
+    s2 = 120
+    sp = 100
     sall = s1 + s2 + s_mat * 2 + s_ar * 2 + sp
     
+
     If Data_out.Cells(2, 7).Value = "Колонн" Then
         sall = sall + s_mat + s_ar
         If Data_out.Cells(2, 9).Value = "Низа стен/колонн" Then
@@ -204,7 +241,7 @@ Function FormatSpec_Ved(ByVal Data_out As Range, ByVal n_row As Integer, ByVal n
             sall = sall + s_mat + s_ar * 2
         End If
     End If
-    With Data_out.Interior
+    With Range(Data_out.Cells(1, 1), Data_out.Cells(n_start_all - 1, n_col)).Interior
         .PatternColorIndex = xlAutomatic
         .ThemeColor = xlThemeColorDark1
         .TintAndShade = -0.249977111117893
@@ -214,80 +251,169 @@ Function FormatSpec_Ved(ByVal Data_out As Range, ByVal n_row As Integer, ByVal n
     End With
     Data_out.Borders(xlDiagonalDown).LineStyle = xlNone
     Data_out.Borders(xlDiagonalUp).LineStyle = xlNone
-    With Data_out.Borders(xlEdgeLeft)
+    With Range(Data_out.Cells(1, 1), Data_out.Cells(n_start_all - 1, n_col)).Borders(xlEdgeLeft)
         .LineStyle = xlContinuous
         .ColorIndex = 0
         .TintAndShade = 0
         .Weight = xlThin
     End With
-    With Data_out.Borders(xlEdgeTop)
+    With Range(Data_out.Cells(1, 1), Data_out.Cells(n_start_all - 1, n_col)).Borders(xlEdgeTop)
         .LineStyle = xlContinuous
         .ColorIndex = 0
         .TintAndShade = 0
         .Weight = xlThin
     End With
-    With Data_out.Borders(xlEdgeBottom)
+    With Range(Data_out.Cells(1, 1), Data_out.Cells(n_start_all - 1, n_col)).Borders(xlEdgeBottom)
         .LineStyle = xlContinuous
         .ColorIndex = 0
         .TintAndShade = 0
         .Weight = xlThin
     End With
-    With Data_out.Borders(xlEdgeRight)
+    With Range(Data_out.Cells(1, 1), Data_out.Cells(n_start_all - 1, n_col)).Borders(xlEdgeRight)
         .LineStyle = xlContinuous
         .ColorIndex = 0
         .TintAndShade = 0
         .Weight = xlThin
     End With
-    With Data_out.Borders(xlInsideVertical)
+    With Range(Data_out.Cells(1, 1), Data_out.Cells(n_start_all - 1, n_col)).Borders(xlInsideVertical)
         .LineStyle = xlContinuous
         .ColorIndex = 0
         .TintAndShade = 0
         .Weight = xlThin
     End With
-    With Data_out.Borders(xlInsideHorizontal)
+    With Range(Data_out.Cells(1, 1), Data_out.Cells(n_start_all - 1, n_col)).Borders(xlInsideHorizontal)
         .LineStyle = xlContinuous
         .ColorIndex = 0
         .TintAndShade = 0
         .Weight = xlThin
     End With
-    Data_out.Borders(xlDiagonalDown).LineStyle = xlNone
-    Data_out.Borders(xlDiagonalUp).LineStyle = xlNone
-    With Data_out.Borders(xlEdgeLeft)
+    Range(Data_out.Cells(1, 1), Data_out.Cells(n_start_all - 1, n_col)).Borders(xlDiagonalDown).LineStyle = xlNone
+    Range(Data_out.Cells(1, 1), Data_out.Cells(n_start_all - 1, n_col)).Borders(xlDiagonalUp).LineStyle = xlNone
+    With Range(Data_out.Cells(1, 1), Data_out.Cells(n_start_all - 1, n_col)).Borders(xlEdgeLeft)
         .LineStyle = xlContinuous
         .ColorIndex = 0
         .TintAndShade = 0
         .Weight = xlMedium
     End With
-    With Data_out.Borders(xlEdgeTop)
+    With Range(Data_out.Cells(1, 1), Data_out.Cells(n_start_all - 1, n_col)).Borders(xlEdgeTop)
         .LineStyle = xlContinuous
         .ColorIndex = 0
         .TintAndShade = 0
         .Weight = xlMedium
     End With
-    With Data_out.Borders(xlEdgeBottom)
+    With Range(Data_out.Cells(1, 1), Data_out.Cells(n_start_all - 1, n_col)).Borders(xlEdgeBottom)
         .LineStyle = xlContinuous
         .ColorIndex = 0
         .TintAndShade = 0
         .Weight = xlMedium
     End With
-    With Data_out.Borders(xlEdgeRight)
+    With Range(Data_out.Cells(1, 1), Data_out.Cells(n_start_all - 1, n_col)).Borders(xlEdgeRight)
         .LineStyle = xlContinuous
         .ColorIndex = 0
         .TintAndShade = 0
         .Weight = xlMedium
     End With
-    With Data_out.Borders(xlInsideVertical)
+    With Range(Data_out.Cells(1, 1), Data_out.Cells(n_start_all - 1, n_col)).Borders(xlInsideVertical)
         .LineStyle = xlContinuous
         .ColorIndex = xlAutomatic
         .TintAndShade = 0
         .Weight = xlThin
     End With
-    With Data_out.Borders(xlInsideHorizontal)
+    With Range(Data_out.Cells(1, 1), Data_out.Cells(n_start_all - 1, n_col)).Borders(xlInsideHorizontal)
         .LineStyle = xlContinuous
         .ColorIndex = xlAutomatic
         .TintAndShade = 0
         .Weight = xlThin
     End With
+    
+    
+    With Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Interior
+        .PatternColorIndex = xlAutomatic
+        .ThemeColor = xlThemeColorDark1
+        .TintAndShade = -0.249977111117893
+        .Pattern = xlNone
+        .TintAndShade = 0
+        .PatternTintAndShade = 0
+    End With
+    Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Borders(xlDiagonalDown).LineStyle = xlNone
+    Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Borders(xlDiagonalUp).LineStyle = xlNone
+    With Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Borders(xlEdgeLeft)
+        .LineStyle = xlContinuous
+        .ColorIndex = 0
+        .TintAndShade = 0
+        .Weight = xlThin
+    End With
+    With Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Borders(xlEdgeTop)
+        .LineStyle = xlContinuous
+        .ColorIndex = 0
+        .TintAndShade = 0
+        .Weight = xlThin
+    End With
+    With Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Borders(xlEdgeBottom)
+        .LineStyle = xlContinuous
+        .ColorIndex = 0
+        .TintAndShade = 0
+        .Weight = xlThin
+    End With
+    With Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Borders(xlEdgeRight)
+        .LineStyle = xlContinuous
+        .ColorIndex = 0
+        .TintAndShade = 0
+        .Weight = xlThin
+    End With
+    With Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Borders(xlInsideVertical)
+        .LineStyle = xlContinuous
+        .ColorIndex = 0
+        .TintAndShade = 0
+        .Weight = xlThin
+    End With
+    With Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Borders(xlInsideHorizontal)
+        .LineStyle = xlContinuous
+        .ColorIndex = 0
+        .TintAndShade = 0
+        .Weight = xlThin
+    End With
+    Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Borders(xlDiagonalDown).LineStyle = xlNone
+    Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Borders(xlDiagonalUp).LineStyle = xlNone
+    With Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Borders(xlEdgeLeft)
+        .LineStyle = xlContinuous
+        .ColorIndex = 0
+        .TintAndShade = 0
+        .Weight = xlMedium
+    End With
+    With Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Borders(xlEdgeTop)
+        .LineStyle = xlContinuous
+        .ColorIndex = 0
+        .TintAndShade = 0
+        .Weight = xlMedium
+    End With
+    With Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Borders(xlEdgeBottom)
+        .LineStyle = xlContinuous
+        .ColorIndex = 0
+        .TintAndShade = 0
+        .Weight = xlMedium
+    End With
+    With Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Borders(xlEdgeRight)
+        .LineStyle = xlContinuous
+        .ColorIndex = 0
+        .TintAndShade = 0
+        .Weight = xlMedium
+    End With
+    With Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Borders(xlInsideVertical)
+        .LineStyle = xlContinuous
+        .ColorIndex = xlAutomatic
+        .TintAndShade = 0
+        .Weight = xlThin
+    End With
+    With Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Borders(xlInsideHorizontal)
+        .LineStyle = xlContinuous
+        .ColorIndex = xlAutomatic
+        .TintAndShade = 0
+        .Weight = xlThin
+    End With
+    
+    
+    
     With Data_out.Font
         .Name = "ISOCPEUR"
         .FontStyle = "обычный"
@@ -329,33 +455,46 @@ Function FormatSpec_Ved(ByVal Data_out As Range, ByVal n_row As Integer, ByVal n
         .ThemeFont = xlThemeFontNone
     End With
     
-    koeff = (sall / 209) * 100
+    Range(Data_out.Cells(1, 1), Data_out.Cells(1, 1)).ColumnWidth = s1
+    koeff = s1 / Range(Data_out.Cells(1, 1), Data_out.Cells(1, 1)).Width
+    
     dblPoints = Application.CentimetersToPoints(1)
-    Range(Data_out.Cells(1, 1), Data_out.Cells(n_row, n_col)).RowHeight = dblPoints * 0.8
+    Range(Data_out.Cells(1, 1), Data_out.Cells(n_row, n_col)).RowHeight = dblPoints * 0.9
     Range(Data_out.Cells(1, 1), Data_out.Cells(n_row, n_col)).Rows.AutoFit
     Range(Data_out.Cells(1, 1), Data_out.Cells(1, n_col)).RowHeight = dblPoints * 0.5
-    Range(Data_out.Cells(1, 1), Data_out.Cells(1, 1)).ColumnWidth = (s1 / sall) * koeff
-    Range(Data_out.Cells(1, 2), Data_out.Cells(1, 2)).ColumnWidth = (s2 / sall) * koeff
-    Range(Data_out.Cells(1, 3), Data_out.Cells(1, 3)).ColumnWidth = (s_mat / sall) * koeff
-    Range(Data_out.Cells(1, 4), Data_out.Cells(1, 4)).ColumnWidth = (s_ar / sall) * koeff
-    Range(Data_out.Cells(1, 5), Data_out.Cells(1, 5)).ColumnWidth = (s_mat / sall) * koeff
-    Range(Data_out.Cells(1, 6), Data_out.Cells(1, 6)).ColumnWidth = (s_ar / sall) * koeff
+    
+    Range(Data_out.Cells(1, 1), Data_out.Cells(1, 1)).ColumnWidth = s1 * koeff
+    Range(Data_out.Cells(1, 2), Data_out.Cells(1, 2)).ColumnWidth = s2 * koeff
+    Range(Data_out.Cells(1, 3), Data_out.Cells(1, 3)).ColumnWidth = s_mat * koeff
+    Range(Data_out.Cells(1, 4), Data_out.Cells(1, 4)).ColumnWidth = s_ar * koeff
+    Range(Data_out.Cells(1, 5), Data_out.Cells(1, 5)).ColumnWidth = s_mat * koeff
+    Range(Data_out.Cells(1, 6), Data_out.Cells(1, 6)).ColumnWidth = s_ar * koeff
     If Data_out.Cells(2, 7).Value = "Колонн" Then
-        Range(Data_out.Cells(1, 7), Data_out.Cells(1, 7)).ColumnWidth = (s_mat / sall) * koeff
-        Range(Data_out.Cells(1, 8), Data_out.Cells(1, 8)).ColumnWidth = (s_ar / sall) * koeff
+        Range(Data_out.Cells(1, 7), Data_out.Cells(1, 7)).ColumnWidth = s_mat * koeff
+        Range(Data_out.Cells(1, 8), Data_out.Cells(1, 8)).ColumnWidth = s_ar * koeff
         If Data_out.Cells(2, 9).Value = "Низа стен/колонн" Then
-            Range(Data_out.Cells(1, 9), Data_out.Cells(1, 9)).ColumnWidth = (s_mat / sall) * koeff
-            Range(Data_out.Cells(1, 10), Data_out.Cells(1, 10)).ColumnWidth = (s_ar / sall) * koeff
-            Range(Data_out.Cells(1, 11), Data_out.Cells(1, 11)).ColumnWidth = (s_ar / sall) * koeff
+            Range(Data_out.Cells(1, 9), Data_out.Cells(1, 9)).ColumnWidth = s_mat * koeff
+            Range(Data_out.Cells(1, 10), Data_out.Cells(1, 10)).ColumnWidth = s_ar * koeff
+            Range(Data_out.Cells(1, 11), Data_out.Cells(1, 11)).ColumnWidth = s_ar * koeff
         End If
     Else
         If Data_out.Cells(2, 7).Value = "Низа стен/колонн" Then
-            Range(Data_out.Cells(1, 7), Data_out.Cells(1, 7)).ColumnWidth = (s_mat / sall) * koeff
-            Range(Data_out.Cells(1, 8), Data_out.Cells(1, 8)).ColumnWidth = (s_ar / sall) * koeff
-            Range(Data_out.Cells(1, 9), Data_out.Cells(1, 9)).ColumnWidth = (s_ar / sall) * koeff
+            Range(Data_out.Cells(1, 7), Data_out.Cells(1, 7)).ColumnWidth = s_mat * koeff
+            Range(Data_out.Cells(1, 8), Data_out.Cells(1, 8)).ColumnWidth = s_ar * koeff
+            Range(Data_out.Cells(1, 9), Data_out.Cells(1, 9)).ColumnWidth = s_ar * koeff
         End If
     End If
-    Range(Data_out.Cells(1, n_col), Data_out.Cells(1, n_col)).ColumnWidth = (sp / sall) * koeff
+    For n_c = 1 To n_col
+        g = Data_out.Cells(2, n_c).Value
+        If InStr(g, "Площадь") Or InStr(g, "Высота") Then
+            Data_out.Cells(2, n_c).Orientation = 90
+            Range(Data_out.Cells(3, n_c), Data_out.Cells(n_row, n_c)).Font.Size = 11
+            Range(Data_out.Cells(3, n_c), Data_out.Cells(n_row, n_c)).ShrinkToFit = True
+        End If
+        g = Data_out.Cells(1, n_c).Value
+        If InStr(g, "Номер") Then Data_out.Cells(1, n_c).Orientation = 90
+    Next n_c
+    Range(Data_out.Cells(1, n_col), Data_out.Cells(1, n_col)).ColumnWidth = sp * koeff
     FormatSpec_Ved = True
 End Function
 
@@ -519,7 +658,7 @@ Function ReadVed(ByVal lastfilespec As String) As Variant
         pos_out(1) = out_data
         pos_out(2) = rules
     Else
-        r = AddRules(lastfilespec, add_rule.keys)
+        r = AddRules(lastfilespec, add_rule.Keys)
         pos_out(1) = Empty
         pos_out(2) = Empty
     End If
@@ -664,7 +803,7 @@ Function Spec_POL(ByRef out_data As Variant) As Variant
         t_zone = t_zone + t_un_zone(i)
         pos_out(j, 1) = type_pol
         pos_out(j, 2) = t_zone
-        pos_out(j, 3) = Round_w(pol_area, n_round_area)
+        pos_out(j, 3) = Round_w(pol_area * k_zap_total, n_round_area)
         pos_out(j, 4) = Round_w(pol_perim / 1000, n_round_area)
     Next j
     Spec_POL = pos_out
@@ -679,7 +818,10 @@ Function Spec_VED(ByRef all_data As Variant) As Variant
         Exit Function
     End If
     Set zone = CreateObject("Scripting.Dictionary")
+    Set materials = CreateObject("Scripting.Dictionary")
     zone.comparemode = 1
+    materials.comparemode = 1
+    n_un_mat = 0
     un_n_zone = ArrayUniqValColumn(out_data, col_s_numb_zone)
     zone.Item("list") = un_n_zone
     is_pan = False
@@ -746,6 +888,35 @@ Function Spec_VED(ByRef all_data As Variant) As Variant
             zone.Item(num + ";c") = name_mat_column
             zone.Item(num + ";cn") = cn
             zone.Item(num + ";ca;") = area_column
+            
+            n_mat = cn
+            area_mat = area_column
+            If area_mat > 0 Then
+                If InStr(n_mat, ";") > 0 Then
+                    mat_1 = Trim(Split(n_mat, ";")(0))
+                    mat_2 = Trim(Split(n_mat, ";")(1))
+                Else
+                    mat_1 = n_mat
+                    mat_2 = ""
+                End If
+                If materials.exists(mat_1) Then
+                    materials.Item(mat_1 + ";a") = materials.Item(mat_1 + ";a") + area_mat
+                Else
+                    n_un_mat = n_un_mat + 1
+                    materials.Item(mat_1) = mat_1
+                    materials.Item(mat_1 + ";a") = materials.Item(mat_1 + ";a") + area_mat
+                End If
+                If mat_2 <> "" Then
+                    If materials.exists(mat_2) Then
+                        materials.Item(mat_2 + ";a") = materials.Item(mat_2 + ";a") + area_mat
+                    Else
+                        n_un_mat = n_un_mat + 1
+                        materials.Item(mat_2) = mat_2
+                        materials.Item(mat_2 + ";a") = materials.Item(mat_2 + ";a") + area_mat
+                    End If
+                End If
+            End If
+                
             If area_pan_column > 0 Then
                 If zone.exists(num + ";pn;" + c) Then
                     zone.Item(num + ";pa;" + c) = zone.Item(num + ";pa;" + c) + area_pan_column
@@ -754,6 +925,34 @@ Function Spec_VED(ByRef all_data As Variant) As Variant
                     zone.Item(num + ";pa;" + c) = area_pan_column
                 End If
                 zone.Item(num + ";ph;" + c) = h_pan
+                
+                n_mat = pn ' + " на высоту h=" + Str(h_pan) + "м."
+                area_mat = area_pan_column
+                If area_mat > 0 Then
+                    If InStr(n_mat, ";") > 0 Then
+                        mat_1 = Trim(Split(n_mat, ";")(0))
+                        mat_2 = Trim(Split(n_mat, ";")(1))
+                    Else
+                        mat_1 = n_mat
+                        mat_2 = ""
+                    End If
+                    If materials.exists(mat_1) Then
+                        materials.Item(mat_1 + ";a") = materials.Item(mat_1 + ";a") + area_mat
+                    Else
+                        n_un_mat = n_un_mat + 1
+                        materials.Item(mat_1) = mat_1
+                        materials.Item(mat_1 + ";a") = materials.Item(mat_1 + ";a") + area_mat
+                    End If
+                    If mat_2 <> "" Then
+                        If materials.exists(mat_2) Then
+                            materials.Item(mat_2 + ";a") = materials.Item(mat_2 + ";a") + area_mat
+                        Else
+                            n_un_mat = n_un_mat + 1
+                            materials.Item(mat_2) = mat_2
+                            materials.Item(mat_2 + ";a") = materials.Item(mat_2 + ";a") + area_mat
+                        End If
+                    End If
+                End If
             End If
             If area_column > 0 Then is_column = True
             
@@ -786,6 +985,35 @@ Function Spec_VED(ByRef all_data As Variant) As Variant
                 End If
                 zone.Item(num + ";wn;" + w) = wn
                 zone.Item(num + ";wa;" + w) = wall_area
+                
+                n_mat = wn
+                area_mat = wall_area
+                If area_mat > 0 Then
+                    If InStr(n_mat, ";") > 0 Then
+                        mat_1 = Trim(Split(n_mat, ";")(0))
+                        mat_2 = Trim(Split(n_mat, ";")(1))
+                    Else
+                        mat_1 = n_mat
+                        mat_2 = ""
+                    End If
+                    If materials.exists(mat_1) Then
+                        materials.Item(mat_1 + ";a") = materials.Item(mat_1 + ";a") + area_mat
+                    Else
+                        n_un_mat = n_un_mat + 1
+                        materials.Item(mat_1) = mat_1
+                        materials.Item(mat_1 + ";a") = materials.Item(mat_1 + ";a") + area_mat
+                    End If
+                    If mat_2 <> "" Then
+                        If materials.exists(mat_2) Then
+                            materials.Item(mat_2 + ";a") = materials.Item(mat_2 + ";a") + area_mat
+                        Else
+                            n_un_mat = n_un_mat + 1
+                            materials.Item(mat_2) = mat_2
+                            materials.Item(mat_2 + ";a") = materials.Item(mat_2 + ";a") + area_mat
+                        End If
+                    End If
+                End If
+
                 If pan_area > 0 Then
                     If zone.exists(num + ";pn;" + w) Then
                         zone.Item(num + ";pa;" + w) = zone.Item(num + ";pa;" + w) + pan_area
@@ -794,6 +1022,33 @@ Function Spec_VED(ByRef all_data As Variant) As Variant
                         zone.Item(num + ";pn;" + w) = pn
                     End If
                     zone.Item(num + ";ph;" + w) = h_pan
+                    n_mat = pn ' + " на высоту h=" + Str(h_pan) + "м."
+                    area_mat = pan_area
+                    If area_mat > 0 Then
+                        If InStr(n_mat, ";") > 0 Then
+                            mat_1 = Trim(Split(n_mat, ";")(0))
+                            mat_2 = Trim(Split(n_mat, ";")(1))
+                        Else
+                            mat_1 = n_mat
+                            mat_2 = ""
+                        End If
+                        If materials.exists(mat_1) Then
+                            materials.Item(mat_1 + ";a") = materials.Item(mat_1 + ";a") + area_mat
+                        Else
+                            n_un_mat = n_un_mat + 1
+                            materials.Item(mat_1) = mat_1
+                            materials.Item(mat_1 + ";a") = materials.Item(mat_1 + ";a") + area_mat
+                        End If
+                        If mat_2 <> "" Then
+                            If materials.exists(mat_2) Then
+                                materials.Item(mat_2 + ";a") = materials.Item(mat_2 + ";a") + area_mat
+                            Else
+                                n_un_mat = n_un_mat + 1
+                                materials.Item(mat_2) = mat_2
+                                materials.Item(mat_2 + ";a") = materials.Item(mat_2 + ";a") + area_mat
+                            End If
+                        End If
+                    End If
                 End If
             Next
             n_row_w = n_row_w + UBound(un_wall, 1)
@@ -836,6 +1091,33 @@ Function Spec_VED(ByRef all_data As Variant) As Variant
                         zone.Item(num + ";potn;" + p) = potn
                         zone.Item(num + ";pota;" + p) = pot_area
                         zone.Item(num + ";potp;" + p) = pot_perim
+                        n_mat = potn
+                        area_mat = pot_area
+                        If area_mat > 0 Then
+                            If InStr(n_mat, ";") > 0 Then
+                                mat_1 = Trim(Split(n_mat, ";")(0))
+                                mat_2 = Trim(Split(n_mat, ";")(1))
+                            Else
+                                mat_1 = n_mat
+                                mat_2 = ""
+                            End If
+                            If materials.exists(mat_1) Then
+                                materials.Item(mat_1 + ";a") = materials.Item(mat_1 + ";a") + area_mat
+                            Else
+                                n_un_mat = n_un_mat + 1
+                                materials.Item(mat_1) = mat_1
+                                materials.Item(mat_1 + ";a") = materials.Item(mat_1 + ";a") + area_mat
+                            End If
+                            If mat_2 <> "" Then
+                                If materials.exists(mat_2) Then
+                                    materials.Item(mat_2 + ";a") = materials.Item(mat_2 + ";a") + area_mat
+                                Else
+                                    n_un_mat = n_un_mat + 1
+                                    materials.Item(mat_2) = mat_2
+                                    materials.Item(mat_2 + ";a") = materials.Item(mat_2 + ";a") + area_mat
+                                End If
+                            End If
+                        End If
                     Next
                     n_row_p = UBound(un_pot, 1)
                     diff_area_pot = area_total - area_total_pot
@@ -844,7 +1126,35 @@ Function Spec_VED(ByRef all_data As Variant) As Variant
                     zone.Item(num + ";potn;" + fin_pot) = fin_pot
                     zone.Item(num + ";pota;" + fin_pot) = area_total
                     zone.Item(num + ";potp;" + fin_pot) = perim_total
+                    n_mat = fin_pot
+                    area_mat = area_total
+                    If area_mat > 0 Then
+                        If InStr(n_mat, ";") > 0 Then
+                            mat_1 = Trim(Split(n_mat, ";")(0))
+                            mat_2 = Trim(Split(n_mat, ";")(1))
+                        Else
+                            mat_1 = n_mat
+                            mat_2 = ""
+                        End If
+                        If materials.exists(mat_1) Then
+                            materials.Item(mat_1 + ";a") = materials.Item(mat_1 + ";a") + area_mat
+                        Else
+                            n_un_mat = n_un_mat + 1
+                            materials.Item(mat_1) = mat_1
+                            materials.Item(mat_1 + ";a") = materials.Item(mat_1 + ";a") + area_mat
+                        End If
+                        If mat_2 <> "" Then
+                            If materials.exists(mat_2) Then
+                                materials.Item(mat_2 + ";a") = materials.Item(mat_2 + ";a") + area_mat
+                            Else
+                                n_un_mat = n_un_mat + 1
+                                materials.Item(mat_2) = mat_2
+                                materials.Item(mat_2 + ";a") = materials.Item(mat_2 + ";a") + area_mat
+                            End If
+                        End If
+                    End If
                 End If
+
                 If Abs(diff_area_pot) > 0.1 Then
                     MsgBox ("Разница площади помещения и потолка в помещении " & num & " = " & Str(diff_area_pot))
                 End If
@@ -853,6 +1163,33 @@ Function Spec_VED(ByRef all_data As Variant) As Variant
                 zone.Item(num + ";potn;" + fin_pot) = fin_pot
                 zone.Item(num + ";pota;" + fin_pot) = area_total
                 zone.Item(num + ";potp;" + fin_pot) = perim_total
+                n_mat = fin_pot
+                area_mat = area_total
+                If area_mat > 0 Then
+                    If InStr(n_mat, ";") > 0 Then
+                        mat_1 = Trim(Split(n_mat, ";")(0))
+                        mat_2 = Trim(Split(n_mat, ";")(1))
+                    Else
+                        mat_1 = n_mat
+                        mat_2 = ""
+                    End If
+                    If materials.exists(mat_1) Then
+                        materials.Item(mat_1 + ";a") = materials.Item(mat_1 + ";a") + area_mat
+                    Else
+                        n_un_mat = n_un_mat + 1
+                        materials.Item(mat_1) = mat_1
+                        materials.Item(mat_1 + ";a") = materials.Item(mat_1 + ";a") + area_mat
+                    End If
+                    If mat_2 <> "" Then
+                        If materials.exists(mat_2) Then
+                            materials.Item(mat_2 + ";a") = materials.Item(mat_2 + ";a") + area_mat
+                        Else
+                            n_un_mat = n_un_mat + 1
+                            materials.Item(mat_2) = mat_2
+                            materials.Item(mat_2 + ";a") = materials.Item(mat_2 + ";a") + area_mat
+                        End If
+                    End If
+                End If
             End If
             '----------------------
             '        ПОЛЫ
@@ -879,7 +1216,7 @@ Function Spec_VED(ByRef all_data As Variant) As Variant
     n_col_out = 7
     If is_pan Then n_col_out = n_col_out + 3
     If is_column Then n_col_out = n_col_out + 2
-    Dim pos_out: ReDim pos_out(2 + n_row_tot, n_col_out)
+    Dim pos_out: ReDim pos_out(3 + n_row_tot + n_un_mat, n_col_out)
     pos_out(1, 1) = "Номер помещения"
     pos_out(1, 2) = "Наименование помещения"
     For i = 3 To n_col_out - 1
@@ -901,7 +1238,7 @@ Function Spec_VED(ByRef all_data As Variant) As Variant
         pos_out(2, col_end + 3) = "Высота, м."
     End If
     pos_out(1, n_col_out) = "Примечание"
-    
+    summ_area_pot = 0
     n_row = 3
     For Each num In un_n_zone
         n_row_p = n_row
@@ -915,7 +1252,8 @@ Function Spec_VED(ByRef all_data As Variant) As Variant
         If Not IsEmpty(pot) Then
             For Each p In pot
                 pos_out(n_row_p, 3) = zone.Item(num + ";potn;" + p)
-                pos_out(n_row_p, 4) = Round_w(zone.Item(num + ";pota;" + p), n_round_area)
+                pos_out(n_row_p, 4) = Round_w(zone.Item(num + ";pota;" + p) * k_zap_total, n_round_area)
+                summ_area_pot = summ_area_pot + pos_out(n_row_p, 4)
                 n_row_p = n_row_p + 1
             Next p
         Else
@@ -928,7 +1266,7 @@ Function Spec_VED(ByRef all_data As Variant) As Variant
         If Not IsEmpty(wall) Then
             For Each w In wall
                 pos_out(n_row_w, 5) = zone.Item(num + ";wn;" + w)
-                pos_out(n_row_w, 6) = Round_w(zone.Item(num + ";wa;" + w), n_round_area)
+                pos_out(n_row_w, 6) = Round_w(zone.Item(num + ";wa;" + w) * k_zap_total, n_round_area)
                 n_row_w = n_row_w + 1
             Next w
         Else
@@ -940,7 +1278,7 @@ Function Spec_VED(ByRef all_data As Variant) As Variant
         If is_column Then
             If zone.Item(num + ";ca;") > 0 Then
                 pos_out(n_row_c, 7) = zone.Item(num + ";cn")
-                pos_out(n_row_c, 8) = Round_w(zone.Item(num + ";ca;"), n_round_area)
+                pos_out(n_row_c, 8) = Round_w(zone.Item(num + ";ca;") * k_zap_total, n_round_area)
             Else
                 pos_out(n_row_c, 7) = "-"
                 pos_out(n_row_c, 8) = "-"
@@ -952,7 +1290,7 @@ Function Spec_VED(ByRef all_data As Variant) As Variant
             If zone.exists(num + ";p") Then
                 For Each p In zone.Item(num + ";p")
                     pos_out(n_row_pan, col_end + 1) = zone.Item(num + ";pn;" + p)
-                    pos_out(n_row_pan, col_end + 2) = Round_w(zone.Item(num + ";pa;" + p), n_round_area)
+                    pos_out(n_row_pan, col_end + 2) = Round_w(zone.Item(num + ";pa;" + p) * k_zap_total, n_round_area)
                     pos_out(n_row_pan, col_end + 3) = zone.Item(num + ";ph;" + p)
                     n_row_pan = n_row_pan + 1
                 Next p
@@ -965,5 +1303,16 @@ Function Spec_VED(ByRef all_data As Variant) As Variant
         End If
         n_row = Application.WorksheetFunction.Max(n_row_p - 1, n_row_w - 1, n_row_c - 1, n_row_pan - 1) + 1
     Next
+    pos_out(n_row, 1) = "Общяя площадь отделки, кв.м."
+    n_mat = 0
+    For Each mat In ArraySort(materials.Keys())
+        If InStr(mat, ";a") = 0 Then
+            n_mat = n_mat + 1
+            pos_out(n_row + n_mat, 1) = materials.Item(mat)
+            pos_out(n_row + n_mat, 4) = Round_w(materials.Item(mat + ";a") * k_zap_total, n_round_area)
+        End If
+    Next
+  
+    MsgBox ("Сумма площади потолка " & CStr(summ_area_pot))
     Spec_VED = pos_out
 End Function

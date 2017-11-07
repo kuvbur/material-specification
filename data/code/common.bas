@@ -2,7 +2,7 @@ Attribute VB_Name = "common"
 Option Compare Text
 Option Base 1
 
-Public Const common_version As String = "2.2"
+Public Const common_version As String = "2.3"
 
 Public Function GetLeghtByID(id As String, table As Range, n_col_id As Integer, n_col_l As Integer) As Variant
     Sum_l = 0
@@ -12,13 +12,13 @@ Public Function GetLeghtByID(id As String, table As Range, n_col_id As Integer, 
     GetLeghtByID = Sum_l
 End Function
 
-Sub Показать_зависимости()
+Function show_s()
     r = OutPrepare()
     For Each rn In Range("E1:H500")
         rn.ShowPrecedents
     Next
     r = OutEnded()
-End Sub
+End Function
 
 Function GetHeightSheet() As Double
     Set Sh = Application.ThisWorkbook.ActiveSheet
@@ -307,7 +307,7 @@ Function ArraySort(ByVal array_in As Variant, Optional ByVal nCol As Integer = 1
         n_str = 0
         n_num = 0
         For i = LBound(array_in, 1) To UBound(array_in, 1)
-            If IsNumeric(array_in(i, nCol)) Then
+            If IsNumeric(ConvTxt2Num(array_in(i, nCol))) Then
                 n_num = n_num + 1
                 For j = LBound(array_in, 2) To UBound(array_in, 2)
                     array_in_num(j, n_num) = array_in(i, j)
@@ -346,7 +346,7 @@ Function ArraySort(ByVal array_in As Variant, Optional ByVal nCol As Integer = 1
         n_str = 0
         n_num = 0
         For i = LBound(array_in) To UBound(array_in)
-            If IsNumeric(array_in(i)) Then
+            If IsNumeric(ConvTxt2Num(array_in(i))) Then
                 n_num = n_num + 1
                 array_in_num(n_num) = array_in(i)
             Else
@@ -441,7 +441,7 @@ Function ArraySortNum(ByVal array_in As Variant, ByVal nCol As Integer) As _
         n = UBound(array_in)
         For i = 1 To n
             For j = 1 To (n - i)
-                If array_in(j) > array_in(j + 1) Then
+                If val(array_in(j)) > val(array_in(j + 1)) Then
                     Tmp = array_in(j)
                     array_in(j) = array_in(j + 1)
                     array_in(j + 1) = Tmp
@@ -883,3 +883,4 @@ Function SaveTXTfile(ByVal filename As String, ByVal txt As String) As Boolean
     SaveTXTfile = Err = 0
     Set ts = Nothing: Set FSO = Nothing
 End Function
+
