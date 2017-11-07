@@ -2,7 +2,7 @@ Attribute VB_Name = "surf"
 Option Compare Text
 Option Base 1
 
-Public Const surf_version As String = "0.8"
+Public Const surf_version As String = "0.9"
 
 Public Const col_s_numb_zone As Integer = 1
 Public Const col_s_name_zone As Integer = 2
@@ -218,9 +218,9 @@ Function FormatSpec_Ved(ByVal Data_out As Range, ByVal n_row As Integer, ByVal n
         End If
     Next n_c
     
-    Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_start_all, 6)).Merge
+    Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_start_all, 4)).Merge
     For i = n_start_all + 1 To n_all
-        Range(Data_out.Cells(i, 1), Data_out.Cells(i, 5)).Merge
+        Range(Data_out.Cells(i, 1), Data_out.Cells(i, 3)).Merge
     Next i
     
     s_mat = 200
@@ -326,6 +326,91 @@ Function FormatSpec_Ved(ByVal Data_out As Range, ByVal n_row As Integer, ByVal n
         .Weight = xlThin
     End With
     
+    
+    With Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Interior
+        .PatternColorIndex = xlAutomatic
+        .ThemeColor = xlThemeColorDark1
+        .TintAndShade = -0.249977111117893
+        .Pattern = xlNone
+        .TintAndShade = 0
+        .PatternTintAndShade = 0
+    End With
+    Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Borders(xlDiagonalDown).LineStyle = xlNone
+    Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Borders(xlDiagonalUp).LineStyle = xlNone
+    With Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Borders(xlEdgeLeft)
+        .LineStyle = xlContinuous
+        .ColorIndex = 0
+        .TintAndShade = 0
+        .Weight = xlThin
+    End With
+    With Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Borders(xlEdgeTop)
+        .LineStyle = xlContinuous
+        .ColorIndex = 0
+        .TintAndShade = 0
+        .Weight = xlThin
+    End With
+    With Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Borders(xlEdgeBottom)
+        .LineStyle = xlContinuous
+        .ColorIndex = 0
+        .TintAndShade = 0
+        .Weight = xlThin
+    End With
+    With Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Borders(xlEdgeRight)
+        .LineStyle = xlContinuous
+        .ColorIndex = 0
+        .TintAndShade = 0
+        .Weight = xlThin
+    End With
+    With Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Borders(xlInsideVertical)
+        .LineStyle = xlContinuous
+        .ColorIndex = 0
+        .TintAndShade = 0
+        .Weight = xlThin
+    End With
+    With Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Borders(xlInsideHorizontal)
+        .LineStyle = xlContinuous
+        .ColorIndex = 0
+        .TintAndShade = 0
+        .Weight = xlThin
+    End With
+    Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Borders(xlDiagonalDown).LineStyle = xlNone
+    Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Borders(xlDiagonalUp).LineStyle = xlNone
+    With Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Borders(xlEdgeLeft)
+        .LineStyle = xlContinuous
+        .ColorIndex = 0
+        .TintAndShade = 0
+        .Weight = xlMedium
+    End With
+    With Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Borders(xlEdgeTop)
+        .LineStyle = xlContinuous
+        .ColorIndex = 0
+        .TintAndShade = 0
+        .Weight = xlMedium
+    End With
+    With Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Borders(xlEdgeBottom)
+        .LineStyle = xlContinuous
+        .ColorIndex = 0
+        .TintAndShade = 0
+        .Weight = xlMedium
+    End With
+    With Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Borders(xlEdgeRight)
+        .LineStyle = xlContinuous
+        .ColorIndex = 0
+        .TintAndShade = 0
+        .Weight = xlMedium
+    End With
+    With Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Borders(xlInsideVertical)
+        .LineStyle = xlContinuous
+        .ColorIndex = xlAutomatic
+        .TintAndShade = 0
+        .Weight = xlThin
+    End With
+    With Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Borders(xlInsideHorizontal)
+        .LineStyle = xlContinuous
+        .ColorIndex = xlAutomatic
+        .TintAndShade = 0
+        .Weight = xlThin
+    End With
     
     
     
@@ -807,12 +892,28 @@ Function Spec_VED(ByRef all_data As Variant) As Variant
             n_mat = cn
             area_mat = area_column
             If area_mat > 0 Then
-                If materials.exists(n_mat) Then
-                    materials.Item(n_mat + ";a") = zone.Item(n_mat + ";a") + area_mat
+                If InStr(n_mat, ";") > 0 Then
+                    mat_1 = Trim(Split(n_mat, ";")(0))
+                    mat_2 = Trim(Split(n_mat, ";")(1))
+                Else
+                    mat_1 = n_mat
+                    mat_2 = ""
+                End If
+                If materials.exists(mat_1) Then
+                    materials.Item(mat_1 + ";a") = materials.Item(mat_1 + ";a") + area_mat
                 Else
                     n_un_mat = n_un_mat + 1
-                    materials.Item(n_mat) = n_mat
-                    materials.Item(n_mat + ";a") = zone.Item(n_mat + ";a") + area_mat
+                    materials.Item(mat_1) = mat_1
+                    materials.Item(mat_1 + ";a") = materials.Item(mat_1 + ";a") + area_mat
+                End If
+                If mat_2 <> "" Then
+                    If materials.exists(mat_2) Then
+                        materials.Item(mat_2 + ";a") = materials.Item(mat_2 + ";a") + area_mat
+                    Else
+                        n_un_mat = n_un_mat + 1
+                        materials.Item(mat_2) = mat_2
+                        materials.Item(mat_2 + ";a") = materials.Item(mat_2 + ";a") + area_mat
+                    End If
                 End If
             End If
                 
@@ -825,15 +926,31 @@ Function Spec_VED(ByRef all_data As Variant) As Variant
                 End If
                 zone.Item(num + ";ph;" + c) = h_pan
                 
-                n_mat = pn + " на высоту h=" + Str(h_pan) + "м."
+                n_mat = pn ' + " на высоту h=" + Str(h_pan) + "м."
                 area_mat = area_pan_column
                 If area_mat > 0 Then
-                    If materials.exists(n_mat) Then
-                        materials.Item(n_mat + ";a") = zone.Item(n_mat + ";a") + area_mat
+                    If InStr(n_mat, ";") > 0 Then
+                        mat_1 = Trim(Split(n_mat, ";")(0))
+                        mat_2 = Trim(Split(n_mat, ";")(1))
+                    Else
+                        mat_1 = n_mat
+                        mat_2 = ""
+                    End If
+                    If materials.exists(mat_1) Then
+                        materials.Item(mat_1 + ";a") = materials.Item(mat_1 + ";a") + area_mat
                     Else
                         n_un_mat = n_un_mat + 1
-                        materials.Item(n_mat) = n_mat
-                        materials.Item(n_mat + ";a") = zone.Item(n_mat + ";a") + area_mat
+                        materials.Item(mat_1) = mat_1
+                        materials.Item(mat_1 + ";a") = materials.Item(mat_1 + ";a") + area_mat
+                    End If
+                    If mat_2 <> "" Then
+                        If materials.exists(mat_2) Then
+                            materials.Item(mat_2 + ";a") = materials.Item(mat_2 + ";a") + area_mat
+                        Else
+                            n_un_mat = n_un_mat + 1
+                            materials.Item(mat_2) = mat_2
+                            materials.Item(mat_2 + ";a") = materials.Item(mat_2 + ";a") + area_mat
+                        End If
                     End If
                 End If
             End If
@@ -872,12 +989,28 @@ Function Spec_VED(ByRef all_data As Variant) As Variant
                 n_mat = wn
                 area_mat = wall_area
                 If area_mat > 0 Then
-                    If materials.exists(n_mat) Then
-                        materials.Item(n_mat + ";a") = zone.Item(n_mat + ";a") + area_mat
+                    If InStr(n_mat, ";") > 0 Then
+                        mat_1 = Trim(Split(n_mat, ";")(0))
+                        mat_2 = Trim(Split(n_mat, ";")(1))
+                    Else
+                        mat_1 = n_mat
+                        mat_2 = ""
+                    End If
+                    If materials.exists(mat_1) Then
+                        materials.Item(mat_1 + ";a") = materials.Item(mat_1 + ";a") + area_mat
                     Else
                         n_un_mat = n_un_mat + 1
-                        materials.Item(n_mat) = n_mat
-                        materials.Item(n_mat + ";a") = zone.Item(n_mat + ";a") + area_mat
+                        materials.Item(mat_1) = mat_1
+                        materials.Item(mat_1 + ";a") = materials.Item(mat_1 + ";a") + area_mat
+                    End If
+                    If mat_2 <> "" Then
+                        If materials.exists(mat_2) Then
+                            materials.Item(mat_2 + ";a") = materials.Item(mat_2 + ";a") + area_mat
+                        Else
+                            n_un_mat = n_un_mat + 1
+                            materials.Item(mat_2) = mat_2
+                            materials.Item(mat_2 + ";a") = materials.Item(mat_2 + ";a") + area_mat
+                        End If
                     End If
                 End If
 
@@ -889,15 +1022,31 @@ Function Spec_VED(ByRef all_data As Variant) As Variant
                         zone.Item(num + ";pn;" + w) = pn
                     End If
                     zone.Item(num + ";ph;" + w) = h_pan
-                    n_mat = pn + " на высоту h=" + Str(h_pan) + "м."
+                    n_mat = pn ' + " на высоту h=" + Str(h_pan) + "м."
                     area_mat = pan_area
                     If area_mat > 0 Then
-                        If materials.exists(n_mat) Then
-                            materials.Item(n_mat + ";a") = zone.Item(n_mat + ";a") + area_mat
+                        If InStr(n_mat, ";") > 0 Then
+                            mat_1 = Trim(Split(n_mat, ";")(0))
+                            mat_2 = Trim(Split(n_mat, ";")(1))
+                        Else
+                            mat_1 = n_mat
+                            mat_2 = ""
+                        End If
+                        If materials.exists(mat_1) Then
+                            materials.Item(mat_1 + ";a") = materials.Item(mat_1 + ";a") + area_mat
                         Else
                             n_un_mat = n_un_mat + 1
-                            materials.Item(n_mat) = n_mat
-                            materials.Item(n_mat + ";a") = zone.Item(n_mat + ";a") + area_mat
+                            materials.Item(mat_1) = mat_1
+                            materials.Item(mat_1 + ";a") = materials.Item(mat_1 + ";a") + area_mat
+                        End If
+                        If mat_2 <> "" Then
+                            If materials.exists(mat_2) Then
+                                materials.Item(mat_2 + ";a") = materials.Item(mat_2 + ";a") + area_mat
+                            Else
+                                n_un_mat = n_un_mat + 1
+                                materials.Item(mat_2) = mat_2
+                                materials.Item(mat_2 + ";a") = materials.Item(mat_2 + ";a") + area_mat
+                            End If
                         End If
                     End If
                 End If
@@ -945,12 +1094,28 @@ Function Spec_VED(ByRef all_data As Variant) As Variant
                         n_mat = potn
                         area_mat = pot_area
                         If area_mat > 0 Then
-                            If materials.exists(n_mat) Then
-                                materials.Item(n_mat + ";a") = zone.Item(n_mat + ";a") + area_mat
+                            If InStr(n_mat, ";") > 0 Then
+                                mat_1 = Trim(Split(n_mat, ";")(0))
+                                mat_2 = Trim(Split(n_mat, ";")(1))
+                            Else
+                                mat_1 = n_mat
+                                mat_2 = ""
+                            End If
+                            If materials.exists(mat_1) Then
+                                materials.Item(mat_1 + ";a") = materials.Item(mat_1 + ";a") + area_mat
                             Else
                                 n_un_mat = n_un_mat + 1
-                                materials.Item(n_mat) = n_mat
-                                materials.Item(n_mat + ";a") = zone.Item(n_mat + ";a") + area_mat
+                                materials.Item(mat_1) = mat_1
+                                materials.Item(mat_1 + ";a") = materials.Item(mat_1 + ";a") + area_mat
+                            End If
+                            If mat_2 <> "" Then
+                                If materials.exists(mat_2) Then
+                                    materials.Item(mat_2 + ";a") = materials.Item(mat_2 + ";a") + area_mat
+                                Else
+                                    n_un_mat = n_un_mat + 1
+                                    materials.Item(mat_2) = mat_2
+                                    materials.Item(mat_2 + ";a") = materials.Item(mat_2 + ";a") + area_mat
+                                End If
                             End If
                         End If
                     Next
@@ -964,12 +1129,28 @@ Function Spec_VED(ByRef all_data As Variant) As Variant
                     n_mat = fin_pot
                     area_mat = area_total
                     If area_mat > 0 Then
-                        If materials.exists(n_mat) Then
-                            materials.Item(n_mat + ";a") = zone.Item(n_mat + ";a") + area_mat
+                        If InStr(n_mat, ";") > 0 Then
+                            mat_1 = Trim(Split(n_mat, ";")(0))
+                            mat_2 = Trim(Split(n_mat, ";")(1))
+                        Else
+                            mat_1 = n_mat
+                            mat_2 = ""
+                        End If
+                        If materials.exists(mat_1) Then
+                            materials.Item(mat_1 + ";a") = materials.Item(mat_1 + ";a") + area_mat
                         Else
                             n_un_mat = n_un_mat + 1
-                            materials.Item(n_mat) = n_mat
-                            materials.Item(n_mat + ";a") = zone.Item(n_mat + ";a") + area_mat
+                            materials.Item(mat_1) = mat_1
+                            materials.Item(mat_1 + ";a") = materials.Item(mat_1 + ";a") + area_mat
+                        End If
+                        If mat_2 <> "" Then
+                            If materials.exists(mat_2) Then
+                                materials.Item(mat_2 + ";a") = materials.Item(mat_2 + ";a") + area_mat
+                            Else
+                                n_un_mat = n_un_mat + 1
+                                materials.Item(mat_2) = mat_2
+                                materials.Item(mat_2 + ";a") = materials.Item(mat_2 + ";a") + area_mat
+                            End If
                         End If
                     End If
                 End If
@@ -985,12 +1166,28 @@ Function Spec_VED(ByRef all_data As Variant) As Variant
                 n_mat = fin_pot
                 area_mat = area_total
                 If area_mat > 0 Then
-                    If materials.exists(n_mat) Then
-                        materials.Item(n_mat + ";a") = zone.Item(n_mat + ";a") + area_mat
+                    If InStr(n_mat, ";") > 0 Then
+                        mat_1 = Trim(Split(n_mat, ";")(0))
+                        mat_2 = Trim(Split(n_mat, ";")(1))
+                    Else
+                        mat_1 = n_mat
+                        mat_2 = ""
+                    End If
+                    If materials.exists(mat_1) Then
+                        materials.Item(mat_1 + ";a") = materials.Item(mat_1 + ";a") + area_mat
                     Else
                         n_un_mat = n_un_mat + 1
-                        materials.Item(n_mat) = n_mat
-                        materials.Item(n_mat + ";a") = zone.Item(n_mat + ";a") + area_mat
+                        materials.Item(mat_1) = mat_1
+                        materials.Item(mat_1 + ";a") = materials.Item(mat_1 + ";a") + area_mat
+                    End If
+                    If mat_2 <> "" Then
+                        If materials.exists(mat_2) Then
+                            materials.Item(mat_2 + ";a") = materials.Item(mat_2 + ";a") + area_mat
+                        Else
+                            n_un_mat = n_un_mat + 1
+                            materials.Item(mat_2) = mat_2
+                            materials.Item(mat_2 + ";a") = materials.Item(mat_2 + ";a") + area_mat
+                        End If
                     End If
                 End If
             End If
@@ -1112,7 +1309,7 @@ Function Spec_VED(ByRef all_data As Variant) As Variant
         If InStr(mat, ";a") = 0 Then
             n_mat = n_mat + 1
             pos_out(n_row + n_mat, 1) = materials.Item(mat)
-            pos_out(n_row + n_mat, 6) = materials.Item(mat + ";a")
+            pos_out(n_row + n_mat, 4) = Round_w(materials.Item(mat + ";a") * k_zap_total, n_round_area)
         End If
     Next
   
