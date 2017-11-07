@@ -39,6 +39,10 @@ Private Sub CommandButtonSB_Click()
     r = Spec_Select(lastfilespec, suffix)
 End Sub
 
+Private Sub CommandButtonShowS_Click()
+    r = show_s()
+End Sub
+
 Private Sub UserForm_Initialize()
     MaterialPath = CheckPath(MaterialPatht.Text)
     SortamentPath = CheckPath(SortamentPatht.Text)
@@ -110,7 +114,7 @@ Sub FormRebild()
     com_ver.Caption = common_version
     man_ver.Caption = manual_version
     surf_ver.Caption = surf_version
-    form_ver.Caption = "2.3"
+    form_ver.Caption = "2.4"
     symb_diam = ChrW(8960)
     remat
 End Sub

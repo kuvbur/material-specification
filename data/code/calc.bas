@@ -2,7 +2,7 @@ Attribute VB_Name = "calc"
 Option Compare Text
 Option Base 1
 
-Public Const macro_version As String = "2.6"
+Public Const macro_version As String = "2.8"
 'Тип округления
 ' 1 - округление в большую сторону
 ' 2 - округление стандартным round
@@ -60,7 +60,7 @@ Public Const col_add_obozn As Integer = 2
 Public Const col_add_naen As Integer = 3
 Public Const col_add_qty As Integer = 4
 Public Const col_add_prim As Integer = 5
-
+Public k_zap_total As Double
 Public symb_diam As String 'Символ диаметра в спецификацию
 Public w_format As String 'Формат выводав техничку
 Public pos_data As Variant
@@ -646,7 +646,7 @@ Function DataWeightSubpos(ByVal array_in As Variant) As Variant
     Set dweight = CreateObject("Scripting.Dictionary")
     dweight.comparemode = 1
     Dim tweight As Double
-    If (UBound(pos_data.Item("parent").keys()) < 0) Then
+    If (UBound(pos_data.Item("parent").Keys()) < 0) Then
         Set DataWeightSubpos = dweight
         Exit Function
     End If
@@ -684,7 +684,7 @@ Function DataWeightSubpos(ByVal array_in As Variant) As Variant
         End If
     Next
     'Делим на количество вхождений, чтоб получить массу одной шт.
-    For Each subpos In dweight.keys()
+    For Each subpos In dweight.Keys()
         If pos_data.Item("child").exists(subpos) Then
             nSubPos = pos_data.Item("qty").Item("all" & subpos)
         Else
@@ -698,8 +698,8 @@ Function DataWeightSubpos(ByVal array_in As Variant) As Variant
         dweight.Item(subpos) = w
     Next
     'Для сборок первого уровня учтём вхождения сборок второго уровня
-    For Each subpos In pos_data.Item("parent").keys()
-        For Each tchild In pos_data.Item("child").keys()
+    For Each subpos In pos_data.Item("parent").Keys()
+        For Each tchild In pos_data.Item("child").Keys()
             If pos_data.Item("qty").exists(subpos & "_" & tchild) Then
                 qty = pos_data.Item("qty").Item(subpos & "_" & tchild) / pos_data.Item("qty").Item("-_" & subpos)
                 tweight = dweight.Item(tchild)
@@ -1597,7 +1597,7 @@ Function Sheet2Pdf(ByVal Data_out As Range, ByVal filename As String, Optional B
                 .BlackAndWhite = True
                 .Zoom = False
                 .FitToPagesWide = 1
-                .FitToPagesTall = False
+                .FitToPagesTall = 1
                 .PrintErrors = xlPrintErrorsBlank
                 .OddAndEvenPagesHeaderFooter = False
                 .DifferentFirstPageHeaderFooter = False
@@ -1634,7 +1634,7 @@ Function SheetExport()
         type_print = 0
         h = GetHeightSheet()
         If SpecGetType(nm) = "11" Then type_print = 1
-        If GetHeightSheet() > 420 Then r = SetPageBreaks(420, 2)
+        'If GetHeightSheet() > 420 Then r = SetPageBreaks(420, 2)
         r = Sheet2Pdf(Data_out, filename, type_print)
     End If
     r = OutEnded()
@@ -1761,6 +1761,7 @@ Function SpecArm(ByVal arm As Variant, ByVal n_arm As Integer, _
                 prim = "": If arm(j, col_gnut) And Not UserForm2.arm_pm_CB.Value Then prim = "*"
                 qty = arm(j, col_qty)
                 n_el = qty / nSubPos
+                If k_zap_total > 1 Then n_el = (qty / nSubPos) + Round((1 - k_zap_total) * (qty / nSubPos), 0)
                 length_pos = arm(j, col_length) / 1000
                 l_spec = (length_pos * n_el)
                 Select Case type_spec
@@ -1851,7 +1852,9 @@ Function SpecIzd(ByVal izd As Variant, ByVal n_izd As Integer, _
                 current_chksum = izd(j, col_chksum)
             End If
             If current_chksum = un_chsum_izd(i) Then
-                n_el = izd(j, col_qty) / nSubPos
+                qty = izd(j, col_qty)
+                n_el = qty / nSubPos
+                If k_zap_total > 1 Then n_el = (qty / nSubPos) + Round((1 - k_zap_total) * (qty / nSubPos), 0)
                 subpos = izd(j, col_sub_pos)
                 pos = izd(j, col_pos)
                 
@@ -1881,7 +1884,7 @@ Function SpecIzd(ByVal izd As Variant, ByVal n_izd As Integer, _
                     pos_out(i, 4) = pos_out(i, 4) + n_el
                     pos_out(i, 5) = Weight
                     If IsNumeric(Weight) Then
-                        pos_out(i, 6) = pos_out(i, 6) + Round_w(n_el * Weight, n_round_w)
+                        pos_out(i, 6) = pos_out(i, 6) + (n_el * Weight)
                     Else
                         pos_out(i, 6) = izd(j, col_m_edizm)
                     End If
@@ -1890,11 +1893,11 @@ Function SpecIzd(ByVal izd As Variant, ByVal n_izd As Integer, _
         Next j
     Next i
     
-    If type_spec = 13 Then
-        For i = 1 To UBound(pos_out, 1)
-            pos_out(i, 7) = t_izd
-        Next
-    End If
+    
+    For i = 1 To UBound(pos_out, 1)
+        If IsNumeric(pos_out(i, 6)) Then pos_out(i, 6) = Round_w(pos_out(i, 6), n_round_w)
+        If type_spec = 13 Then pos_out(i, 7) = t_izd
+    Next
     
     If type_spec = 1 Then
         pos_out = ArraySort(pos_out, 2)
@@ -1942,13 +1945,13 @@ Function SpecMaterial(ByVal mat As Variant, ByVal n_mat As Integer, _
                     pos_out(i, 1) = mat(j, col_sub_pos) & n_txt
                     pos_out(i, 2) = " "
                     pos_out(i, 3) = mat(j, col_m_naen) & " по " & mat(j, col_m_obozn) & ", " & mat(j, col_m_edizm)
-                    pos_out(i, 4) = pos_out(i, 4) + Round_w(mat(j, col_qty) / nSubPos, n_round_w)
+                    pos_out(i, 4) = pos_out(i, 4) + (mat(j, col_qty) * k_zap_total / nSubPos)
                     pos_out(i, 5) = "-"
                 Case Else
                     pos_out(i, 1) = " "
                     pos_out(i, 2) = mat(j, col_m_obozn)
                     pos_out(i, 3) = mat(j, col_m_naen)
-                    pos_out(i, 4) = pos_out(i, 4) + Round_w(mat(j, col_qty) / nSubPos, n_round_w)
+                    pos_out(i, 4) = pos_out(i, 4) + (mat(j, col_qty) * k_zap_total / nSubPos)
                     pos_out(i, 5) = "-"
                     pos_out(i, 6) = mat(j, col_m_edizm)
                 End Select
@@ -1956,11 +1959,11 @@ Function SpecMaterial(ByVal mat As Variant, ByVal n_mat As Integer, _
         Next j
     Next i
     
-    If type_spec = 13 Then
-        For i = 1 To UBound(pos_out, 1)
-            pos_out(i, 7) = t_mat
-        Next
-    End If
+    
+    For i = 1 To UBound(pos_out, 1)
+        pos_out(i, 4) = Round_w(pos_out(i, 4), n_round_w)
+        If type_spec = 13 Then pos_out(i, 7) = t_mat
+    Next
     
     If type_spec = 1 Then
         pos_out = ArraySort(pos_out, 2)
@@ -2365,8 +2368,8 @@ Function Spec_AS(ByRef all_data As Variant, ByVal type_spec As Integer) As Varia
     If type_spec = 13 Then n_col_spec = n_col_spec + 1
     Dim pos_out: ReDim pos_out(1, n_col_spec)
     If IsEmpty(all_data) Then Spec_AS = Empty: Exit Function
-    qty_parent = UBound(pos_data.Item("parent").keys()) + 1
-    qty_child = UBound(pos_data.Item("child").keys()) + 1
+    qty_parent = UBound(pos_data.Item("parent").Keys()) + 1
+    qty_child = UBound(pos_data.Item("child").Keys()) + 1
     If qty_parent < 0 And qty_child < 0 And (type_spec = 2 Or type_spec = 13) Then
         MsgBox ("Сборки отсутвуют. Создана общестроительная спецификаця")
         type_spec = 3
@@ -2424,7 +2427,7 @@ Function Spec_AS(ByRef all_data As Variant, ByVal type_spec As Integer) As Varia
     End If
     
     If type_spec = 1 Then
-        For Each subpos In ArraySort(pos_data.Item(ch_key).keys(), 1)
+        For Each subpos In ArraySort(pos_data.Item(ch_key).Keys(), 1)
             pos_out = ArrayCombine(pos_out, SpecOneSubpos(all_data, subpos, type_spec))
         Next
         Dim pos_end: ReDim pos_end(1, 6)
@@ -2437,14 +2440,14 @@ Function Spec_AS(ByRef all_data As Variant, ByVal type_spec As Integer) As Varia
     End If
     
     If type_spec = 2 Then
-        For Each subpos In ArraySort(pos_data.Item("parent").keys(), 1)
+        For Each subpos In ArraySort(pos_data.Item("parent").Keys(), 1)
             pos_out = ArrayCombine(pos_out, SpecOneSubpos(all_data, subpos, type_spec))
         Next
         If pos_data.exists("-") Then pos_out = ArrayCombine(pos_out, SpecOneSubpos(all_data, "-", type_spec))
     End If
     
     If type_spec = 3 Then
-        If (pos_data.exists("-") Or (UserForm2.show_subpos_CB.Value And (UBound(pos_data.Item("parent").keys()) >= 0))) Then
+        If (pos_data.exists("-") Or (UserForm2.show_subpos_CB.Value And (UBound(pos_data.Item("parent").Keys()) >= 0))) Then
             pos_out = ArrayCombine(pos_out, SpecOneSubpos(all_data, "-", type_spec))
         Else
             Spec_AS = Empty
@@ -2466,7 +2469,7 @@ Function Spec_AS(ByRef all_data As Variant, ByVal type_spec As Integer) As Varia
         Dim n_row_izd As Integer
         Dim n_row_mat As Integer
 
-        For Each subpos In ArraySort(pos_data.Item("parent").keys(), 1)
+        For Each subpos In ArraySort(pos_data.Item("parent").Keys(), 1)
             If UserForm2.qtyOneSubpos_CB.Value Then
                 nSubPos = GetNSubpos(subpos, type_spec)
                 pos_out(2, n_col_sb) = subpos & vbLf & "(" & nSubPos & "шт)"
@@ -2786,8 +2789,8 @@ End Function
 
 Function Spec_KZH(ByRef all_data As Variant) As Variant
     Set name_subpos = pos_data.Item("name") 'Словарь с именами сборок
-    un_child = ArraySort(pos_data.Item("child").keys())
-    un_parent = ArraySort(pos_data.Item("parent").keys())
+    un_child = ArraySort(pos_data.Item("child").Keys())
+    un_parent = ArraySort(pos_data.Item("parent").Keys())
     If IsEmpty(un_child) Then un_child = Array()
     If IsEmpty(un_parent) Then un_parent = Array()
     'Выясняем - какие диаметры и какие классы арматуры есть для всех сборок
@@ -3020,7 +3023,7 @@ Function Spec_KZH(ByRef all_data As Variant) As Variant
                 End If
                 If Not UserForm2.qtyOneSubpos_CB.Value Then nSubPos = 1
                 l_spec = (length_pos * qty) / nSubPos
-                w_pos = Round_w(weight_pm * l_spec, n_round_w)
+                w_pos = Round_w(weight_pm * l_spec * k_zap_total, n_round_w)
                 i_col_d = weight_index.Item("col" & tkeyd)
                 i_col_s1 = weight_index.Item("col" & tkesum_1)
                 i_col_s2 = weight_index.Item("col" & n_type & "Всего")
@@ -3072,16 +3075,28 @@ Function Spec_Select(ByVal lastfilespec As String, ByVal suffix As String)
     Else
         ThisWorkbook.Worksheets.Add.Name = nm
     End If
+    tt = ConvTxt2Num(UserForm2.Kzap.Text)
+    If IsNumeric(tt) Then
+        If tt > 1 And tt < 2 Then
+            k_zap_total = tt
+        Else
+            k_zap_total = 1
+        End If
+    End If
     Select Case type_spec
         Case 1, 2, 3, 13
+            MsgBox ("Коэффицент запаса для объёма, площади и длин " & CStr(k_zap_total))
             pos_out = Spec_AS(all_data, type_spec)
         Case 4
             pos_out = Spec_KM(all_data)
         Case 5
+            MsgBox ("Коэффицент запаса для веса " & CStr(k_zap_total))
             pos_out = Spec_KZH(all_data)
         Case 11
+            MsgBox ("Коэффицент запаса площади отделки -" & CStr(k_zap_total))
             pos_out = Spec_VED(all_data)
         Case 12
+            MsgBox ("Коэффицент запаса площади пола -" & CStr(k_zap_total))
             pos_out = Spec_POL(all_data)
     End Select
     If Not IsEmpty(pos_out) Then
