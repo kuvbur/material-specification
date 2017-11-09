@@ -114,7 +114,7 @@ Sub FormRebild()
     com_ver.Caption = common_version
     man_ver.Caption = manual_version
     surf_ver.Caption = surf_version
-    form_ver.Caption = "2.4"
+    form_ver.Caption = "2.5"
     symb_diam = ChrW(8960)
     remat
 End Sub
@@ -279,4 +279,3 @@ Function ReadConstr()
     Set ReadConstr = constr_index
     End If
 End Function
-

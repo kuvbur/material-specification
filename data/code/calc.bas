@@ -415,6 +415,7 @@ Function DataIsWall(ByVal nm As String) As Variant
         p_start = 0
         If InStr(naen, "(ТУ") Then p_start = InStr(naen, "(ТУ") - 1
         If InStr(naen, "(ГОСТ") Then p_start = InStr(naen, "(ГОСТ") - 1
+        If InStr(naen, "(СТО") Then p_start = InStr(naen, "(СТО") - 1
         If p_start > 0 Then
             p_end = InStr(naen, ")") + 1
             t_start = Trim(Mid(naen, 1, p_start))
@@ -1135,21 +1136,30 @@ Function ManualAdd(ByVal lastfileadd As String) As Boolean
     sub_pos_arr = ArraySelectParam(add_array, t_subpos, col_type_el)
     Dim array_out(): ReDim array_out(UBound(add_array, 1), UBound(add_array, 2))
     n_row = 0
-    For i = 1 To UBound(sub_pos_arr, 1)
-        n_row = n_row + 1
-        For k = 1 To UBound(add_array, 2)
-            array_out(n_row, k) = sub_pos_arr(i, k)
-        Next k
-        
+    If IsEmpty(sub_pos_arr) Then
         For j = 1 To UBound(add_array, 1)
-            If add_array(j, col_sub_pos) = sub_pos_arr(i, col_sub_pos) And add_array(j, col_type_el) <> t_subpos Then
-                n_row = n_row + 1
-                For k = 1 To UBound(add_array, 2)
-                    array_out(n_row, k) = add_array(j, k)
-                Next k
-            End If
+            n_row = n_row + 1
+            For k = 1 To UBound(add_array, 2)
+                array_out(n_row, k) = add_array(j, k)
+            Next k
         Next j
-    Next i
+    Else
+        For i = 1 To UBound(sub_pos_arr, 1)
+            n_row = n_row + 1
+            For k = 1 To UBound(add_array, 2)
+                array_out(n_row, k) = sub_pos_arr(i, k)
+            Next k
+            
+            For j = 1 To UBound(add_array, 1)
+                If add_array(j, col_sub_pos) = sub_pos_arr(i, col_sub_pos) And add_array(j, col_type_el) <> t_subpos Then
+                    n_row = n_row + 1
+                    For k = 1 To UBound(add_array, 2)
+                        array_out(n_row, k) = add_array(j, k)
+                    Next k
+                End If
+            Next j
+        Next i
+    End If
     r = ManualSpec(nm, array_out)
     ManualAdd = True
 End Function
@@ -1265,7 +1275,7 @@ Function ManualSpec(ByVal nm As String, Optional ByVal add_array As Variant) As 
             Case t_subpos
                 pos_out(n_row_out, col_m_obozn) = obozn
                 pos_out(n_row_out, col_m_naen) = naen
-                pos_out(n_row_out, col_m_weight) = "-"
+                pos_out(n_row_out, col_m_weight) = Weight
                 pos_out(n_row_out, col_m_edizm) = prim
             End Select
             If flag_add And Not IsEmpty(mod_array) Then
@@ -1761,7 +1771,7 @@ Function SpecArm(ByVal arm As Variant, ByVal n_arm As Integer, _
                 prim = "": If arm(j, col_gnut) And Not UserForm2.arm_pm_CB.Value Then prim = "*"
                 qty = arm(j, col_qty)
                 n_el = qty / nSubPos
-                If k_zap_total > 1 Then n_el = (qty / nSubPos) + Round((1 - k_zap_total) * (qty / nSubPos), 0)
+                If k_zap_total > 1 Then n_el = (qty / nSubPos) + Round((k_zap_total - 1) * (qty / nSubPos), 0)
                 length_pos = arm(j, col_length) / 1000
                 l_spec = (length_pos * n_el)
                 Select Case type_spec
@@ -1854,7 +1864,7 @@ Function SpecIzd(ByVal izd As Variant, ByVal n_izd As Integer, _
             If current_chksum = un_chsum_izd(i) Then
                 qty = izd(j, col_qty)
                 n_el = qty / nSubPos
-                If k_zap_total > 1 Then n_el = (qty / nSubPos) + Round((1 - k_zap_total) * (qty / nSubPos), 0)
+                If k_zap_total > 1 Then n_el = (qty / nSubPos) + Round((k_zap_total - 1) * (qty / nSubPos), 0)
                 subpos = izd(j, col_sub_pos)
                 pos = izd(j, col_pos)
                 
@@ -2078,7 +2088,9 @@ Function SpecOneSubpos(ByVal all_data As Variant, ByVal subpos As String, _
                         For j = 1 To max_col
                             subp(n_subpos, j) = all_data(i, j)
                         Next j
-                        subp(n_subpos, col_m_weight) = pos_data.Item("weight").Item(сurrent_subpos)
+                        If pos_data.Item("weight").Item(сurrent_subpos) > 0 Then
+                            subp(n_subpos, col_m_weight) = pos_data.Item("weight").Item(сurrent_subpos)
+                        End If
                 End Select
         End If
     Next
@@ -2342,7 +2354,7 @@ Function SpecSubpos(ByVal subp As Variant, ByVal n_subp As Integer, _
                     pos_out(i, 3) = naen
                     pos_out(i, 4) = pos_out(i, 4) + n_el
                     pos_out(i, 5) = Weight
-                    pos_out(i, 6) = subp(j, col_m_edizm)
+                    pos_out(i, 6) = pos_out(i, 6) + n_el * Weight
                 End Select
             End If
         Next j
@@ -2374,7 +2386,7 @@ Function Spec_AS(ByRef all_data As Variant, ByVal type_spec As Integer) As Varia
         MsgBox ("Сборки отсутвуют. Создана общестроительная спецификаця")
         type_spec = 3
     End If
-    If (qty_parent <= 1) Or (qty_parent < 1 And pos_data.exists("-")) And type_spec = 13 Then
+    If type_spec = 13 And ((qty_parent <= 1) Or (qty_parent < 1 And pos_data.exists("-"))) Then
         MsgBox ("Сборок меньше двух. Создана общестроительная спецификаця")
         type_spec = 3
     End If
@@ -2417,7 +2429,7 @@ Function Spec_AS(ByRef all_data As Variant, ByVal type_spec As Integer) As Varia
         
     Dim ch_key As String
     ch_key = "child"
-    If qty_child <= 0 And type_spec = 1 Then
+    If qty_child <= 0 And ((type_spec = 1) Or (type_spec = 2)) Then
         If qty_parent >= 0 Then
             ch_key = "parent"
         Else
@@ -2440,9 +2452,11 @@ Function Spec_AS(ByRef all_data As Variant, ByVal type_spec As Integer) As Varia
     End If
     
     If type_spec = 2 Then
-        For Each subpos In ArraySort(pos_data.Item("parent").Keys(), 1)
-            pos_out = ArrayCombine(pos_out, SpecOneSubpos(all_data, subpos, type_spec))
-        Next
+        If qty_parent > 0 Then
+            For Each subpos In ArraySort(pos_data.Item("parent").Keys(), 1)
+                pos_out = ArrayCombine(pos_out, SpecOneSubpos(all_data, subpos, type_spec))
+            Next
+        End If
         If pos_data.exists("-") Then pos_out = ArrayCombine(pos_out, SpecOneSubpos(all_data, "-", type_spec))
     End If
     
@@ -3067,6 +3081,7 @@ Function Spec_Select(ByVal lastfilespec As String, ByVal suffix As String)
             all_data = DataRead(lastfilespec)
     End Select
     If IsEmpty(all_data) Then
+        r = Write2log(lastfilespec, suffix, "Данные отсутвуют")
         MsgBox ("Данные отсутвуют")
         Exit Function
     End If
@@ -3103,8 +3118,90 @@ Function Spec_Select(ByVal lastfilespec As String, ByVal suffix As String)
         Worksheets(nm).Cells.Clear
         r = FormatTable(pos_out)
         r = FormatTable()
+        r = Write2log(lastfilespec, suffix, "ОК")
     Else
+        r = Write2log(lastfilespec, suffix, "Данные отсутвуют")
         MsgBox ("Данные отсутвуют")
     End If
 End Function
 
+
+Function NewLogSheet()
+    log_sheet_name = "!Лог"
+    ThisWorkbook.Worksheets.Add.Name = log_sheet_name
+    Set log_sheet = Application.ThisWorkbook.Sheets(log_sheet_name)
+    Sheets(log_sheet_name).Visible = False
+    i = 0
+    i = i + 1: log_sheet.Cells(1, i) = "Время"
+    i = i + 1: log_sheet.Cells(1, i) = "Логин"
+    i = i + 1: log_sheet.Cells(1, i) = "Лист"
+    i = i + 1: log_sheet.Cells(1, i) = "Тип"
+    i = i + 1: log_sheet.Cells(1, i) = "Результат"
+    i = i + 1: log_sheet.Cells(1, i) = "calc"
+    i = i + 1: log_sheet.Cells(1, i) = "common"
+    i = i + 1: log_sheet.Cells(1, i) = "manual"
+    i = i + 1: log_sheet.Cells(1, i) = "surf"
+    i = i + 1: log_sheet.Cells(1, i) = "form"
+    i = i + 1: log_sheet.Cells(1, i) = "Коэфф. запаса"
+    i = i + 1: log_sheet.Cells(1, i) = "Арм п.м."
+    i = i + 1: log_sheet.Cells(1, i) = "Про п.м."
+    i = i + 1: log_sheet.Cells(1, i) = "Поз"
+    i = i + 1: log_sheet.Cells(1, i) = "На одну"
+    i = i + 1: log_sheet.Cells(1, i) = "Сборки"
+    i = i + 1: log_sheet.Cells(1, i) = "Игнор"
+    n_col = i
+    Range(log_sheet.Cells(1, 1), log_sheet.Cells(1, n_col)).RowHeight = 95
+    Range(log_sheet.Cells(2, 1), log_sheet.Cells(1000, n_col)).RowHeight = 16
+    i = 0
+    i = i + 1: log_sheet.Cells(1, i).ColumnWidth = 16
+    i = i + 1: log_sheet.Cells(1, i).ColumnWidth = 20
+    i = i + 1: log_sheet.Cells(1, i).ColumnWidth = 40
+    i = i + 1: log_sheet.Cells(1, i).ColumnWidth = 9
+    i = i + 1: log_sheet.Cells(1, i).ColumnWidth = 20
+    
+    
+    Range(log_sheet.Cells(1, i), log_sheet.Cells(1, n_col)).ColumnWidth = 8
+    
+    With Range(log_sheet.Cells(1, 1), log_sheet.Cells(1000, n_col))
+        .HorizontalAlignment = xlCenter
+        .VerticalAlignment = xlCenter
+        .WrapText = False
+        .Orientation = 0
+        .AddIndent = False
+        .IndentLevel = 0
+        .ShrinkToFit = False
+        .ReadingOrder = xlContext
+        .MergeCells = False
+    End With
+    Range(log_sheet.Cells(1, i), log_sheet.Cells(1, n_col)).Orientation = 90
+    Range(log_sheet.Cells(1, 1), log_sheet.Cells(1, n_col)).Font.Bold = True
+End Function
+
+Function Write2log(ByVal sheet_name As String, ByVal suffix As String, ByVal rezult As String)
+    log_sheet_name = "!Лог"
+    If Not SheetExist(log_sheet_name) Then
+        r = NewLogSheet()
+        j = 2
+    Else
+        Set log_sheet = Application.ThisWorkbook.Sheets(log_sheet_name)
+        j = GetSizeSheet(log_sheet)(1) + 1
+    End If
+    i = 0
+    i = i + 1: log_sheet.Cells(j, i) = Now
+    i = i + 1: log_sheet.Cells(j, i) = Application.UserName
+    i = i + 1: log_sheet.Cells(j, i) = sheet_name
+    i = i + 1: log_sheet.Cells(j, i) = suffix
+    i = i + 1: log_sheet.Cells(j, i) = rezult
+    i = i + 1: log_sheet.Cells(j, i) = macro_version
+    i = i + 1: log_sheet.Cells(j, i) = common_version
+    i = i + 1: log_sheet.Cells(j, i) = manual_version
+    i = i + 1: log_sheet.Cells(j, i) = surf_version
+    i = i + 1: log_sheet.Cells(j, i) = UserForm2.form_ver.Caption
+    i = i + 1: log_sheet.Cells(j, i) = k_zap_total
+    i = i + 1: log_sheet.Cells(j, i) = UserForm2.arm_pm_CB.Value
+    i = i + 1: log_sheet.Cells(j, i) = UserForm2.pr_pm_CB.Value
+    i = i + 1: log_sheet.Cells(j, i) = UserForm2.keep_pos_CB
+    i = i + 1: log_sheet.Cells(j, i) = UserForm2.qtyOneSubpos_CB
+    i = i + 1: log_sheet.Cells(j, i) = UserForm2.show_subpos_CB
+    i = i + 1: log_sheet.Cells(j, i) = UserForm2.ignore_subpos_CB
+End Function
