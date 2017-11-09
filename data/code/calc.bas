@@ -1161,6 +1161,7 @@ Function ManualAdd(ByVal lastfileadd As String) As Boolean
         Next i
     End If
     r = ManualSpec(nm, array_out)
+    r = Write2log(nm, "add", Str(UBound(add_array, 1)))
     ManualAdd = True
 End Function
 
@@ -1646,6 +1647,7 @@ Function SheetExport()
         If SpecGetType(nm) = "11" Then type_print = 1
         'If GetHeightSheet() > 420 Then r = SetPageBreaks(420, 2)
         r = Sheet2Pdf(Data_out, filename, type_print)
+        r = Write2log(filename, "PDF", "Œ ")
     End If
     r = OutEnded()
 End Function

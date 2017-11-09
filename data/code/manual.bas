@@ -199,6 +199,7 @@ Function ManualCheck() As Boolean
     Else
         ManualCheck = True
     End If
+    r = Write2log(nm, "check", Str(n_err))
 End Function
 
 
