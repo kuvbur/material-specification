@@ -21,7 +21,7 @@ Public lastsheet, lastconstrtype, lastconstr, lastfile, lastfilespec, lastfilead
 
 Private Sub CommandButtonIns_Click()
     arr2paste = materialbook_index.Item(lastconstrtype & "_" & lastconstr)
-    r = Paste2Sheet(arr2paste)
+    r = ManualPaste2Sheet(arr2paste)
 End Sub
 
 Private Sub CommandButtonOTD_Click()
@@ -40,7 +40,7 @@ Private Sub CommandButtonSB_Click()
 End Sub
 
 Private Sub CommandButtonShowS_Click()
-    r = show_s()
+    r = SheetShowAddictions()
 End Sub
 
 Private Sub UserForm_Initialize()
@@ -73,7 +73,7 @@ Private Sub CommandButtonAS_Click()
 End Sub
 
 Private Sub CommandButtonExport_Click()
-    r = SheetExport()
+    r = ExportSheet()
 End Sub
 
 Private Sub CommandButtonGR_Click()
@@ -112,8 +112,6 @@ End Sub
 Sub FormRebild()
     calc_ver.Caption = macro_version
     com_ver.Caption = common_version
-    man_ver.Caption = manual_version
-    surf_ver.Caption = surf_version
     form_ver.Caption = "2.5"
     symb_diam = ChrW(8960)
     remat
@@ -234,7 +232,7 @@ Function ReadConstr()
     For Each sheet_name In listsheet
         ReDim constr_list(1)
         Set sheet = materialbook.Sheets(sheet_name)
-        n_row = GetSizeSheet(sheet)(1)
+        n_row = SheetGetSize(sheet)(1)
         flag = 0: istart = 0
         For i = 1 To n_row
             If InStr(sheet.Cells(i, col_man_pos), "#") > 0 Or InStr(sheet.Cells(i, col_man_subpos), "#") > 0 Or i = n_row Then
