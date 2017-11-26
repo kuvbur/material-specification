@@ -2,7 +2,8 @@ Attribute VB_Name = "calc"
 Option Compare Text
 Option Base 1
 
-Public Const macro_version As String = "3.0"
+Public Const macro_version As String = "3.1"
+Public symb_diam As String 'Символ диаметра в спецификацию
 'Тип округления
 ' 1 - округление в большую сторону
 ' 2 - округление стандартным round
@@ -10,7 +11,7 @@ Public Const macro_version As String = "3.0"
 Public Const type_okrugl As Integer = 1
 'Кол-во знаков после запятой
 Public Const n_round_l As Integer = 2 'Длина
-Public Const n_round_w As Integer = 2 'Вес
+Public Const n_round_w As Integer = 1 'Вес
 Public Const n_round_area As Integer = 1 'Площадь в ведомость отделки
 '-------------------------------------------------------
 'Типы элементов (столбец col_type_el)
@@ -21,6 +22,12 @@ Public Const t_mat_spc As Integer = 35
 Public Const t_izd As Integer = 40
 Public Const t_subpos As Integer = 45
 Public Const t_else As Integer = 50
+
+Public Const t_wind_m As Integer = 60
+Public Const t_wind As Integer = 61
+Public Const t_perem_m As Integer = 65
+Public Const t_perem As Integer = 66
+
 Public Const t_error As Integer = -1 'Ошибка распознавания типов
 Public Const t_sys As Integer = -10 'Вспомогательный тип
 'Столбцы общие
@@ -133,7 +140,6 @@ Public gost2fklass, name_gost, reinforcement_specifications As Variant 'Разные м
 Public pr_adress As Variant
 
 Public k_zap_total As Double
-Public symb_diam As String 'Символ диаметра в спецификацию
 Public w_format As String 'Формат вывода в техничку
 Public pos_data As Variant
 
@@ -149,7 +155,6 @@ Function ArrayCol(ByVal array_in As Variant, ByVal col As Integer) As Variant
     ArrayCol = out
     Erase out
 End Function
-
     
 Function ArrayCombine(ByVal Arr1 As Variant, ByVal Arr2 As Variant) As Variant
     If (Not IsArray(Arr1)) And IsArray(Arr2) Then ArrayCombine = Arr2: Exit Function
@@ -254,6 +259,7 @@ End Function
 
 Function ArrayRedim(ByVal array_in As Variant, ByVal n_row As Integer) As Variant
     If IsEmpty(array_in) Then ArrayRedim = Empty: Exit Function
+    If n_row < 1 Then ArrayRedim = Empty: Exit Function
     If ArrayIsSecondDim(array_in) = False Then
         ReDim Preserve array_in(n_row)
         ArrayRedim = array_in
@@ -453,7 +459,7 @@ Function ArraySortABC(ByVal array_in As Variant, ByVal nCol As Integer) As Varia
         k = UBound(array_in)
         For j = LBound(array_in) To UBound(array_in) - 1
             For i = 2 To k
-                If Not IsEmpty(array_in(i - 1)) And Not IsEmpty(array_in(i)) Then
+                If Not IsEmpty(array_in(i - 1)) And Not IsEmpty(array_in(i)) And Not array_in(i) = "" And Not array_in(i - 1) = "" Then
                     If Asc(UCase(array_in(i - 1))) > Asc(UCase(array_in(i))) Then
                         v = array_in(i - 1)
                         array_in(i - 1) = array_in(i)
@@ -473,15 +479,15 @@ Function ArraySortNum(ByVal array_in As Variant, ByVal nCol As Integer) As Varia
     If ArrayIsSecondDim(array_in) Then
         If nCol > UBound(array_in, 2) Or nCol < LBound(array_in, 2) Then MsgBox "Нет такого столбца в массиве!", vbCritical: Exit Function
         Dim Check As Boolean, iCount As Integer, jCount As Integer
-        ReDim tmparr(UBound(array_in, 2)) As Variant
+        ReDim tmpArr(UBound(array_in, 2)) As Variant
         Do Until Check
             Check = True
             For iCount = LBound(array_in, 1) To UBound(array_in, 1) - 1
                 If val(array_in(iCount, nCol)) > val(array_in(iCount + 1, nCol)) Then
                     For jCount = LBound(array_in, 2) To UBound(array_in, 2)
-                        tmparr(jCount) = array_in(iCount, jCount)
+                        tmpArr(jCount) = array_in(iCount, jCount)
                         array_in(iCount, jCount) = array_in(iCount + 1, jCount)
-                        array_in(iCount + 1, jCount) = tmparr(jCount)
+                        array_in(iCount + 1, jCount) = tmpArr(jCount)
                         Check = False
                     Next
                 End If
@@ -1058,6 +1064,7 @@ Function DataRead(ByVal nm As String) As Variant
         Erase out
         If Not DataIsSpec(out_data) And SpecGetType(nm) <> "7" Then
             MsgBox ("Неверный формат файла")
+            r = LogWrite(nm, "", "Неверный формат файла")
             DataRead = Empty
             Exit Function
         End If
@@ -1208,7 +1215,7 @@ Function DataWeightSubpos(ByVal array_in As Variant) As Variant
     Set dweight = CreateObject("Scripting.Dictionary")
     dweight.comparemode = 1
     Dim tweight As Double
-    If (UBound(pos_data.Item("parent").Keys()) < 0) Then
+    If (UBound(pos_data.Item("parent").keys()) < 0) Then
         Set DataWeightSubpos = dweight
         Exit Function
     End If
@@ -1236,7 +1243,7 @@ Function DataWeightSubpos(ByVal array_in As Variant) As Variant
                 Case t_izd
                     qty = array_in(i, col_qty)
                     If (qty = 0) Or IsEmpty(qty) Then qty = 1
-                    If array_in(i, col_m_weight) = "-" Then
+                    If Not IsNumeric(array_in(i, col_m_weight)) Then
                         tweight = 0
                     Else
                         tweight = qty * array_in(i, col_m_weight)
@@ -1246,7 +1253,7 @@ Function DataWeightSubpos(ByVal array_in As Variant) As Variant
         End If
     Next
     'Делим на количество вхождений, чтоб получить массу одной шт.
-    For Each subpos In dweight.Keys()
+    For Each subpos In dweight.keys()
         If pos_data.Item("child").exists(subpos) Then
             nSubPos = pos_data.Item("qty").Item("all" & subpos)
         Else
@@ -1254,14 +1261,15 @@ Function DataWeightSubpos(ByVal array_in As Variant) As Variant
         End If
         If nSubPos < 1 Then
             MsgBox ("Не определено кол-во сборок " & subpos & ", принято 1 шт.")
+            r = LogWrite(subpos, "", "Не определено кол-во сборок")
             nSubPos = 1
         End If
         w = (dweight.Item(subpos) / nSubPos)
         dweight.Item(subpos) = w
     Next
     'Для сборок первого уровня учтём вхождения сборок второго уровня
-    For Each subpos In pos_data.Item("parent").Keys()
-        For Each tchild In pos_data.Item("child").Keys()
+    For Each subpos In pos_data.Item("parent").keys()
+        For Each tchild In pos_data.Item("child").keys()
             If pos_data.Item("qty").exists(subpos & "_" & tchild) Then
                 qty = pos_data.Item("qty").Item(subpos & "_" & tchild) / pos_data.Item("qty").Item("-_" & subpos)
                 tweight = dweight.Item(tchild)
@@ -1850,7 +1858,7 @@ Function FormatManual(ByVal nm As String) As Boolean
 
     With Range(r_prim).Validation
         .Delete
-        .Add Type:=xlValidateList, AlertStyle:=xlValidAlertStop, Operator:=xlBetween, Formula1:="=" & pr_adress.Item("Примечания")
+        .Add Type:=xlValidateList, AlertStyle:=xlValidAlertWarning, Operator:=xlBetween, Formula1:="=" & pr_adress.Item("Примечания")
         .IgnoreBlank = True
         .InCellDropdown = True
         .InputTitle = ""
@@ -1900,10 +1908,24 @@ Function FormatManual(ByVal nm As String) As Boolean
         .ShowError = True
     End With
     
-    For i = 1 To 500
+    
+    With Range(r_pr_okr).Validation
+        .Delete
+        .Add Type:=xlValidateList, AlertStyle:=xlValidAlertStop, Operator:=xlBetween, Formula1:="=" & pr_adress.Item("Окраска")
+        .IgnoreBlank = True
+        .InCellDropdown = True
+        .InputTitle = ""
+        .ErrorTitle = ""
+        .InputMessage = ""
+        .ErrorMessage = ""
+        .ShowInput = True
+        .ShowError = True
+    End With
+
+    For i = 1 To 800
         gost = Cells(i, col_man_pr_gost_pr).Value
         addr = pr_adress.Item(gost)
-        If Not IsEmpty(addr) Then
+        If Not IsEmpty(addr) And Not IsEmpty(gost) Then
             With Cells(i, col_man_pr_prof).Validation
                             .Delete
                             .Add Type:=xlValidateList, AlertStyle:=xlValidAlertStop, Operator:=xlBetween, Formula1:="=" & addr(1)
@@ -1920,7 +1942,7 @@ Function FormatManual(ByVal nm As String) As Boolean
         
         klass = Cells(i, col_man_klass).Value
         addr = pr_adress.Item(klass)
-        If Not IsEmpty(addr) Then
+        If Not IsEmpty(addr) And Not IsEmpty(klass) Then
             With Cells(i, col_man_diametr).Validation
                             .Delete
                             .Add Type:=xlValidateList, AlertStyle:=xlValidAlertStop, Operator:=xlBetween, Formula1:="=" & addr
@@ -1951,7 +1973,7 @@ End Function
 
 Function FormatManualrange(ByVal col As Integer) As String
     litera = FormatManuallitera(col)
-    out = litera & "3:" & litera & "500"
+    out = litera & "3:" & litera & "800"
     FormatManualrange = out
 End Function
 
@@ -2299,9 +2321,9 @@ Function FormatSpec_Ved(ByVal Data_out As Range, ByVal n_row As Integer, ByVal n
     n_start = 3
     n_end = 3
     For i = 3 To n_row
-        temp = Trim(Data_out.Cells(i, 1))
-        If temp = Empty Then n_end = i
-        If temp <> Empty Then
+        temp = Trim(Data_out.Cells(i, 1).MergeArea.Cells(1, 1).Value)
+        If temp = Empty Or temp = "-" Then n_end = i
+        If temp <> Empty And temp <> "-" Then
             If n_end > n_start Then
                 Range(Data_out.Cells(n_start, 1), Data_out.Cells(n_end, 1)).Merge
                 Range(Data_out.Cells(n_start, 2), Data_out.Cells(n_end, 2)).Merge
@@ -2309,7 +2331,7 @@ Function FormatSpec_Ved(ByVal Data_out As Range, ByVal n_row As Integer, ByVal n
             End If
             n_start = i
         End If
-        If i = n_row And temp = Empty Then
+        If i = n_row And temp = Empty Or temp = "-" Then
             n_end = i
             Range(Data_out.Cells(n_start, 1), Data_out.Cells(n_end, 1)).Merge
             Range(Data_out.Cells(n_start, 2), Data_out.Cells(n_end, 2)).Merge
@@ -2321,7 +2343,7 @@ Function FormatSpec_Ved(ByVal Data_out As Range, ByVal n_row As Integer, ByVal n
         n_start = 3
         n_end = 3
         For i = 3 To n_row
-            temp = Trim(Data_out.Cells(i, n_c))
+            temp = Trim(Data_out.Cells(i, n_c).MergeArea.Cells(1, 1).Value)
             If temp = Empty Then n_end = i
             If temp <> Empty Then
                 If n_end > n_start Then Range(Data_out.Cells(n_start, n_c), Data_out.Cells(n_end, n_c)).Merge
@@ -2334,27 +2356,29 @@ Function FormatSpec_Ved(ByVal Data_out As Range, ByVal n_row As Integer, ByVal n
         Next i
     Next n_c
 
-    For n_c = 3 To n_col - 1
-        If InStr(Data_out.Cells(2, n_c), "Площадь") = 0 And InStr(Data_out.Cells(2, n_c), "Высота") = 0 Then
-            temp_1 = Data_out.Cells(n_start, n_c).Value
-            n_start = 3
-            n_end = 3
-            For i = 3 To n_row
-                temp_2 = Data_out.Cells(i, n_c).Value
-                If temp_1 <> temp_2 And temp_2 <> Empty Then
-                    temp_1 = temp_2
-                    If n_end > n_start Then Range(Data_out.Cells(n_start, n_c), Data_out.Cells(n_end, n_c)).Merge
-                    n_start = i
-                Else
-                    n_end = i
-                End If
-                If i = n_row And temp_1 = temp_2 And temp_2 <> Empty Then
-                    n_end = i
-                    Range(Data_out.Cells(n_start, n_c), Data_out.Cells(n_end, n_c)).Merge
-                End If
-            Next i
-        End If
-    Next n_c
+    If UserForm2.merge_material_CB.Value Then
+        For n_c = 3 To n_col - 1
+            If InStr(Data_out.Cells(2, n_c), "Площадь") = 0 And InStr(Data_out.Cells(2, n_c), "Высота") = 0 Then
+                temp_1 = Data_out.Cells(n_start, n_c).MergeArea.Cells(1, 1).Value
+                n_start = 3
+                n_end = 3
+                For i = 3 To n_row
+                    temp_2 = Data_out.Cells(i, n_c).MergeArea.Cells(1, 1).Value
+                    If temp_1 <> temp_2 And temp_2 <> Empty Then
+                        temp_1 = temp_2
+                        If n_end > n_start Then Range(Data_out.Cells(n_start, n_c), Data_out.Cells(n_end, n_c)).Merge
+                        n_start = i
+                    Else
+                        n_end = i
+                    End If
+                    If i = n_row And temp_1 = temp_2 And temp_2 <> Empty Then
+                        n_end = i
+                        Range(Data_out.Cells(n_start, n_c), Data_out.Cells(n_end, n_c)).Merge
+                    End If
+                Next i
+            End If
+        Next n_c
+    End If
     
     Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_start_all, 4)).Merge
     For i = n_start_all + 1 To n_all
@@ -2768,6 +2792,7 @@ Function GetNSubpos(ByVal subpos As String, ByVal type_spec As Integer) As Integ
         End If
         If nSubPos < 1 Then
             MsgBox ("Не определено кол-во сборок " & subpos & ", принято 1 шт.")
+            r = LogWrite(subpos, "", "Не определено кол-во сборок")
             nSubPos = 1
         End If
     Else
@@ -2817,6 +2842,7 @@ Function GetWeightForDiametr(ByVal diametr As Integer, ByVal klass As String) As
         End If
     Next
     MsgBox ("Отсутвует вес для " & diametr & " " & klass)
+    r = LogWrite("Ошибка арматуры", "", "Отсутвует вес для " & diametr & " " & klass)
     GetWeightForDiametr = 1
 End Function
 
@@ -3001,13 +3027,12 @@ Function ManualCatchChange(ByVal Target As Range)
         n_row = ceil.row
         name_colum = Cells(2, n_colum).Value
         If name_colum = "ГОСТ профиля" Then
-            'Cells(n_row, col_man_pr_prof).ClearContents
             gost = ceil.Value
             addr = pr_adress.Item(gost)
-            If Not IsEmpty(addr) Then
+            If Not IsEmpty(addr) And Not IsEmpty(gost) Then
                 With Cells(n_row, col_man_pr_prof).Validation
                                 .Delete
-                                .Add Type:=xlValidateList, AlertStyle:=xlValidAlertStop, Operator:=xlBetween, Formula1:="=" & addr(1)
+                                .Add Type:=xlValidateList, AlertStyle:=xlValidAlertWarning, Operator:=xlBetween, Formula1:="=" & addr(1)
                                 .IgnoreBlank = True
                                 .InCellDropdown = True
                                 .InputTitle = ""
@@ -3026,10 +3051,10 @@ Function ManualCatchChange(ByVal Target As Range)
             'Cells(n_row, col_man_diametr).ClearContents
             klass = ceil.Value
             addr = pr_adress.Item(klass)
-            If Not IsEmpty(addr) Then
+            If Not IsEmpty(addr) And Not IsEmpty(klass) Then
                 With Cells(n_row, col_man_diametr).Validation
                                 .Delete
-                                .Add Type:=xlValidateList, AlertStyle:=xlValidAlertStop, Operator:=xlBetween, Formula1:="=" & addr
+                                .Add Type:=xlValidateList, AlertStyle:=xlValidAlertWarning, Operator:=xlBetween, Formula1:="=" & addr
                                 .IgnoreBlank = True
                                 .InCellDropdown = True
                                 .InputTitle = ""
@@ -3061,7 +3086,14 @@ Function ManualCatchChange(ByVal Target As Range)
                 If Not IsEmpty(prof) Then
                     If Not IsEmpty(pr_adress.Item(gost & prof)) Then
                         Cells(n_row, col_man_weight) = pr_adress.Item(gost & prof)(1)
-                        Cells(n_row, col_man_naen) = GetNameForGOST(pr_adress.Item(gost)(2)) & " " & prof
+                        If InStr(Cells(n_row, col_man_pr_gost_pr).Value, "Лист_") Then
+                            If GetAreaList(Cells(n_row, col_man_naen).Value) <> Cells(n_row, col_man_pr_length).Value Then
+                                Cells(n_row, col_man_pr_length).Value = GetAreaList(Cells(n_row, col_man_naen).Value)
+                                Cells(n_row, col_man_pr_length).Interior.Color = XlRgbColor.rgbLightGrey
+                            End If
+                        Else
+                            Cells(n_row, col_man_naen) = GetNameForGOST(pr_adress.Item(gost)(2)) & " " & prof
+                        End If
                     Else
                         Cells(n_row, col_man_pr_prof).ClearContents
                         Cells(n_row, col_man_weight).ClearContents
@@ -3142,6 +3174,10 @@ Function ManualCheck() As Boolean
             'Data_out.Cells(i, col_man_pos).value = pos
         End If
         
+        If type_el <> t_prokat Then
+            Data_out.Range(Data_out.Cells(i, col_man_pr_length), Data_out.Cells(i, col_man_pr_ogn)).ClearContents
+        End If
+        
         Select Case type_el
             Case t_sys 'Отмечаем вспомогательные строки
                 With Data_out.Range(Data_out.Cells(i, 1), Data_out.Cells(i, max_col_man)).Interior
@@ -3159,11 +3195,11 @@ Function ManualCheck() As Boolean
                 Data_out.Cells(i, col_man_weight).Value = GetWeightForDiametr(diametr, klass)
                 Data_out.Cells(i, col_man_weight).Interior.Color = XlRgbColor.rgbLightGrey
                 If qty = Empty And prim <> "п.м." Then
-                    r = ManualCeilAlert(Data_out.Cells(i, col_man_qty), "Необходимо указать количество" & vbLf & "или добавить примечание п.м.")
+                    r = ManualCeilAlert(Data_out.Cells(i, col_man_qty), "Необходимо указать количество")
                     n_err = n_err + 1
                 End If
-                If Length > 11800 And prim <> "п.м." Then
-                    r = ManualCeilAlert(Data_out.Cells(i, col_man_length), "Стержни длиной выше 11,8 должны идти в п.м.")
+                If Length > 11700 And prim <> "п.м." Then
+                    r = ManualCeilAlert(Data_out.Cells(i, col_man_length), "Стержни длиной выше 11,7 должны идти в п.м.")
                     n_err = n_err + 1
                 End If
                 If Length < 100 Then
@@ -3182,25 +3218,18 @@ Function ManualCheck() As Boolean
                 pr_type = row(col_man_pr_type) ' Тип конструкции
                 pr_st = row(col_man_pr_st) ' Сталь
                 Data_out.Cells(i, col_man_weight).Interior.Color = XlRgbColor.rgbLightGrey
-                If Length > 11800 And prim <> "п.м." Then
-                    r = ManualCeilAlert(Data_out.Cells(i, col_man_length), "Стержни длиной выше 11,8 должны идти в п.м.")
+                If IsEmpty(qty) Then
+                    r = ManualCeilAlert(Data_out.Cells(i, col_man_qty), "Необходимо указать количество")
                     n_err = n_err + 1
                 End If
                 
-                If prim = "п.м." Then
-                    If Not IsEmpty(qty) Then
-                        r = ManualCeilAlert(Data_out.Cells(i, col_man_qty), "Количество для элементов в п.м. не указывается")
-                        n_err = n_err + 1
-                    Else
-                        Data_out.Cells(i, col_man_qty).Interior.Color = XlRgbColor.rgbLightGrey
+                If InStr(Data_out.Cells(i, col_man_pr_gost_pr).Value, "Лист_") Then
+                    If GetAreaList(Cells(i, col_man_naen).Value) <> Cells(i, col_man_pr_length).Value Then
+                        Data_out.Cells(i, col_man_pr_length).Value = GetAreaList(Data_out.Cells(i, col_man_naen).Value)
                     End If
-                Else
-                    If IsEmpty(qty) Then
-                        r = ManualCeilAlert(Data_out.Cells(i, col_man_qty), "Необходимо указать количество" & vbLf & "или добавить примечание п.м.")
-                        n_err = n_err + 1
-                    End If
+                    Data_out.Cells(i, col_man_pr_length).Interior.Color = XlRgbColor.rgbLightGrey
                 End If
-
+                
             Case t_subpos 'Правила для маркировки сборок
                 With Data_out.Range(Data_out.Cells(i, 1), Data_out.Cells(i, max_col_man)).Interior
                     .Pattern = xlSolid
@@ -3288,16 +3317,24 @@ Function ManualSpec(ByVal nm As String, Optional ByVal add_array As Variant) As 
     spec = spec_sheet.Range(spec_sheet.Cells(1, 1), spec_sheet.Cells(n_row, max_col_man))
     Dim pos_out: ReDim pos_out(n_row - istart, max_col): n_row_out = 0
     Dim param
+    r = ManualCheck()
+    Dim add_okr_array
+    n_add_okr = 0
+    For i = istart To n_row
+        If Not IsEmpty(spec(i, col_man_pr_okr)) And spec(i, col_man_pr_okr) <> "-" Then n_add_okr = n_add_okr + 1
+    Next i
+    ReDim add_okr_array(n_add_okr, max_col)
+    n_add_okr = 0
     For i = istart To n_row
         row = ArrayRow(spec, i)
 
-        subpos = Replace(row(col_man_subpos), ".", "@")  ' Марка элемента
-        pos = Replace(row(col_man_pos), ".", "@")  ' Поз.
-        obozn = row(col_man_obozn) ' Обозначение
-        naen = row(col_man_naen) ' Наименование
+        subpos = Trim(Replace(row(col_man_subpos), ".", "@"))  ' Марка элемента
+        pos = Trim(Replace(row(col_man_pos), ".", "@"))  ' Поз.
+        obozn = Trim(row(col_man_obozn)) ' Обозначение
+        naen = Trim(row(col_man_naen)) ' Наименование
         qty = row(col_man_qty) ' Кол-во на один элемент
         Weight = row(col_man_weight) ' Масса, кг
-        prim = row(col_man_prim) ' Примечание (на лист)
+        prim = Trim(row(col_man_prim)) ' Примечание (на лист)
         
         If qty = Empty Or qty <= 0 Then qty = 1
         type_el = ManualType(row)
@@ -3332,14 +3369,45 @@ Function ManualSpec(ByVal nm As String, Optional ByVal add_array As Variant) As 
                 pr_prof = row(col_man_pr_prof) ' Профиль
                 pr_type = row(col_man_pr_type) ' Тип конструкции
                 pr_st = row(col_man_pr_st) ' Сталь
-                
+                pr_okr = row(col_man_pr_okr) ' Окраска
                 pos_out(n_row_out, col_pr_type_konstr) = pr_type
                 pos_out(n_row_out, col_pr_gost_st) = pr_adress.Item(pr_st)
                 pos_out(n_row_out, col_pr_st) = pr_st
                 pos_out(n_row_out, col_pr_gost_prof) = pr_adress.Item(pr_gost_pr)(2)
                 pos_out(n_row_out, col_pr_prof) = pr_prof
-                pos_out(n_row_out, col_pr_length) = pr_length
+                koef_l = 1
+                area_okr = -1
+                If InStr(pr_gost_pr, "Лист_") Then
+                    koef_l = 1000
+                    ab = Split(naen, "x")
+                    If UBound(ab) = 0 Then ab = Split(naen, "х")
+                    If UBound(ab) = 0 Then ab = Split(naen, "*")
+                    If UBound(ab) > 0 Then
+                        aa = Application.WorksheetFunction.Max(ab(0), ab(1))
+                        bb = Application.WorksheetFunction.Min(ab(0), ab(1))
+                        pos_out(n_row_out, col_pr_naen) = pr_prof & "x" & aa & "x" & bb
+                        perim_okr = 2 / 1000
+                    End If
+                Else
+                    perim_okr = pr_adress.Item(pr_gost_pr & pr_prof)(2)
+                    pos_out(n_row_out, col_pr_naen) = pr_prof & " L=" & pr_length * 1000 & "мм."
+                End If
+                pos_out(n_row_out, col_pr_length) = pr_length / koef_l
                 pos_out(n_row_out, col_pr_weight) = Weight
+                
+                If Not IsEmpty(pr_okr) And pr_okr <> "-" Then
+                    n_add_okr = n_add_okr + 1
+                    area_okr = perim_okr * pr_length / 1000
+                    add_okr_array(n_add_okr, col_marka) = pos
+                    add_okr_array(n_add_okr, col_sub_pos) = subpos
+                    add_okr_array(n_add_okr, col_type_el) = t_mat
+                    add_okr_array(n_add_okr, col_pos) = "-"
+                    add_okr_array(n_add_okr, col_qty) = qty * area_okr
+                    add_okr_array(n_add_okr, col_m_obozn) = "см. примечания"
+                    add_okr_array(n_add_okr, col_m_naen) = "Покрытие " & StrConv(pr_okr, vbLowerCase)
+                    add_okr_array(n_add_okr, col_m_weight) = "-"
+                    add_okr_array(n_add_okr, col_m_edizm) = "кв.м."
+                End If
             Case t_mat
                 pos_out(n_row_out, col_m_obozn) = obozn
                 pos_out(n_row_out, col_m_naen) = naen
@@ -3370,7 +3438,9 @@ Function ManualSpec(ByVal nm As String, Optional ByVal add_array As Variant) As 
             End If
         End If
     Next i
-
+    
+    n_row_out = n_row_out + n_add_okr
+    pos_out = ArrayCombine(pos_out, add_okr_array)
     If flag_add Then
         'Добавим из add_array все новые элементы (в первом столбце нет значения "mod")
         end_row = n_row_out + istart + 1
@@ -3446,7 +3516,7 @@ Function ManualSpec(ByVal nm As String, Optional ByVal add_array As Variant) As 
                 End If
             Next i
             'Осталось ещё раз пройти по элементам и добавить элементы из сборок второго уровня,
-            'Поменяв при это обозначение вхождения сборки с t_izd на t_subpos
+            'Поменяв при этом обозначение вхождения сборки с t_izd на t_subpos
             Dim subarray: ReDim subarray(max_col, 1)
             For j = 1 To UBound(pos_out, 1)
                 If pos_out(j, col_type_el) = t_izd Then
@@ -3595,6 +3665,7 @@ Function ReadMetall() As Boolean
         name_gost = ReadTxt(nf_prof)
     Else
         MsgBox ("Нет файла с именами профилей")
+        r = LogWrite("Ошибка профилей", "", "Нет файла с именами профилей")
     End If
 End Function
 
@@ -3632,6 +3703,7 @@ End Function
 
 Function ReadPrSortament()
     r = OutPrepare()
+    r = SheetNew("!System")
     Set Sh = Application.ThisWorkbook.Sheets("!System") 'На этом скрытом листе будем хранить данные для списков
     Sh.Cells.Clear
     Set tpr_adress = CreateObject("Scripting.Dictionary") 'В этом словаре будем хранить адреса
@@ -3655,12 +3727,42 @@ Function ReadPrSortament()
         tmp_arr(1) = "'!System'!" & Sh.Range(Sh.Cells(3, n_col - 1), Sh.Cells(n_prof, n_col - 1)).Address
         tmp_arr(2) = f_list_gost(n_col)
         tpr_adress.Item(file) = tmp_arr
+        type_prof = f_list_sort(n_col, 5)
         For j = 2 To n_prof - 1
-            prof = f_list_prof(j)
-            tmp_arr(1) = f_list_weight(j) 'Вес
-            tmp_arr(2) = j 'Периметр
-            tmp_arr(3) = j 'Площадь сечения
-            tpr_adress.Item(file & prof) = tmp_arr
+            If Not IsEmpty(f_list_weight(j)) Then
+                'Определяем периметр
+                perim = 0
+                Select Case type_prof
+                    Case "Круглая труба"
+                        Dd = f_prof(j, 5) / 1000
+                        perim = 3.141592 * Dd
+                    Case "Квадратная труба"
+                        hh = f_prof(j, 5) / 1000
+                        bb = f_prof(j, 6) / 1000
+                        perim = 2 * hh + 2 * bb
+                    Case "Швеллер", "Швеллер гнутый"
+                        bb = f_prof(j, 6) / 1000
+                        hh = f_prof(j, 5) / 1000
+                        perim = 2 * hh + 4 * bb
+                    Case "Двутавр"
+                        hh = f_prof(j, 5) / 1000
+                        bb = f_prof(j, 6) / 1000
+                        tt = f_prof(j, 8) / 1000
+                        perim = 2 * hh + 4 * bb + 4 * tt
+                    Case "Уголок", "Уголок гнутый"
+                        hh = f_prof(j, 5) / 1000
+                        bb = f_prof(j, 6) / 1000
+                        tt = f_prof(j, 7) / 1000
+                        perim = 2 * hh + 2 * bb + 2 * tt
+                    Case "Лист"
+                        perim = -1
+                End Select
+                prof = f_list_prof(j)
+                tmp_arr(1) = f_list_weight(j) 'Вес
+                tmp_arr(2) = perim 'Периметр
+                tmp_arr(3) = f_prof(j, 4) 'Площадь сечения
+                tpr_adress.Item(file & prof) = tmp_arr
+            End If
         Next j
     Next
     n_start = n_sort + 1
@@ -3704,8 +3806,19 @@ Function ReadPrSortament()
     Sh.Cells(2, n_start) = "п.м."
     Sh.Cells(3, n_start) = "кв.м."
     Sh.Cells(4, n_start) = "куб.м."
-    tpr_adress.Item("Примечания") = "'!System'!" & Sh.Range(Sh.Cells(1, n_start), Sh.Cells(4, n_start)).Address
+    Sh.Cells(5, n_start) = "кг."
+    Sh.Cells(6, n_start) = "л."
+    tpr_adress.Item("Примечания") = "'!System'!" & Sh.Range(Sh.Cells(1, n_start), Sh.Cells(6, n_start)).Address
     
+    n_start = n_end + 2
+    'Типы окраски
+    Sh.Cells(1, n_start) = "-"
+    Sh.Cells(2, n_start) = "Тип 1"
+    Sh.Cells(3, n_start) = "Тип 2"
+    Sh.Cells(4, n_start) = "Тип 3"
+    Sh.Cells(5, n_start) = "Тип 4"
+    tpr_adress.Item("Окраска") = "'!System'!" & Sh.Range(Sh.Cells(1, n_start), Sh.Cells(5, n_start)).Address
+      
     r = OutEnded()
     Set pr_adress = tpr_adress
     ReadPrSortament = True
@@ -3719,6 +3832,7 @@ Function ReadReinforce() As Boolean
         reinforcement_specifications = ReadTxt(nf_sort)
     Else
         MsgBox ("Нет файла сортамента арматуры")
+        r = LogWrite("Ошибка арматуры", "", "Нет файла сортамента арматуры")
         Exit Function
     End If
     Set gost2fklass = CreateObject("Scripting.Dictionary")
@@ -4137,7 +4251,7 @@ Function SpecIzd(ByVal izd As Variant, ByVal n_izd As Integer, ByVal type_spec A
                     pos_out(i, 3) = naen
                     pos_out(i, 4) = pos_out(i, 4) + n_el
                     pos_out(i, 5) = Weight
-                    If IsNumeric(Weight) Then
+                    If IsNumeric(Weight) And izd(j, col_m_edizm) = "" Then
                         pos_out(i, 6) = pos_out(i, 6) + (n_el * Weight)
                     Else
                         pos_out(i, 6) = izd(j, col_m_edizm)
@@ -4240,7 +4354,7 @@ Function SpecOneSubpos(ByVal all_data As Variant, ByVal subpos As String, ByVal 
     Else
         n_n = 1
     End If
-    
+    sb_naen = "@"
     n_col_spec = 6
     If type_spec = 13 Then n_col_spec = n_col_spec + 1
     If type_spec = 2 Then
@@ -4258,9 +4372,10 @@ Function SpecOneSubpos(ByVal all_data As Variant, ByVal subpos As String, ByVal 
         Else
             pos_naen(n_n, 1) = " Прочие элементы "
         End If
+        sb_naen = pos_naen(n_n, 1)
         pos_out = ArrayCombine(pos_out, pos_naen)
     End If
-    
+
     n_row = UBound(all_data, 1)
     Dim arm(): ReDim arm(n_row, max_col)
     Dim prokat(): ReDim prokat(n_row, max_col)
@@ -4397,22 +4512,40 @@ Function SpecOneSubpos(ByVal all_data As Variant, ByVal subpos As String, ByVal 
     If IsEmpty(pos_out) Then
         SpecOneSubpos = pos_out
     Else
-        If type_spec = 1 Then
-            For i = 1 To UBound(pos_out, 1)
-                If IsNumeric(pos_out(i, 4)) Then
-                    k = pos_out(i, 4)
-                Else
-                    k = 1
+        Select Case type_spec
+            Case 1
+                For i = 1 To UBound(pos_out, 1)
+                    If IsNumeric(pos_out(i, 4)) Then
+                        k = pos_out(i, 4)
+                    Else
+                        k = 1
+                    End If
+                    If IsNumeric(pos_out(i, 5)) Then
+                        m = pos_out(i, 5)
+                    Else
+                        m = 0
+                    End If
+                    pos_out(1, 6) = pos_out(1, 6) + k * m
+                Next i
+                pos_out(1, 6) = Round_w(pos_out(1, 6), 0)
+            Case Else
+                If Not UserForm2.show_type_CB.Value Then
+                    pos_out_sort = ArraySort(pos_out, 1)
+                    If sb_naen = "@" Then
+                        n_row = 0
+                    Else
+                        n_row = n_n
+                    End If
+                    For i = 1 To UBound(pos_out, 1)
+                        If pos_out_sort(i, 1) <> "Поз." And pos_out_sort(i, 1) <> sb_naen And pos_out_sort(i, 3) <> "" Then
+                            n_row = n_row + 1
+                            For j = 1 To UBound(pos_out, 2)
+                                pos_out(n_row, j) = pos_out_sort(i, j)
+                            Next j
+                        End If
+                    Next i
                 End If
-                If IsNumeric(pos_out(i, 5)) Then
-                    m = pos_out(i, 5)
-                Else
-                    m = 0
-                End If
-                pos_out(1, 6) = pos_out(1, 6) + k * m
-            Next i
-            pos_out(1, 6) = Round_w(pos_out(1, 6), 0)
-        End If
+        End Select
         SpecOneSubpos = pos_out
         Erase pos_out
     End If
@@ -4619,14 +4752,16 @@ Function Spec_AS(ByRef all_data As Variant, ByVal type_spec As Integer) As Varia
     If type_spec = 13 Then n_col_spec = n_col_spec + 1
     Dim pos_out: ReDim pos_out(1, n_col_spec)
     If IsEmpty(all_data) Then Spec_AS = Empty: Exit Function
-    qty_parent = UBound(pos_data.Item("parent").Keys()) + 1
-    qty_child = UBound(pos_data.Item("child").Keys()) + 1
+    qty_parent = UBound(pos_data.Item("parent").keys()) + 1
+    qty_child = UBound(pos_data.Item("child").keys()) + 1
     If qty_parent < 0 And qty_child < 0 And (type_spec = 2 Or type_spec = 13) Then
+        r = LogWrite("Ошибка спецификации", "", "Сборки отсутвуют. Создана общестроительная спецификаця")
         MsgBox ("Сборки отсутвуют. Создана общестроительная спецификаця")
         type_spec = 3
     End If
     If type_spec = 13 And ((qty_parent <= 1) Or (qty_parent < 1 And pos_data.exists("-"))) Then
         MsgBox ("Сборок меньше двух. Создана общестроительная спецификаця")
+        r = LogWrite("Ошибка спецификации", "", "Сборок меньше двух. Создана общестроительная спецификаця")
         type_spec = 3
     End If
     Select Case type_spec
@@ -4678,7 +4813,7 @@ Function Spec_AS(ByRef all_data As Variant, ByVal type_spec As Integer) As Varia
     End If
     
     If type_spec = 1 Then
-        For Each subpos In ArraySort(pos_data.Item(ch_key).Keys(), 1)
+        For Each subpos In ArraySort(pos_data.Item(ch_key).keys(), 1)
             pos_out = ArrayCombine(pos_out, SpecOneSubpos(all_data, subpos, type_spec))
         Next
         Dim pos_end: ReDim pos_end(1, 6)
@@ -4692,7 +4827,7 @@ Function Spec_AS(ByRef all_data As Variant, ByVal type_spec As Integer) As Varia
     
     If type_spec = 2 Then
         If qty_parent > 0 Then
-            For Each subpos In ArraySort(pos_data.Item("parent").Keys(), 1)
+            For Each subpos In ArraySort(pos_data.Item("parent").keys(), 1)
                 pos_out = ArrayCombine(pos_out, SpecOneSubpos(all_data, subpos, type_spec))
             Next
         End If
@@ -4700,7 +4835,7 @@ Function Spec_AS(ByRef all_data As Variant, ByVal type_spec As Integer) As Varia
     End If
     
     If type_spec = 3 Then
-        If (pos_data.exists("-") Or (UserForm2.show_subpos_CB.Value And (UBound(pos_data.Item("parent").Keys()) >= 0))) Then
+        If (pos_data.exists("-") Or (UserForm2.show_subpos_CB.Value And (UBound(pos_data.Item("parent").keys()) >= 0))) Then
             pos_out = ArrayCombine(pos_out, SpecOneSubpos(all_data, "-", type_spec))
         Else
             Spec_AS = Empty
@@ -4722,7 +4857,7 @@ Function Spec_AS(ByRef all_data As Variant, ByVal type_spec As Integer) As Varia
         Dim n_row_izd As Integer
         Dim n_row_mat As Integer
 
-        For Each subpos In ArraySort(pos_data.Item("parent").Keys(), 1)
+        For Each subpos In ArraySort(pos_data.Item("parent").keys(), 1)
             If UserForm2.qtyOneSubpos_CB.Value Then
                 nSubPos = GetNSubpos(subpos, type_spec)
                 pos_out(2, n_col_sb) = subpos & vbLf & "(" & nSubPos & "шт)"
@@ -4765,11 +4900,18 @@ Function Spec_AS(ByRef all_data As Variant, ByVal type_spec As Integer) As Varia
             Next i
             pos_out(2, end_col - 3) = "Прочее"
         End If
-        If n_row_subpos > 0 Then pos_out = ArrayCombine(pos_out, ArrayRedim(pos_out_subpos, n_row_subpos))
-        If n_row_arm > 0 Then pos_out = ArrayCombine(pos_out, ArrayRedim(pos_out_arm, n_row_arm))
-        If n_row_prokat > 0 Then pos_out = ArrayCombine(pos_out, ArrayRedim(pos_out_prokat, n_row_prokat))
-        If n_row_izd > 0 Then pos_out = ArrayCombine(pos_out, ArrayRedim(pos_out_izd, n_row_izd))
-        If n_row_mat > 0 Then pos_out = ArrayCombine(pos_out, ArrayRedim(pos_out_mat, n_row_mat))
+        
+        pos_out_subpos = ArraySort(ArrayRedim(pos_out_subpos, n_row_subpos), 1)
+        pos_out_arm = ArraySort(ArrayRedim(pos_out_arm, n_row_arm), 1)
+        pos_out_prokat = ArraySort(ArrayRedim(pos_out_prokat, n_row_prokat), 1)
+        pos_out_izd = ArraySort(ArrayRedim(pos_out_izd, n_row_izd), 1)
+        pos_out_mat = ArraySort(ArrayRedim(pos_out_mat, n_row_mat), 1)
+        
+        If n_row_subpos > 0 Then pos_out = ArrayCombine(pos_out, pos_out_subpos)
+        If n_row_arm > 0 Then pos_out = ArrayCombine(pos_out, pos_out_arm)
+        If n_row_prokat > 0 Then pos_out = ArrayCombine(pos_out, pos_out_prokat)
+        If n_row_izd > 0 Then pos_out = ArrayCombine(pos_out, pos_out_izd)
+        If n_row_mat > 0 Then pos_out = ArrayCombine(pos_out, pos_out_mat)
         For i = 3 To UBound(pos_out, 1)
             If Not IsEmpty(pos_out(i, end_col - 1)) Then
                 For j = 4 To end_col - 1
@@ -4784,16 +4926,35 @@ Function Spec_AS(ByRef all_data As Variant, ByVal type_spec As Integer) As Varia
                 End If
             End If
         Next i
+        
+        If Not UserForm2.show_type_CB.Value Then
+            pos_out_sort = ArraySort(pos_out, 1)
+            n_row = 2
+            For i = 1 To UBound(pos_out, 1)
+                If pos_out_sort(i, 1) <> "Поз." And pos_out_sort(i, 1) <> sb_naen And pos_out_sort(i, 3) <> "" Then
+                    n_row = n_row + 1
+                    For j = 1 To UBound(pos_out, 2)
+                        pos_out(n_row, j) = pos_out_sort(i, j)
+                    Next j
+                End If
+            Next i
+        End If
+
     Else
         For i = 2 To UBound(pos_out, 1)
-            If IsNumeric(pos_out(i, 6)) Then
-                If Round_w(pos_out(i, 6), 0) > 0 Then
-                    pos_out(i, 6) = Str(Round_w(pos_out(i, 6), 0)) & " кг."
+            If pos_out(i, 3) <> "" Then
+                If IsNumeric(ConvTxt2Num(pos_out(i, 6))) Then
+                    If Round_w(pos_out(i, 6), 0) > 0 Then
+                        pos_out(i, 6) = Str(Round_w(pos_out(i, 6), 0)) & " кг."
+                    Else
+                        pos_out(i, 6) = "-"
+                    End If
+                    If pos_out(i, 5) = 0 Then pos_out(i, 5) = "-"
                 Else
-                    pos_out(i, 6) = "-"
+                    For kk = 5 To 6
+                        If pos_out(i, kk) = "" Or pos_out(i, kk) = " " Or pos_out(i, kk) = 0 Then pos_out(i, kk) = "-"
+                    Next kk
                 End If
-            Else
-                If pos_out(i, 6) = " " Or IsEmpty(pos_out(i, 6)) Then pos_out(i, 6) = "-"
             End If
         Next i
     End If
@@ -4821,6 +4982,7 @@ Function Spec_KM(ByRef all_data As Variant) As Variant
     If IsEmpty(prokat) Then
         n_prokat = 0
         MsgBox ("Прокат в файле/листе не найден")
+        r = LogWrite("Ошибка спецификации", "", "Прокат в файле/листе не найден")
         Spec_KM = Empty
         Exit Function
     Else
@@ -5012,8 +5174,8 @@ End Function
 
 Function Spec_KZH(ByRef all_data As Variant) As Variant
     Set name_subpos = pos_data.Item("name") 'Словарь с именами сборок
-    un_child = ArraySort(pos_data.Item("child").Keys())
-    un_parent = ArraySort(pos_data.Item("parent").Keys())
+    un_child = ArraySort(pos_data.Item("child").keys())
+    un_parent = ArraySort(pos_data.Item("parent").keys())
     If IsEmpty(un_child) Then un_child = Array()
     If IsEmpty(un_parent) Then un_parent = Array()
     'Выясняем - какие диаметры и какие классы арматуры есть для всех сборок
@@ -5172,6 +5334,7 @@ Function Spec_KZH(ByRef all_data As Variant) As Variant
             subpos = un_parent(k - 5)
             nSubPos = pos_data.Item("qty").Item("-_" & subpos)
             If nSubPos < 1 Then
+                r = LogWrite("Ошибка спецификации", subpos, "Не определено кол-во сборок")
                 MsgBox ("Не определено кол-во сборок " & subpos & ", принято 1 шт.")
                 nSubPos = 1
             End If
@@ -5370,6 +5533,67 @@ Function Spec_Select(ByVal lastfilespec As String, ByVal suffix As String)
     End If
 End Function
 
+Function VedAddArea(ByRef zone As Variant, ByRef materials As Variant, ByVal mat_draft As String, ByVal mat_fin As String, ByVal num As String, ByVal area_mat As Double, Optional ByVal perim As Double = 0) As Integer
+    If UserForm2.separate_material_CB.Value Then
+        razd = ";"
+        mat_fin = Trim(mat_fin)
+    Else
+        razd = "&"
+        mat_fin = " " + mat_fin
+    End If
+    mat_draft = Trim(mat_draft)
+    mat_draft = "a@" & Replace(mat_draft, razd, ";a@")
+    mat_draft = Replace(mat_draft, "@ ", "@")
+    If InStr(mat_draft, "=") > 0 Then
+        name_mat = Array(Trim(Left(mat_draft, Len(mat_draft) - 1)))
+    Else
+        name_mat = Split((mat_draft & ";b@" & mat_fin), razd)
+    End If
+    flag = 0
+    If perim > 0 Then
+        If zone.exists(num + "perim;" + mat_fin) Then
+            zone.Item(num + "perim;" + mat_fin) = zone.Item(num + "perim;" + mat_fin) + perim
+        Else
+            zone.Item(num + "perim;" + mat_fin) = perim
+        End If
+    End If
+    If area_mat > 0 Then
+        For Each mat In name_mat
+            mat = Trim(mat)
+            naen_mat = StrConv(Trim(Replace(Replace(mat, "a@", ""), "b@", "")), vbProperCase)
+            If Left(naen_mat, 1) = ";" Then naen_mat = Trim(Right(naen_mat, Len(naen_mat) - 1))
+            If naen_mat <> "" And Not IsEmpty(naen_mat) And InStr(naen_mat, "--") = 0 Then
+                If Not zone.exists(num) Then
+                    Set mat_collect = CreateObject("Scripting.Dictionary")
+                    mat_collect.Item(mat) = 1
+                    Set zone.Item(num) = mat_collect
+                    flag = flag + 1
+                Else
+                    If Not zone.Item(num).exists(mat) Then
+                        zone.Item(num).Item(mat) = 1
+                        flag = flag + 1
+                    End If
+                End If
+                
+                If zone.exists(num + "n;" + mat) Then
+                    zone.Item(num + "a;" + mat) = zone.Item(num + "a;" + mat) + area_mat
+                Else
+                    zone.Item(num + "a;" + mat) = area_mat
+                    zone.Item(num + "n;" + mat) = naen_mat
+                End If
+                
+                If materials.exists(mat) Then
+                    materials.Item(mat + ";a") = materials.Item(mat + ";a") + area_mat
+                Else
+                    materials.Item(mat) = naen_mat
+                    materials.Item(mat + ";a") = materials.Item(mat + ";a") + area_mat
+                End If
+            End If
+        Next
+    End If
+    VedAddArea = flag
+End Function
+
 Function Spec_VED(ByRef all_data As Variant) As Variant
     out_data = all_data(1)
     rules = all_data(2)
@@ -5382,7 +5606,6 @@ Function Spec_VED(ByRef all_data As Variant) As Variant
     Set materials = CreateObject("Scripting.Dictionary")
     zone.comparemode = 1
     materials.comparemode = 1
-    n_un_mat = 0
     un_n_zone = ArrayUniqValColumn(out_data, col_s_numb_zone)
     zone.Item("list") = un_n_zone
     is_pan = False
@@ -5399,8 +5622,10 @@ Function Spec_VED(ByRef all_data As Variant) As Variant
     If UBound(out_data, 2) < col_s_tipverh_l Then spec_type = 2 'Без лестниц
     If UBound(out_data, 2) < col_s_type_el Then spec_type = 3 'Только зоны
     For Each num In un_n_zone
-        n_row_p = 0
+        n_row_pot = 0
         n_row_w = 0
+        n_row_pn = 0
+        n_row_c = 0
         If IsNumeric(num) Then num = CStr(num)
         zone_el = ArraySelectParam(out_data, num, col_s_numb_zone, "ЗОНА", col_s_type)
         If Not IsEmpty(zone_el) Then
@@ -5428,100 +5653,25 @@ Function Spec_VED(ByRef all_data As Variant) As Variant
             '        КОЛОННЫ
             '----------------------
             'Добавить возможность выбора наличия отверстий
-            perim_column_in_wall = perim_total - wall_len - free_len - perim_hole
-            perim_column = perim_hole
-            perim_column_total = perim_column + perim_column_in_wall
-            area_pan_column = perim_column_total * h_pan
-            area_pan_column = Round(area_pan_column * 10, 0) / 10
-            area_column = perim_column_total * (h_zone - h_pan)
-            area_column = Round(area_column * 10, 0) / 10
+            column_perim_in_wall = perim_total - wall_len - free_len - perim_hole
+            column_perim = perim_hole
+            column_perim_total = column_perim + column_perim_in_wall
+            column_pan_area = column_perim_total * h_pan
+            column_pan_area = Round(column_pan_area * 10, 0) / 10
+            column_area = column_perim_total * (h_zone - h_pan)
+            column_area = Round(column_area * 10, 0) / 10
             name_mat_column = "ЖБ"
             c = VedNameMat("Колонны", name_mat_column, rules)
-            cn = ""
-            pn = ""
-            If InStr(c, "=") > 0 Then
-                cn = Left(c, Len(c) - 1)
-                pn = Left(c, Len(c) - 1)
-            Else
-                cn = c + "; " + fin_column
-                pn = c + "; " + fin_pan
+
+            If column_area > 0 Then
+                n_row_c = n_row_c + VedAddArea(zone, materials, c, fin_column, num + ";c", column_area)
+                is_column = True
             End If
-            zone.Item(num + ";c") = name_mat_column
-            zone.Item(num + ";cn") = cn
-            zone.Item(num + ";ca;") = area_column
-            
-            n_mat = cn
-            area_mat = area_column
-            If area_mat > 0 Then
-                If InStr(n_mat, ";") > 0 Then
-                    mat_1 = Trim(Split(n_mat, ";")(0))
-                    mat_2 = Trim(Split(n_mat, ";")(1))
-                Else
-                    mat_1 = n_mat
-                    mat_2 = ""
-                End If
-                If materials.exists(mat_1) Then
-                    materials.Item(mat_1 + ";a") = materials.Item(mat_1 + ";a") + area_mat
-                Else
-                    n_un_mat = n_un_mat + 1
-                    materials.Item(mat_1) = mat_1
-                    materials.Item(mat_1 + ";a") = materials.Item(mat_1 + ";a") + area_mat
-                End If
-                If mat_2 <> "" Then
-                    If materials.exists(mat_2) Then
-                        materials.Item(mat_2 + ";a") = materials.Item(mat_2 + ";a") + area_mat
-                    Else
-                        n_un_mat = n_un_mat + 1
-                        materials.Item(mat_2) = mat_2
-                        materials.Item(mat_2 + ";a") = materials.Item(mat_2 + ";a") + area_mat
-                    End If
-                End If
-            End If
-                
-            If area_pan_column > 0 Then
-                If zone.exists(num + ";pn;" + c) Then
-                    zone.Item(num + ";pa;" + c) = zone.Item(num + ";pa;" + c) + area_pan_column
-                Else
-                    zone.Item(num + ";pn;" + c) = pn
-                    zone.Item(num + ";pa;" + c) = area_pan_column
-                End If
-                zone.Item(num + ";ph;" + c) = h_pan
-                
-                n_mat = pn ' + " на высоту h=" + Str(h_pan) + "м."
-                area_mat = area_pan_column
-                If area_mat > 0 Then
-                    If InStr(n_mat, ";") > 0 Then
-                        mat_1 = Trim(Split(n_mat, ";")(0))
-                        mat_2 = Trim(Split(n_mat, ";")(1))
-                    Else
-                        mat_1 = n_mat
-                        mat_2 = ""
-                    End If
-                    If materials.exists(mat_1) Then
-                        materials.Item(mat_1 + ";a") = materials.Item(mat_1 + ";a") + area_mat
-                    Else
-                        n_un_mat = n_un_mat + 1
-                        materials.Item(mat_1) = mat_1
-                        materials.Item(mat_1 + ";a") = materials.Item(mat_1 + ";a") + area_mat
-                    End If
-                    If mat_2 <> "" Then
-                        If materials.exists(mat_2) Then
-                            materials.Item(mat_2 + ";a") = materials.Item(mat_2 + ";a") + area_mat
-                        Else
-                            n_un_mat = n_un_mat + 1
-                            materials.Item(mat_2) = mat_2
-                            materials.Item(mat_2 + ";a") = materials.Item(mat_2 + ";a") + area_mat
-                        End If
-                    End If
-                End If
-            End If
-            If area_column > 0 Then is_column = True
-            
+            If column_pan_area > 0 Then n_row_pn = n_row_pn + VedAddArea(zone, materials, c, fin_pan, num + ";pn", column_pan_area)
             '----------------------
             '        СТЕНЫ
             '----------------------
             un_wall = ArrayUniqValColumn(wall, col_s_mat_wall)
-            zone.Item(num + ";w") = un_wall
             For Each w In un_wall
                 wall_by_key = ArraySelectParam(wall, w, col_s_mat_wall)
                 n_wall = UBound(wall_by_key, 1)
@@ -5535,103 +5685,17 @@ Function Spec_VED(ByRef all_data As Variant) As Variant
                 Next i
                 pan_area = (wall_len - door_len) * h_pan
                 wall_area = wall_area - pan_area
-                wn = ""
-                pn = ""
-                If InStr(w, "=") > 0 Then
-                    wn = Left(w, Len(w) - 1)
-                    pn = Left(w, Len(w) - 1)
-                Else
-                    wn = w + "; " + fin_wall
-                    pn = w + "; " + fin_pan
-                End If
-                zone.Item(num + ";wn;" + w) = wn
-                zone.Item(num + ";wa;" + w) = wall_area
-                
-                n_mat = wn
-                area_mat = wall_area
-                If area_mat > 0 Then
-                    If InStr(n_mat, ";") > 0 Then
-                        mat_1 = Trim(Split(n_mat, ";")(0))
-                        mat_2 = Trim(Split(n_mat, ";")(1))
-                    Else
-                        mat_1 = n_mat
-                        mat_2 = ""
-                    End If
-                    If materials.exists(mat_1) Then
-                        materials.Item(mat_1 + ";a") = materials.Item(mat_1 + ";a") + area_mat
-                    Else
-                        n_un_mat = n_un_mat + 1
-                        materials.Item(mat_1) = mat_1
-                        materials.Item(mat_1 + ";a") = materials.Item(mat_1 + ";a") + area_mat
-                    End If
-                    If mat_2 <> "" Then
-                        If materials.exists(mat_2) Then
-                            materials.Item(mat_2 + ";a") = materials.Item(mat_2 + ";a") + area_mat
-                        Else
-                            n_un_mat = n_un_mat + 1
-                            materials.Item(mat_2) = mat_2
-                            materials.Item(mat_2 + ";a") = materials.Item(mat_2 + ";a") + area_mat
-                        End If
-                    End If
-                End If
-
-                If pan_area > 0 Then
-                    If zone.exists(num + ";pn;" + w) Then
-                        zone.Item(num + ";pa;" + w) = zone.Item(num + ";pa;" + w) + pan_area
-                    Else
-                        zone.Item(num + ";pa;" + w) = pan_area
-                        zone.Item(num + ";pn;" + w) = pn
-                    End If
-                    zone.Item(num + ";ph;" + w) = h_pan
-                    n_mat = pn ' + " на высоту h=" + Str(h_pan) + "м."
-                    area_mat = pan_area
-                    If area_mat > 0 Then
-                        If InStr(n_mat, ";") > 0 Then
-                            mat_1 = Trim(Split(n_mat, ";")(0))
-                            mat_2 = Trim(Split(n_mat, ";")(1))
-                        Else
-                            mat_1 = n_mat
-                            mat_2 = ""
-                        End If
-                        If materials.exists(mat_1) Then
-                            materials.Item(mat_1 + ";a") = materials.Item(mat_1 + ";a") + area_mat
-                        Else
-                            n_un_mat = n_un_mat + 1
-                            materials.Item(mat_1) = mat_1
-                            materials.Item(mat_1 + ";a") = materials.Item(mat_1 + ";a") + area_mat
-                        End If
-                        If mat_2 <> "" Then
-                            If materials.exists(mat_2) Then
-                                materials.Item(mat_2 + ";a") = materials.Item(mat_2 + ";a") + area_mat
-                            Else
-                                n_un_mat = n_un_mat + 1
-                                materials.Item(mat_2) = mat_2
-                                materials.Item(mat_2 + ";a") = materials.Item(mat_2 + ";a") + area_mat
-                            End If
-                        End If
-                    End If
-                End If
+                n_row_w = n_row_w + VedAddArea(zone, materials, w, fin_wall, num + ";w", wall_area)
+                n_row_pn = n_row_pn + VedAddArea(zone, materials, w, fin_pan, num + ";pn", pan_area)
             Next
-            n_row_w = n_row_w + UBound(un_wall, 1)
-            If h_pan > 0 Then
-                is_pan = True
-                If area_pan_column > 0 Then
-                    un_panel = ArrayUniqValColumn(ArrayCombine(Array(c), un_wall), 1)
-                    zone.Item(num + ";p") = un_panel
-                    n_row_w = n_row_w + 1
-                Else
-                    zone.Item(num + ";p") = un_wall
-                End If
-            End If
+            If h_pan > 0 Then is_pan = True
             '----------------------
             '        ПОТОЛКИ
             '----------------------
-            n_row_p = 0
             If spec_type < 3 Then
                 area_total_pot = 0
                 pot = ArraySelectParam(out_data, num, col_s_numb_zone, "Потолок", col_s_type_el)
                 un_pot = ArrayUniqValColumn(pot, col_s_type_pol)
-                zone.Item(num + ";pot") = un_pot
                 If Not IsEmpty(un_pot) Then
                     For Each p In un_pot
                         pot_by_type = ArraySelectParam(pot, p, col_s_type_pol)
@@ -5643,114 +5707,19 @@ Function Spec_VED(ByRef all_data As Variant) As Variant
                             pot_perim = pot_perim + pot_by_type(i, col_s_perim_pol) / 1000
                             area_total_pot = area_total_pot + pot_area
                         Next
-                        potn = ""
-                        If InStr(p, "=") > 0 Then
-                            potn = Left(p, Len(p) - 1)
-                        Else
-                            potn = p + "; " + fin_pot
-                        End If
-                        zone.Item(num + ";potn;" + p) = potn
-                        zone.Item(num + ";pota;" + p) = pot_area
-                        zone.Item(num + ";potp;" + p) = pot_perim
-                        n_mat = potn
-                        area_mat = pot_area
-                        If area_mat > 0 Then
-                            If InStr(n_mat, ";") > 0 Then
-                                mat_1 = Trim(Split(n_mat, ";")(0))
-                                mat_2 = Trim(Split(n_mat, ";")(1))
-                            Else
-                                mat_1 = n_mat
-                                mat_2 = ""
-                            End If
-                            If materials.exists(mat_1) Then
-                                materials.Item(mat_1 + ";a") = materials.Item(mat_1 + ";a") + area_mat
-                            Else
-                                n_un_mat = n_un_mat + 1
-                                materials.Item(mat_1) = mat_1
-                                materials.Item(mat_1 + ";a") = materials.Item(mat_1 + ";a") + area_mat
-                            End If
-                            If mat_2 <> "" Then
-                                If materials.exists(mat_2) Then
-                                    materials.Item(mat_2 + ";a") = materials.Item(mat_2 + ";a") + area_mat
-                                Else
-                                    n_un_mat = n_un_mat + 1
-                                    materials.Item(mat_2) = mat_2
-                                    materials.Item(mat_2 + ";a") = materials.Item(mat_2 + ";a") + area_mat
-                                End If
-                            End If
-                        End If
+                        n_row_pot = n_row_pot + VedAddArea(zone, materials, p, fin_pot, num + ";pot", pot_area, pot_perim)
                     Next
-                    n_row_p = UBound(un_pot, 1)
                     diff_area_pot = area_total - area_total_pot
                 Else
-                    zone.Item(num + ";pot") = Array(fin_pot)
-                    zone.Item(num + ";potn;" + fin_pot) = fin_pot
-                    zone.Item(num + ";pota;" + fin_pot) = area_total
-                    zone.Item(num + ";potp;" + fin_pot) = perim_total
-                    n_mat = fin_pot
-                    area_mat = area_total
-                    If area_mat > 0 Then
-                        If InStr(n_mat, ";") > 0 Then
-                            mat_1 = Trim(Split(n_mat, ";")(0))
-                            mat_2 = Trim(Split(n_mat, ";")(1))
-                        Else
-                            mat_1 = n_mat
-                            mat_2 = ""
-                        End If
-                        If materials.exists(mat_1) Then
-                            materials.Item(mat_1 + ";a") = materials.Item(mat_1 + ";a") + area_mat
-                        Else
-                            n_un_mat = n_un_mat + 1
-                            materials.Item(mat_1) = mat_1
-                            materials.Item(mat_1 + ";a") = materials.Item(mat_1 + ";a") + area_mat
-                        End If
-                        If mat_2 <> "" Then
-                            If materials.exists(mat_2) Then
-                                materials.Item(mat_2 + ";a") = materials.Item(mat_2 + ";a") + area_mat
-                            Else
-                                n_un_mat = n_un_mat + 1
-                                materials.Item(mat_2) = mat_2
-                                materials.Item(mat_2 + ";a") = materials.Item(mat_2 + ";a") + area_mat
-                            End If
-                        End If
-                    End If
+                    n_row_pot = n_row_pot + VedAddArea(zone, materials, "", fin_pot, num + ";pot", area_total, perim_total)
                 End If
 
                 If Abs(diff_area_pot) > 0.1 Then
-                    MsgBox ("Разница площади помещения и потолка в помещении " & num & " = " & Str(diff_area_pot))
+                    'MsgBox ("Разница площади помещения и потолка в помещении " & num & " = " & Str(diff_area_pot))
+                    r = LogWrite("Ведомость отделки", "Ошибка ", num & " = " & Str(diff_area_pot))
                 End If
             Else
-                zone.Item(num + ";pot") = Array(fin_pot)
-                zone.Item(num + ";potn;" + fin_pot) = fin_pot
-                zone.Item(num + ";pota;" + fin_pot) = area_total
-                zone.Item(num + ";potp;" + fin_pot) = perim_total
-                n_mat = fin_pot
-                area_mat = area_total
-                If area_mat > 0 Then
-                    If InStr(n_mat, ";") > 0 Then
-                        mat_1 = Trim(Split(n_mat, ";")(0))
-                        mat_2 = Trim(Split(n_mat, ";")(1))
-                    Else
-                        mat_1 = n_mat
-                        mat_2 = ""
-                    End If
-                    If materials.exists(mat_1) Then
-                        materials.Item(mat_1 + ";a") = materials.Item(mat_1 + ";a") + area_mat
-                    Else
-                        n_un_mat = n_un_mat + 1
-                        materials.Item(mat_1) = mat_1
-                        materials.Item(mat_1 + ";a") = materials.Item(mat_1 + ";a") + area_mat
-                    End If
-                    If mat_2 <> "" Then
-                        If materials.exists(mat_2) Then
-                            materials.Item(mat_2 + ";a") = materials.Item(mat_2 + ";a") + area_mat
-                        Else
-                            n_un_mat = n_un_mat + 1
-                            materials.Item(mat_2) = mat_2
-                            materials.Item(mat_2 + ";a") = materials.Item(mat_2 + ";a") + area_mat
-                        End If
-                    End If
-                End If
+                n_row_pot = n_row_pot + VedAddArea(zone, materials, "", fin_pot, num + ";pot", area_total, perim_total)
             End If
             '----------------------
             '        ПОЛЫ
@@ -5766,7 +5735,7 @@ Function Spec_VED(ByRef all_data As Variant) As Variant
                     diff_area_pol = area_total - area_total_pol
                 End If
             End If
-            n_row_tot = n_row_tot + Application.WorksheetFunction.Max(1, n_row_p, n_row_w)
+            n_row_tot = n_row_tot + Application.WorksheetFunction.Max(n_row_pot, n_row_w, n_row_pn, n_row_c)
         Else
             MsgBox ("Номер зоны в элементе записан не правильно - " + num)
             Spec_VED = Empty
@@ -5777,6 +5746,8 @@ Function Spec_VED(ByRef all_data As Variant) As Variant
     n_col_out = 7
     If is_pan Then n_col_out = n_col_out + 3
     If is_column Then n_col_out = n_col_out + 2
+    n_un_mat = (materials.Count / 2)
+    If (n_un_mat - Int(n_un_mat)) <> 0 Then MsgBox ("Ошибка записи в словарь")
     Dim pos_out: ReDim pos_out(3 + n_row_tot + n_un_mat, n_col_out)
     pos_out(1, 1) = "Номер помещения"
     pos_out(1, 2) = "Наименование помещения"
@@ -5800,81 +5771,97 @@ Function Spec_VED(ByRef all_data As Variant) As Variant
     End If
     pos_out(1, n_col_out) = "Примечание"
     summ_area_pot = 0
-    n_row = 3
+    n_row = 2
     For Each num In un_n_zone
         n_row_p = n_row
         n_row_w = n_row
         n_row_c = n_row
         n_row_pan = n_row
-        pos_out(n_row, 1) = num
-        pos_out(n_row, 2) = zone.Item(num + ";name")
+        pos_out(n_row + 1, 1) = num
+        pos_out(n_row + 1, 2) = zone.Item(num + ";name")
         '-- ПОТОЛКИ ---
-        pot = zone.Item(num + ";pot")
+        If Not zone.exists(num + ";pot") Then
+            pot = Empty
+        Else
+            pot = ArraySort(zone.Item(num + ";pot").keys())
+        End If
         If Not IsEmpty(pot) Then
             For Each p In pot
+                n_row_p = n_row_p + 1
                 pos_out(n_row_p, 3) = zone.Item(num + ";potn;" + p)
                 pos_out(n_row_p, 4) = Round_w(zone.Item(num + ";pota;" + p) * k_zap_total, n_round_area)
                 summ_area_pot = summ_area_pot + pos_out(n_row_p, 4)
-                n_row_p = n_row_p + 1
             Next p
         Else
+            n_row_p = n_row_p + 1
             pos_out(n_row_p, 3) = "-"
             pos_out(n_row_p, 4) = "-"
-            n_row_p = n_row_p + 1
         End If
         '-- СТЕНЫ ---
-        wall = zone.Item(num + ";w")
+        If Not zone.exists(num + ";w") Then
+            wall = Empty
+        Else
+            wall = ArraySort(zone.Item(num + ";w").keys())
+        End If
         If Not IsEmpty(wall) Then
             For Each w In wall
+                n_row_w = n_row_w + 1
                 pos_out(n_row_w, 5) = zone.Item(num + ";wn;" + w)
                 pos_out(n_row_w, 6) = Round_w(zone.Item(num + ";wa;" + w) * k_zap_total, n_round_area)
-                n_row_w = n_row_w + 1
             Next w
         Else
+            n_row_w = n_row_w + 1
             pos_out(n_row_w, 3) = "-"
             pos_out(n_row_w, 4) = "-"
-            n_row_w = n_row_w + 1
         End If
          '-- КОЛОННЫ ---
         If is_column Then
-            If zone.Item(num + ";ca;") > 0 Then
-                pos_out(n_row_c, 7) = zone.Item(num + ";cn")
-                pos_out(n_row_c, 8) = Round_w(zone.Item(num + ";ca;") * k_zap_total, n_round_area)
+            If Not zone.exists(num + ";c") Then
+                colum = Empty
             Else
+                colum = ArraySort(zone.Item(num + ";c").keys())
+            End If
+            If Not IsEmpty(colum) Then
+                For Each c In colum
+                    n_row_c = n_row_c + 1
+                    pos_out(n_row_c, 7) = zone.Item(num + ";cn;" + c)
+                    pos_out(n_row_c, 8) = Round_w(zone.Item(num + ";ca;" + c) * k_zap_total, n_round_area)
+                Next c
+            Else
+                n_row_c = n_row_c + 1
                 pos_out(n_row_c, 7) = "-"
                 pos_out(n_row_c, 8) = "-"
             End If
-            n_row_c = n_row_c + 1
         End If
          '-- ПАНЕЛИ ---
         If is_pan Then
             If zone.exists(num + ";p") Then
-                For Each p In zone.Item(num + ";p")
-                    pos_out(n_row_pan, col_end + 1) = zone.Item(num + ";pn;" + p)
-                    pos_out(n_row_pan, col_end + 2) = Round_w(zone.Item(num + ";pa;" + p) * k_zap_total, n_round_area)
-                    pos_out(n_row_pan, col_end + 3) = zone.Item(num + ";ph;" + p)
+                panel = ArraySort(zone.Item(num + ";pn").keys())
+                For Each p In panel
                     n_row_pan = n_row_pan + 1
+                    pos_out(n_row_pan, col_end + 1) = zone.Item(num + ";pnn;" + p)
+                    pos_out(n_row_pan, col_end + 2) = Round_w(zone.Item(num + ";pna;" + p) * k_zap_total, n_round_area)
+                    pos_out(n_row_pan, col_end + 3) = zone.Item(num + ";pnh;" + p)
                 Next p
             Else
+                n_row_pan = n_row_pan + 1
                 pos_out(n_row_pan, col_end + 1) = "-"
                 pos_out(n_row_pan, col_end + 2) = "-"
                 pos_out(n_row_pan, col_end + 3) = "-"
-                n_row_pan = n_row_pan + 1
             End If
         End If
-        n_row = Application.WorksheetFunction.Max(n_row_p - 1, n_row_w - 1, n_row_c - 1, n_row_pan - 1) + 1
+        n_row = Application.WorksheetFunction.Max(n_row_p, n_row_w, n_row_c, n_row_pan)
     Next
+    n_row = n_row + 1
     pos_out(n_row, 1) = "Общяя площадь отделки, кв.м."
-    n_mat = 0
-    For Each mat In ArraySort(materials.Keys())
+    For Each mat In ArraySort(materials.keys())
         If InStr(mat, ";a") = 0 Then
-            n_mat = n_mat + 1
-            pos_out(n_row + n_mat, 1) = materials.Item(mat)
-            pos_out(n_row + n_mat, 4) = Round_w(materials.Item(mat + ";a") * k_zap_total, n_round_area)
+            n_row = n_row + 1
+            pos_out(n_row, 1) = materials.Item(mat)
+            pos_out(n_row, 4) = Round_w(materials.Item(mat + ";a") * k_zap_total, n_round_area)
         End If
     Next
-  
-    MsgBox ("Сумма площади потолка " & CStr(summ_area_pot))
+    r = LogWrite("Ведомость отделки", "Итог", CStr(summ_area_pot))
     Spec_VED = pos_out
 End Function
 
@@ -5989,11 +5976,11 @@ Function VedNewListRules(ByVal nm As String) As Boolean
     Worksheets(nm & "_правила").Activate
     Cells(1, 1).Value = "Имя многослойной конструкции (целиком или часть имени)"
     Cells(1, 2).Value = "Слой"
-    Cells(1, 3).Value = "Черновая отделка"
+    Cells(1, 3).Value = "Черновая отделка (разделитель ';')"
     
     Cells(2, 1).Value = "ЖБ"
     Cells(2, 2).Value = "Колонны"
-    Cells(2, 3).Value = "Затирка, шпатлёвка ж/б колонн"
+    Cells(2, 3).Value = "Затирка; Шпатлёвка"
     
     Cells(3, 1).Value = "П1"
     Cells(3, 2).Value = "Потолок"
@@ -6070,7 +6057,7 @@ Function VedRead(ByVal lastfilespec As String) As Variant
         pos_out(1) = out_data
         pos_out(2) = rules
     Else
-        r = VedAddRules(lastfilespec, add_rule.Keys)
+        r = VedAddRules(lastfilespec, add_rule.keys)
         pos_out(1) = Empty
         pos_out(2) = Empty
     End If

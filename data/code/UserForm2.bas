@@ -18,7 +18,7 @@ Option Compare Text
 Option Base 1
 Public CodePath, MaterialPath, SortamentPath As String
 Public lastsheet, lastconstrtype, lastconstr, lastfile, lastfilespec, lastfileadd, materialbook_index As Variant
-
+Const form_version As String = "2.7"
 Private Sub CommandButtonIns_Click()
     arr2paste = materialbook_index.Item(lastconstrtype & "_" & lastconstr)
     r = ManualPaste2Sheet(arr2paste)
@@ -47,7 +47,7 @@ Private Sub UserForm_Initialize()
     MaterialPath = CheckPath(MaterialPatht.Text)
     SortamentPath = CheckPath(SortamentPatht.Text)
     CodePath = CheckPath(CodePatht.Text)
-    Set materialbook_index = ReadConstr()
+    If use_tmp_CB.Value Then Set materialbook_index = ReadConstr()
     FormRebild
 End Sub
 
@@ -112,7 +112,7 @@ End Sub
 Sub FormRebild()
     calc_ver.Caption = macro_version
     com_ver.Caption = common_version
-    form_ver.Caption = "2.5"
+    form_ver.Caption = form_version
     symb_diam = ChrW(8960)
     remat
 End Sub
@@ -160,11 +160,14 @@ Function ReList(ByRef objListBox As Variant, ByRef arr As Variant) As _
 End Function
 
 Sub remat()
-    lastconstrtype = materialbook_index.Item("sheet_list")(1)
-    r = ReList(ListBoxTypeIns, materialbook_index.Item("sheet_list"))
+
+    If use_tmp_CB.Value Then
+        lastconstrtype = materialbook_index.Item("sheet_list")(1)
+        r = ReList(ListBoxTypeIns, materialbook_index.Item("sheet_list"))
     
-    lastconstr = materialbook_index.Item(lastconstrtype & "constr")(1)
-    r = ReList(ListBoxNaenIns, materialbook_index.Item(lastconstrtype & "constr"))
+        lastconstr = materialbook_index.Item(lastconstrtype & "constr")(1)
+        r = ReList(ListBoxNaenIns, materialbook_index.Item(lastconstrtype & "constr"))
+    End If
     
     listFile = GetListFile("*.txt")
     Dim listspec: ReDim listspec(1): n_man = 0
@@ -185,7 +188,7 @@ Sub remat()
     Next
     For i = 1 To UBound(listFile, 1)
         If ((listFile(i, 1) <> "Полы") * (listFile(i, 1) <> _
-            "Отметки_перемычек") * (listFile(i, 1) <> "Типы_полов")) Then
+            "Отметки_перемычек") * (listFile(i, 1) <> "Типы_полов") * (InStr(listFile(i, 1), "_сист") = 0)) Then
             n_man = n_man + 1
             ReDim Preserve listspec(n_man)
             listspec(n_man) = listFile(i, 1)
