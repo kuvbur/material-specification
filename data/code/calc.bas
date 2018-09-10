@@ -2,16 +2,17 @@ Attribute VB_Name = "calc"
 Option Compare Text
 Option Base 1
 
-Public Const macro_version As String = "3.1"
+Public Const macro_version As String = "3.15"
 Public symb_diam As String 'Символ диаметра в спецификацию
 'Тип округления
 ' 1 - округление в большую сторону
 ' 2 - округление стандартным round
 ' 3 - округление отключено
-Public Const type_okrugl As Integer = 1
+Public Const type_okrugl As Integer = 2
 'Кол-во знаков после запятой
 Public Const n_round_l As Integer = 2 'Длина
-Public Const n_round_w As Integer = 1 'Вес
+Public Const n_round_w As Integer = 2 'Вес
+Public Const n_round_wkzh As Integer = 1 'Вес в ведомости расхода стали
 Public Const n_round_area As Integer = 1 'Площадь в ведомость отделки
 '-------------------------------------------------------
 'Типы элементов (столбец col_type_el)
@@ -22,12 +23,9 @@ Public Const t_mat_spc As Integer = 35
 Public Const t_izd As Integer = 40
 Public Const t_subpos As Integer = 45
 Public Const t_else As Integer = 50
-
-Public Const t_wind_m As Integer = 60
-Public Const t_wind As Integer = 61
-Public Const t_perem_m As Integer = 65
-Public Const t_perem As Integer = 66
-
+Public Const t_wind As Integer = 60
+Public Const t_perem_m As Integer = 70
+Public Const t_perem As Integer = 71
 Public Const t_error As Integer = -1 'Ошибка распознавания типов
 Public Const t_sys As Integer = -10 'Вспомогательный тип
 'Столбцы общие
@@ -59,6 +57,13 @@ Public Const col_m_obozn As Integer = 5
 Public Const col_m_naen As Integer = 6
 Public Const col_m_weight As Integer = 7
 Public Const col_m_edizm As Integer = 9
+'Столбцы окон, дверей
+Public Const col_w_obozn As Integer = 5
+Public Const col_w_naen As Integer = 6
+Public Const col_w_weight As Integer = 7
+Public Const col_w_prim As Integer = 9
+Public Const col_w_nfloor As Integer = 10
+Public Const col_w_floor As Integer = 11
 'Общее количество столбцов во входном массиве
 Public Const max_col As Integer = 15
 '-------------------------------------------------------
@@ -135,6 +140,9 @@ Public Const col_man_pr_okr As Integer = 16
 Public Const col_man_pr_ogn As Integer = 17
 Public Const max_col_man As Integer = col_man_komment
 '-------------------------------------------------------
+Public Const ignore_pos As String = "!!" 'Игнорировать элементы, содержащих ЭТО в позиции или марке
+Public Const subpos_delim As String = "'" 'Разделитель основной и вложенной сборки
+Public Const izd_sheet_name As String = "Изделия"
 
 Public gost2fklass, name_gost, reinforcement_specifications As Variant 'Разные массивы
 Public pr_adress As Variant
@@ -298,7 +306,6 @@ Function ArraySelectParam(ByVal array_in As Variant, ByVal param1 As Variant, By
         n_row_s = 0
         ReDim arrout(n_row, n_param)
         For j = 1 To n_row
-        
             If Not IsMissing(n_col2) And Not IsMissing(param2) Then
                 If array_in(j, n_col2) = param2 Then
                     flag2 = 1 'Записывать
@@ -308,13 +315,11 @@ Function ArraySelectParam(ByVal array_in As Variant, ByVal param1 As Variant, By
             Else
                 flag2 = 1 'Обязательно записывать
             End If
-            
             If array_in(j, n_col1) = param1 Then
                 flag1 = 1 'Конечно, записывать
             Else
                 flag1 = 0 'Не записывать ни в коем случае
             End If
-            
             If flag1 And flag2 Then 'Если все согласны
                     n_row_s = n_row_s + 1
                     For k = 1 To n_param
@@ -459,7 +464,7 @@ Function ArraySortABC(ByVal array_in As Variant, ByVal nCol As Integer) As Varia
         k = UBound(array_in)
         For j = LBound(array_in) To UBound(array_in) - 1
             For i = 2 To k
-                If Not IsEmpty(array_in(i - 1)) And Not IsEmpty(array_in(i)) And Not array_in(i) = "" And Not array_in(i - 1) = "" Then
+                If Not IsEmpty(array_in(i - 1)) And Not IsEmpty(array_in(i)) And Not Len(array_in(i)) = 0 And Not Len(array_in(i - 1)) = 0 Then
                     If Asc(UCase(array_in(i - 1))) > Asc(UCase(array_in(i))) Then
                         v = array_in(i - 1)
                         array_in(i - 1) = array_in(i)
@@ -545,7 +550,8 @@ Function ArrayUniqValColumn(ByVal array_in As Variant, ByVal cols As Long) As Va
             For j = 1 To n_un
                 If array_out(j) = array_in(i, cols) Then flag = 0
             Next
-            If array_in(i, cols) = "" Then flag = 0
+            If IsEmpty(array_in(i, cols)) Then flag = 0
+            If Len(array_in(i, cols)) = 0 Then flag = 0
             If array_in(i, cols) = " " Then flag = 0
             If ConvTxt2Num(array_in(i, cols)) = 0 Then flag = 0
             If flag = 1 Then
@@ -568,7 +574,8 @@ Function ArrayUniqValColumn(ByVal array_in As Variant, ByVal cols As Long) As Va
             For j = 1 To n_un
                 If array_out(j) = array_in(i) Then flag = 0
             Next
-            If array_in(i) = "" Then flag = 0
+            If IsEmpty(array_in(i)) Then flag = 0
+            If Len(array_in(i)) = 0 Then flag = 0
             If array_in(i) = " " Then flag = 0
             If ConvTxt2Num(array_in(i)) = 0 Then flag = 0
             If flag = 1 Then
@@ -593,10 +600,9 @@ Function ControlSumAddVar(ByVal var As Variant) As String
     If var = "_" Then
         ControlSumAddVar = "_"
     Else
-        var = Trim(Replace(var, " ", ""))
-        var = Trim(Replace(var, "--", ""))
-        var = Trim(Replace(var, "x", ""))
-        var = Trim(Replace(var, "х", ""))
+        For Each deltxt In Array(" ", "--", "x", "х", "-")
+            var = Trim(Replace(var, deltxt, ""))
+        Next
         ControlSumAddVar = var
     End If
 End Function
@@ -725,6 +731,34 @@ Function ControlSumEl(ByVal array_in As Variant) As String
             param(4) = sparent
             param(5) = "_"
             param(6) = subpos
+        Case t_wind
+            isel = 1
+            obozn = array_in(col_w_obozn)
+            naen = array_in(col_w_naen)
+            Floor = array_in(col_w_floor)
+            
+            ReDim param(7)
+            param(1) = pos
+            param(2) = subpos
+            param(3) = "_"
+            param(4) = Floor
+            param(5) = "_"
+            param(6) = obozn
+            param(7) = naen
+        Case t_perem
+            isel = 1
+            obozn = array_in(col_m_obozn)
+            naen = array_in(col_m_naen)
+            Weight = array_in(col_m_weight)
+            edizm = array_in(col_m_edizm)
+            
+            ReDim param(6)
+            param(1) = subpos
+            param(2) = "_"
+            param(3) = subpos
+            param(4) = sparent
+            param(5) = "_"
+            param(6) = subpos
     End Select
     control_sum = ""
     If isel Then
@@ -789,7 +823,7 @@ Function DataAddNullSubpos(ByVal array_in As Variant) As Variant
     arr_subpos = ArrayUniqValColumn(array_in, col_sub_pos)
     add_txt = Empty
     For Each current_subpos In arr_subpos
-        If current_subpos <> "-" Then
+        If current_subpos <> "-" And InStr(current_subpos, "zap") = 0 Then
             'Проеряем - есть ли маркировка для главных сборок
             seach_subpos = ArraySelectParam(array_in, current_subpos, col_sub_pos, t_subpos, col_type_el)
             If IsEmpty(seach_subpos) Then
@@ -809,7 +843,7 @@ Function DataAddNullSubpos(ByVal array_in As Variant) As Variant
                 add_subpos(1, col_sub_pos) = current_subpos
                 add_subpos(1, col_type_el) = t_subpos
                 add_subpos(1, col_pos) = current_subpos
-                add_subpos(1, col_m_naen) = Replace(naen, "@", ".")
+                add_subpos(1, col_m_naen) = Replace(naen, "@", subpos_delim)
                 add_subpos(1, col_m_obozn) = obozn
                 add_subpos(1, col_qty) = 1
                 add_subpos(1, col_chksum) = ControlSumEl(add_subpos)
@@ -825,34 +859,53 @@ End Function
 Function DataCheck(ByVal array_in As Variant) As Variant
     If IsEmpty(array_in) Then DataCheck = Empty: Exit Function
     n_col = UBound(array_in, 2)
+    n_ingore = 0
     Dim out_data: ReDim out_data(UBound(array_in, 1), n_col): n_row = 0
     For i = 1 To UBound(array_in, 1)
         type_el = array_in(i, col_type_el)
-        'Вложенные сборки определяем по точке в первом столбце
-        'Если это строка относится к вложенной сборке, то формат будет ИмяГлавнойСборки.ПозЭлемента
+        'Вложенные сборки определяем по разделителю subpos_delim в первом столбце
+        'Если это строка относится к вложенной сборке, то формат будет ИмяГлавнойСборки subpos_delim ПозЭлемента
         array_in(i, col_parent) = Empty
-        If InStr(array_in(i, col_marka), ".") Then
-            parent_subpos = Split(array_in(i, col_marka), ".")(0)
-            pos = Split(array_in(i, col_marka), ".")(1)
+        If InStr(array_in(i, col_marka), subpos_delim) Then
+            parent_subpos = Split(array_in(i, col_marka), subpos_delim)(0)
+            pos = Split(array_in(i, col_marka), subpos_delim)(1)
             array_in(i, col_parent) = parent_subpos
             array_in(i, col_marka) = parent_subpos
         End If
-        'Также проверяем поле сборки, сравнивая его с маркой
-        'Если это вложенная сброрка, то в графе сборки будет МАРКА.СБОРКА
-        If InStr(array_in(i, col_sub_pos), ".") Then
-            parent_subpos = Split(array_in(i, col_sub_pos), ".")(0)
-            subpos = Split(array_in(i, col_sub_pos), ".")(1)
+'        Также проверяем поле сборки, сравнивая его с маркой
+'        Если это вложенная сброрка, то в графе сборки будет МАРКА subpos_delim СБОРКА
+        If InStr(array_in(i, col_sub_pos), subpos_delim) Then
+            parent_subpos = Split(array_in(i, col_sub_pos), subpos_delim)(0)
+            subpos = Split(array_in(i, col_sub_pos), subpos_delim)(1)
             array_in(i, col_sub_pos) = subpos
             array_in(i, col_parent) = parent_subpos
             array_in(i, col_marka) = parent_subpos
             If type_el = t_subpos Then array_in(i, col_pos) = subpos
         End If
-
-        If type_el <> "" Then
+        
+        ignore_flag = 0
+        If InStr(array_in(i, col_sub_pos), ignore_pos) Then ignore_flag = 1
+        If InStr(array_in(i, col_parent), ignore_pos) Then ignore_flag = 1
+        If InStr(array_in(i, col_marka), ignore_pos) Then ignore_flag = 1
+        If ignore_flag Then
+            type_el = t_error
+            array_in(i, col_type_el) = t_error
+            n_ingore = n_ingore + 1
+        End If
+    
+        If Len(type_el) > 0 Then
+            'Для арматуры в п.м. количество должно быть 1.
+            If type_el = t_arm Then
+                If array_in(i, col_fon) = 1 And array_in(i, col_qty) > 1 Then
+                    l_spec = array_in(i, col_length) * array_in(i, col_qty)
+                    array_in(i, col_length) = l_spec
+                    array_in(i, col_qty) = 1
+                End If
+            End If
             'Ищем материалы, привязанные к стандартным элементам архикада (t_mat_spc)
             If type_el = t_mat_spc Then
-                If InStr(array_in(i, col_marka), ".") Then
-                    array_in(i, col_sub_pos) = Split(array_in(i, col_marka), ".")(1)
+                If InStr(array_in(i, col_marka), subpos_delim) Then
+                    array_in(i, col_sub_pos) = Split(array_in(i, col_marka), subpos_delim)(1)
                 Else
                     array_in(i, col_sub_pos) = array_in(i, col_marka)
                 End If
@@ -860,18 +913,21 @@ Function DataCheck(ByVal array_in As Variant) As Variant
                 array_in(i, col_type_el) = t_mat
                 array_in(i, col_m_weight) = "-"
             End If
-
-            If type_el <> Empty Then
-                If array_in(i, col_sub_pos) = "" Then array_in(i, col_sub_pos) = "-"
-                If array_in(i, col_sub_pos) = " " Then array_in(i, col_sub_pos) = "-"
-                If array_in(i, col_sub_pos) = 0 Then array_in(i, col_sub_pos) = "-"
-                If array_in(i, col_sub_pos) = "-" Then array_in(i, col_parent) = "-"
-                If IsEmpty(array_in(i, col_parent)) Then array_in(i, col_parent) = "-"
-                array_in(i, col_sub_pos) = Replace(array_in(i, col_sub_pos), "@", ".")
-                array_in(i, col_parent) = Replace(array_in(i, col_parent), "@", ".")
-                array_in(i, col_marka) = Replace(array_in(i, col_marka), "@", ".")
-                array_in(i, col_pos) = Replace(array_in(i, col_pos), "@", ".")
+            
+            'Пометим заполнение окон, дверей, а также перемычки - для них нет нужны выделять элементы сборок
+            If (type_el = t_perem) Or (type_el = t_perem_m) Or (type_el = t_wind) Then
+                 array_in(i, col_sub_pos) = "zap" + array_in(i, col_sub_pos)
             End If
+            
+            If array_in(i, col_sub_pos) = "" Then array_in(i, col_sub_pos) = "-"
+            If array_in(i, col_sub_pos) = " " Then array_in(i, col_sub_pos) = "-"
+            If array_in(i, col_sub_pos) = 0 Then array_in(i, col_sub_pos) = "-"
+            If array_in(i, col_sub_pos) = "-" Then array_in(i, col_parent) = "-"
+            If IsEmpty(array_in(i, col_parent)) Then array_in(i, col_parent) = "-"
+            array_in(i, col_sub_pos) = Replace(array_in(i, col_sub_pos), "@", subpos_delim)
+            array_in(i, col_parent) = Replace(array_in(i, col_parent), "@", subpos_delim)
+            array_in(i, col_marka) = Replace(array_in(i, col_marka), "@", subpos_delim)
+            array_in(i, col_pos) = Replace(array_in(i, col_pos), "@", subpos_delim)
             
             'Вычисление и проверка контрольных сумм
             array_in(i, col_chksum) = ControlSumEl(ArrayRow(array_in, i))
@@ -881,6 +937,7 @@ Function DataCheck(ByVal array_in As Variant) As Variant
             Next j
         End If
     Next i
+    If n_ingore > 0 Then r = LogWrite("Строк, содержащих " & ignore_pos & " пропущено", "", n_ingore)
     If n_row Then
         out_data = ArrayTranspose(out_data)
         ReDim Preserve out_data(n_col, n_row)
@@ -898,7 +955,12 @@ Function DataIsOtd(ByVal array_in As Variant) As Boolean
         Exit Function
     End If
     n_col = UBound(array_in, 2)
-    If array_in(1, col_s_type) = "ЗОНА" And (n_col = col_s_layer Or n_col = col_s_mun_zone Or n_col = col_s_areapl_l) Then DataIsOtd = True Else DataIsOtd = False
+    hh = array_in(1, col_s_type)
+    If array_in(1, col_s_type) = "ЗОНА" And (n_col = col_s_layer Or n_col = col_s_mun_zone Or n_col = col_s_areapl_l) Then
+        DataIsOtd = True
+    Else
+        DataIsOtd = False
+    End If
 End Function
 
 Function DataIsShort(ByVal array_in As Variant) As Boolean
@@ -934,6 +996,9 @@ Function DataIsSpec(ByVal array_in As Variant) As Boolean
         If t_prokat = array_in(i, col_type_el) Then n = n + 1
         If t_else = array_in(i, col_type_el) Then n = n + 1
         If t_mat_spc = array_in(i, col_type_el) Then n = n + 1
+        If t_perem = array_in(i, col_type_el) Then n = n + 1
+        If t_perem_m = array_in(i, col_type_el) Then n = n + 1
+        If t_wind = array_in(i, col_type_el) Then n = n + 1
     Next i
     If n > 0 Then DataIsSpec = True Else DataIsSpec = False
 End Function
@@ -943,7 +1008,7 @@ Function DataIsWall(ByVal nm As String) As Variant
     n_row = UBound(array_in, 1)
     Dim pos_out: ReDim pos_out(n_row - 1, max_col)
     For i = 2 To n_row
-        subpos = Replace(array_in(i, 1), ".", "@")
+        subpos = Replace(array_in(i, 1), subpos_delim, "@")
         naen = array_in(i, 2)
         obozn = "-"
         p_start = 0
@@ -984,7 +1049,7 @@ Function DataNameSubpos(ByVal sub_pos_arr As Variant) As Object
             name_subpos.Item(subpos) = Array(naen, obozn)
         Next i
     End If
-    nm = ActiveWorkbook.ActiveSheet.Name
+    nm = ThisWorkbook.ActiveSheet.Name
     type_sheet = SpecGetType(nm)
     If Not IsEmpty(type_sheet) And type_sheet <> 3 Then
         sheet = Split(nm, "_")(0) & "_поз"
@@ -1037,6 +1102,7 @@ Function DataRead(ByVal nm As String) As Variant
                     errread = 1
                 Else
                     'Читаем с листа
+                    r = ManualCheck(nsht)
                     out_data = ManualSpec(nsht)
                 End If
             Else
@@ -1062,7 +1128,7 @@ Function DataRead(ByVal nm As String) As Variant
         Next i
         out_data = out
         Erase out
-        If Not DataIsSpec(out_data) And SpecGetType(nm) <> "7" Then
+        If Not DataIsSpec(out_data) And SpecGetType(nm) <> 7 Then
             MsgBox ("Неверный формат файла")
             r = LogWrite(nm, "", "Неверный формат файла")
             DataRead = Empty
@@ -1103,14 +1169,19 @@ Function DataShort(ByRef array_in As Variant) As Variant
                 out(n_row, j - 1) = array_in(i, j)
             Next j
             qty = array_in(i, 1)
-            Select Case out(n_row, col_type_el)
-                Case t_arm
-                    out(n_row, col_qty) = out(n_row, col_qty) * qty
-                Case t_prokat
-                    out(n_row, col_qty) = out(n_row, col_qty) * qty
-                Case t_else
-                    out(n_row, col_qty) = out(n_row, col_qty) * qty
-            End Select
+            out(n_row, col_qty) = out(n_row, col_qty) * array_in(i, 1)
+            'Select Case out(n_row, col_type_el)
+                'Case t_arm
+                    'out(n_row, col_qty) = out(n_row, col_qty) * qty
+                'Case t_prokat
+                    'out(n_row, col_qty) = out(n_row, col_qty) * qty
+                'Case t_else
+                    'out(n_row, col_qty) = out(n_row, col_qty) * qty
+                'Case t_izd
+                    'out(n_row, col_qty) = out(n_row, col_qty) * qty
+                'Case t_mat
+                    'out(n_row, col_qty) = out(n_row, col_qty) * qty
+            'End Select
         End If
     Next i
     DataShort = out
@@ -1126,7 +1197,7 @@ Function DataSumByControlSum(ByVal array_in As Variant)
     n_col = UBound(array_in, 2)
     Dim out_data
     Dim sum_by_type
-    For Each t_el In Array(t_arm, t_prokat, t_mat, t_izd, t_subpos)
+    For Each t_el In Array(t_arm, t_prokat, t_mat, t_izd, t_subpos, t_wind, t_perem)
         arr_by_type = ArraySelectParam(array_in, t_el, col_type_el)
         If Not IsEmpty(arr_by_type) Then
             un_controlsum_type = ArrayUniqValColumn(arr_by_type, col_chksum)
@@ -1140,8 +1211,20 @@ Function DataSumByControlSum(ByVal array_in As Variant)
                                 sum_by_type(i, k) = arr_by_type(j, k)
                             Next
                         Else
-                            'Суммируем
-                            sum_by_type(i, col_qty) = sum_by_type(i, col_qty) + arr_by_type(j, col_qty)
+                            Select Case t_el
+                                Case t_arm
+                                    If arr_by_type(j, col_fon) Then
+                                        If arr_by_type(j, col_qty) <> 1 Then MsgBox ("Ошибка суммирования арматуры в п.м.")
+                                        sum_by_type(i, col_qty) = 1
+                                        l_pos = arr_by_type(j, col_qty) * arr_by_type(j, col_length)
+                                        sum_by_type(i, col_length) = sum_by_type(i, col_length) + l_pos
+                                    Else
+                                        sum_by_type(i, col_qty) = sum_by_type(i, col_qty) + arr_by_type(j, col_qty)
+                                    End If
+                                Case Else
+                                    'Суммируем
+                                    sum_by_type(i, col_qty) = sum_by_type(i, col_qty) + arr_by_type(j, col_qty)
+                            End Select
                         End If
                     End If
                 Next j
@@ -1232,21 +1315,21 @@ Function DataWeightSubpos(ByVal array_in As Variant) As Variant
                     klass = array_in(i, col_klass)
                     diametr = array_in(i, col_diametr)
                     weight_pm = GetWeightForDiametr(diametr, klass)
-                    length_pos = array_in(i, col_length) / 1000
-                    tweight = weight_pm * length_pos * qty
+                    length_pos = Round_w(array_in(i, col_length) / 1000, n_round_l)
+                    tweight = Round_w(weight_pm * length_pos * k_zap_total, n_round_w) * qty
                 Case t_prokat
                     qty = array_in(i, col_qty)
                     If (qty = 0) Or IsEmpty(qty) Then qty = 1
                     weight_pm = array_in(i, col_pr_weight)
-                    length_pos = array_in(i, col_pr_length) / 1000
-                    tweight = weight_pm * length_pos * qty
+                    length_pos = Round_w(array_in(i, col_pr_length) / 1000, n_round_l)
+                    tweight = Round_w(weight_pm * length_pos * k_zap_total, n_round_w) * qty
                 Case t_izd
                     qty = array_in(i, col_qty)
                     If (qty = 0) Or IsEmpty(qty) Then qty = 1
                     If Not IsNumeric(array_in(i, col_m_weight)) Then
                         tweight = 0
                     Else
-                        tweight = qty * array_in(i, col_m_weight)
+                        tweight = Round_w(array_in(i, col_m_weight) * k_zap_total, n_round_w) * qty
                     End If
             End Select
             If tweight Then dweight.Item(subpos) = dweight.Item(subpos) + tweight
@@ -1343,13 +1426,12 @@ Function ExportSaveTXTfile(ByVal filename As String, ByVal txt As String) As Boo
     Set ts = Nothing: Set FSO = Nothing
 End Function
 
-Function ExportSetPageBreaks(ByVal h_list As Double, Optional ByVal n_first As Integer) As Boolean
-    If GetHeightSheet() > h_list Then
-        Set Sh = Application.ThisWorkbook.ActiveSheet
-        Sh.ResetAllPageBreaks
+Function ExportSetPageBreaks(ByRef Sh As Variant, ByVal h_list As Double, Optional ByVal n_first As Integer) As Boolean
+    If GetHeightSheet(Sh) > h_list Then
         lsize = SheetGetSize(Sh)
         n_row = lsize(1)
         n_col = lsize(2)
+        Sh.ResetAllPageBreaks
         Sh.VPageBreaks.Add Before:=Sh.Cells(1, n_col)
         h_dop = 0
         For i = 1 To n_first
@@ -1374,29 +1456,39 @@ Function ExportSetPageBreaks(ByVal h_list As Double, Optional ByVal n_first As I
     End If
 End Function
 
-Function ExportSheet()
-    r = OutPrepare()
-    nm = ActiveWorkbook.ActiveSheet.Name
-    If SpecGetType(nm) <> 7 Then
-        Set Sh = ActiveWorkbook.ActiveSheet
+Function ExportSheet(nm)
+    type_spec = SpecGetType(nm)
+    If type_spec <> 7 And type_spec > 0 Then
+        Set Sh = Application.ThisWorkbook.Sheets(nm)
         lsize = SheetGetSize(Sh)
         n_row = lsize(1)
         n_col = lsize(2)
         Set Data_out = Sh.Range(Sh.Cells(1, 1), Sh.Cells(n_row, n_col))
         filename$ = ThisWorkbook.path & "\list\Спец_" & nm & ".pdf"
+        If Dir(filename) <> "" Then
+            If Not CreateObject("Scripting.FileSystemObject").FolderExists(ThisWorkbook.path & "\list\old\") Then
+                MkDir (ThisWorkbook.path & "\list\old\")
+            End If
+            tdate = Right(Str(DatePart("yyyy", Now)), 2) & Str(DatePart("m", Now)) & Str(DatePart("d", Now))
+            stamp = "=" + tdate + "=" + Str(DatePart("h", Now)) + Str(DatePart("n", Now)) + Str(DatePart("s", Now))
+            stamp = Replace(stamp, " ", "")
+            Set fs = CreateObject("Scripting.FileSystemObject")
+            fs.CopyFile filename, ThisWorkbook.path & "\list\old\Спец_" & nm & stamp & ".pdf"
+            Set fs = Nothing
+        End If
         type_print = 0
-        h = GetHeightSheet()
-        If SpecGetType(nm) = "11" Then type_print = 1
-        'If GetHeightSheet() > 420 Then r = ExportSetPageBreaks(420, 2)
+        hh = GetHeightSheet(Sh)
+        bb = GetWidthSheet(Sh)
+        If SpecGetType(nm) = 11 Then type_print = 1
+        'If GetHeightSheet(sh) > 420 Then r = ExportSetPageBreaks(sh,420, 2)
         r = ExportSheet2Pdf(Data_out, filename, type_print)
         r = LogWrite(filename, "PDF", "ОК")
     End If
-    r = OutEnded()
 End Function
 
 Function ExportSheet2Pdf(ByVal Data_out As Range, ByVal filename As String, Optional ByVal type_print As Integer = 0) As Boolean
     Data_out.Select
-    Application.PrintCommunication = True
+    Application.PrintCommunication = False
     ActiveSheet.PageSetup.PrintArea = Data_out.Address
     Select Case type_print
         Case 0
@@ -1421,7 +1513,7 @@ Function ExportSheet2Pdf(ByVal Data_out As Range, ByVal filename As String, Opti
                 .CenterVertically = False
                 .Orientation = xlPortrait
                 .Draft = False
-                .PaperSize = xlPaperA3
+                '.PaperSize = xlPaperA3
                 .FirstPageNumber = xlAutomatic
                 .Order = xlDownThenOver
                 .BlackAndWhite = False
@@ -1448,10 +1540,6 @@ Function ExportSheet2Pdf(ByVal Data_out As Range, ByVal filename As String, Opti
             End With
         Case 1
             With ActiveSheet.PageSetup
-                .PrintTitleRows = "$1:$2"
-                .PrintTitleColumns = ""
-            End With
-            With ActiveSheet.PageSetup
                 .LeftHeader = ""
                 .CenterHeader = ""
                 .RightHeader = ""
@@ -1472,7 +1560,7 @@ Function ExportSheet2Pdf(ByVal Data_out As Range, ByVal filename As String, Opti
                 .CenterVertically = False
                 .Orientation = xlPortrait
                 .Draft = False
-                .PaperSize = xlPaperA3
+                '.PaperSize = xlPaperA3
                 .FirstPageNumber = xlAutomatic
                 .Order = xlDownThenOver
                 .BlackAndWhite = True
@@ -1498,6 +1586,7 @@ Function ExportSheet2Pdf(ByVal Data_out As Range, ByVal filename As String, Opti
                 .FirstPage.RightFooter.Text = ""
             End With
     End Select
+    Application.PrintCommunication = True
     ActiveSheet.ExportAsFixedFormat Type:=xlTypePDF, filename:=filename$, Quality:=xlQualityStandard, IncludeDocProperties:=False, IgnorePrintAreas:=False, OpenAfterPublish:=False
     ExportSheet2Pdf = True
 End Function
@@ -1540,7 +1629,7 @@ Function FormatFont(ByVal Data_out As Range, ByVal n_row As Integer, ByVal n_col
         Data_out.FormatConditions(1).Font.Underline = xlUnderlineStyleSingle
     Next
     
-    arr_warning = Array("!!!!")
+    arr_warning = Array("!!!", "ИЗ ФАЙЛА", "С ЛИСТА")
     For Each txt In arr_warning
         Data_out.FormatConditions.Add Type:=xlTextString, String:=txt, TextOperator:=xlContains
         Data_out.FormatConditions(Data_out.FormatConditions.Count).SetFirstPriority
@@ -1698,33 +1787,36 @@ End Function
 
 Function FormatManual(ByVal nm As String) As Boolean
     'Наведение красоты на листе с ручной спецификацией
-    r = OutPrepare()
+    If IsEmpty(pr_adress) Then r = ReadPrSortament()
     Set Data_out = Application.ThisWorkbook.Sheets(nm)
-    Data_out.Cells.UnMerge
+    nrow = SheetGetSize(Data_out)(1)
     'Имена диапазонов для каждого столбца
     r_all = FormatManuallitera(1) & ":" & FormatManuallitera(max_col_man)
-    r_subpos = FormatManualrange(col_man_subpos)
-    r_pos = FormatManualrange(col_man_pos)
-    r_obozn = FormatManualrange(col_man_obozn)
-    r_naen = FormatManualrange(col_man_naen)
-    r_qty = FormatManualrange(col_man_qty)
-    r_weight = FormatManualrange(col_man_weight)
-    r_prim = FormatManualrange(col_man_prim)
-    r_komment = FormatManualrange(col_man_komment)
+    r_subpos = FormatManualrange(col_man_subpos, nrow)
+    r_pos = FormatManualrange(col_man_pos, nrow)
+    r_obozn = FormatManualrange(col_man_obozn, nrow)
+    r_naen = FormatManualrange(col_man_naen, nrow)
+    r_qty = FormatManualrange(col_man_qty, nrow)
+    r_weight = FormatManualrange(col_man_weight, nrow)
+    r_prim = FormatManualrange(col_man_prim, nrow)
+    r_komment = FormatManualrange(col_man_komment, nrow)
         
-    r_length = FormatManualrange(col_man_length)
-    r_length = FormatManualrange(col_man_length)
-    r_diametr = FormatManualrange(col_man_diametr)
-    r_klass = FormatManualrange(col_man_klass)
+    r_length = FormatManualrange(col_man_length, nrow)
+    r_diametr = FormatManualrange(col_man_diametr, nrow)
+    r_klass = FormatManualrange(col_man_klass, nrow)
     
-    r_pr_length = FormatManualrange(col_man_pr_length)
-    r_pr_gost_pr = FormatManualrange(col_man_pr_gost_pr)
-    r_pr_prof = FormatManualrange(col_man_pr_prof)
-    r_pr_type = FormatManualrange(col_man_pr_type)
-    r_pr_st = FormatManualrange(col_man_pr_st)
-    r_pr_okr = FormatManualrange(col_man_pr_okr)
-    r_pr_ogn = FormatManualrange(col_man_pr_ogn)
+    r_pr_length = FormatManualrange(col_man_pr_length, nrow)
+    r_pr_gost_pr = FormatManualrange(col_man_pr_gost_pr, nrow)
+    r_pr_prof = FormatManualrange(col_man_pr_prof, nrow)
+    r_pr_type = FormatManualrange(col_man_pr_type, nrow)
+    r_pr_st = FormatManualrange(col_man_pr_st, nrow)
+    r_pr_okr = FormatManualrange(col_man_pr_okr, nrow)
+    r_pr_ogn = FormatManualrange(col_man_pr_ogn, nrow)
 
+    Columns(r_all).Validation.Delete
+    Range(r_all).ClearOutline
+    Data_out.Cells.UnMerge
+    
     Data_out.Cells(1, col_man_subpos) = "Марка" & vbLf & "элемента"
     Data_out.Cells(1, col_man_pos) = "Поз."
     Data_out.Cells(1, col_man_obozn) = "Обозначение"
@@ -1748,13 +1840,6 @@ Function FormatManual(ByVal nm As String) As Boolean
     Data_out.Cells(2, col_man_pr_okr) = "Окраска"
     Data_out.Cells(2, col_man_pr_ogn) = "Огнезащита"
     
-    Range(r_all).ClearOutline
-    Range(FormatManuallitera(col_man_obozn) & ":" & FormatManuallitera(col_man_prim)).Columns.Group
-    Range(FormatManuallitera(col_man_diametr) & ":" & FormatManuallitera(col_man_klass)).Columns.Group
-    Range(FormatManuallitera(col_man_pr_gost_pr) & ":" & FormatManuallitera(col_man_pr_ogn)).Columns.Group
-    
-    Columns(r_all).Validation.Delete
-
     Range("A1:A2").Merge
     Range("B1:B2").Merge
     Range("C1:C2").Merge
@@ -1788,12 +1873,10 @@ Function FormatManual(ByVal nm As String) As Boolean
     Data_out.Cells(2, col_man_pr_okr).ColumnWidth = 8
     Data_out.Cells(2, col_man_pr_ogn).ColumnWidth = 8
 
-    
     'Создаём столбец с марками элементов и добавим раскрывающийся список
     sheet_subpos_name = Left(nm, Len(nm) - 5) & "_поз"
     If SheetExist(sheet_subpos_name) Then
         Set subpos_sheet = Application.ThisWorkbook.Sheets(sheet_subpos_name)
-        istart = istart + 1
         row = SheetGetSize(subpos_sheet)(1)
         pos = subpos_sheet.Range(subpos_sheet.Cells(3, 1), subpos_sheet.Cells(row, 1))
         If IsArray(pos) Then
@@ -1802,13 +1885,13 @@ Function FormatManual(ByVal nm As String) As Boolean
             un_pos = Array(pos)
         End If
         If Not IsEmpty(un_pos) Then
+            istart = max_col_man + 1
             iend = UBound(un_pos, 1)
             'Data_out.range(Data_out.Cells(1, istart), Data_out.Cells((iEnd + 3) * 500, istart)).ClearContents
             For i = 1 To iend
                 Data_out.Range(Data_out.Cells(i, istart), Data_out.Cells(i, istart)) = un_pos(i)
             Next
-            Range(r_subpos).Select
-            With Selection.Validation
+            With Range(r_subpos).Validation
                 .Delete
                 .Add Type:=xlValidateInputOnly, AlertStyle:=xlValidAlertStop, Operator:=xlBetween
                 .IgnoreBlank = True
@@ -1816,8 +1899,7 @@ Function FormatManual(ByVal nm As String) As Boolean
                 .ShowInput = True
                 .ShowError = False
             End With
-            Data_out.Range(Data_out.Cells(1, istart), Data_out.Cells(iend, istart)).Select
-            With Selection.Font
+            With Data_out.Range(Data_out.Cells(1, istart), Data_out.Cells(iend, istart)).Font
                 .Name = "Calibri"
                 .Size = 8
                 .Strikethrough = False
@@ -1830,20 +1912,16 @@ Function FormatManual(ByVal nm As String) As Boolean
                 .TintAndShade = 0
                 .ThemeFont = xlThemeFontMinor
             End With
-            With Selection.Interior
+            With Data_out.Range(Data_out.Cells(1, istart), Data_out.Cells(iend, istart)).Interior
                 .Pattern = xlSolid
                 .PatternColorIndex = xlAutomatic
                 .ThemeColor = xlThemeColorDark1
                 .TintAndShade = 0
                 .PatternTintAndShade = 0
             End With
-            With Selection.Font
-                .ThemeColor = xlThemeColorDark1
-                .TintAndShade = 0
-            End With
             With Range(r_subpos).Validation
                 .Delete
-                .Add Type:=xlValidateList, AlertStyle:=xlValidAlertStop, Operator:=xlBetween, Formula1:="=" & Selection.Address
+                .Add Type:=xlValidateList, AlertStyle:=xlValidAlertStop, Operator:=xlBetween, Formula1:="=" & Data_out.Range(Data_out.Cells(1, istart), Data_out.Cells(iend, istart)).Address
                 .IgnoreBlank = True
                 .InCellDropdown = True
                 .InputTitle = ""
@@ -1855,7 +1933,7 @@ Function FormatManual(ByVal nm As String) As Boolean
             End With
         End If
     End If
-
+    
     With Range(r_prim).Validation
         .Delete
         .Add Type:=xlValidateList, AlertStyle:=xlValidAlertWarning, Operator:=xlBetween, Formula1:="=" & pr_adress.Item("Примечания")
@@ -1922,7 +2000,7 @@ Function FormatManual(ByVal nm As String) As Boolean
         .ShowError = True
     End With
 
-    For i = 1 To 800
+    For i = 1 To nrow + 100
         gost = Cells(i, col_man_pr_gost_pr).Value
         addr = pr_adress.Item(gost)
         If Not IsEmpty(addr) And Not IsEmpty(gost) Then
@@ -1957,7 +2035,6 @@ Function FormatManual(ByVal nm As String) As Boolean
             End With
         End If
     Next i
-    
     Range(r_all).Rows.AutoFit
     FormatManual = True
 End Function
@@ -1971,15 +2048,51 @@ Function FormatManuallitera(ByVal col As Integer) As String
     FormatManuallitera = litera
 End Function
 
-Function FormatManualrange(ByVal col As Integer) As String
+Function FormatManualrange(ByVal col As Integer, ByVal nrow As Integer) As String
     litera = FormatManuallitera(col)
-    out = litera & "3:" & litera & "800"
+    out = litera & "3:" & litera & Trim(Str(nrow))
     FormatManualrange = out
+End Function
+
+Function FormatColWidth(ByVal dblWidthCm As Double, ByRef rngTarget As Range)
+    dblWidthPoint = Application.CentimetersToPoints(dblWidthCm)
+    If dblWidthPoint >= 255 Then dblWidthPoint = 254
+    For Each col In rngTarget.Columns
+        With col
+            
+            While .Width > dblWidthPoint
+                .ColumnWidth = .ColumnWidth - 0.1
+            Wend
+            While .Width < dblWidthPoint
+                .ColumnWidth = .ColumnWidth + 0.1
+            Wend
+        End With
+    Next col
+End Function
+
+Function FormatRowHigh(ByVal dblHightCm As Double, ByRef rngTarget As Range)
+    dblHightPoint = Application.CentimetersToPoints(dblHightCm)
+    For Each row In rngTarget.Rows
+        row.AutoFit
+        If row.RowHeight < dblHightPoint Then
+            row.RowHeight = dblHightPoint
+        End If
+    Next row
+End Function
+
+Function FormatRowPrint(ByRef Data_out As Range, ByVal n_row As Integer)
+    Application.PrintCommunication = False
+    With Application.ThisWorkbook.Sheets(Data_out.Parent.Name).PageSetup
+        .PrintTitleRows = "$1:$" + CStr(n_row)
+        .PrintTitleColumns = ""
+    End With
+    Application.PrintCommunication = True
 End Function
 
 Function FormatSpec_AS(ByVal Data_out As Range, ByVal n_row As Integer, ByVal n_col As Integer) As Boolean
         For i = 2 To n_row
-            If InStr(Data_out(i, 1), ", на ") > 0 Then Range(Cells(i, 1), Cells(i, 6)).Merge
+            If InStr(Data_out(i, 1), ", на ") > 0 Or InStr(Data_out(i, 1), ",**") > 0 Then Range(Cells(i, 1), Cells(i, 6)).Merge
+            If InStr(Data_out(i, 1), ",**") > 0 Then Data_out(i, 1) = Left(Data_out(i, 1), Len(Data_out(i, 1)) - Len(",**"))
             If InStr(Data_out(i, 1), " Прочие") > 0 Then Range(Cells(i, 1), Cells(i, 6)).Merge
         Next i
         s1 = 15
@@ -2094,7 +2207,7 @@ Function FormatSpec_GR(ByVal Data_out As Range, ByVal n_row As Integer, ByVal n_
     End If
     Range(Data_out.Cells(1, 1), Data_out.Cells(n_row, 1)).Columns.AutoFit
     Range(Data_out.Cells(1, 2), Data_out.Cells(1, 2)).ColumnWidth = 0.07 * koeff
-    Range(Data_out.Cells(1, 3), Data_out.Cells(1, 3)).ColumnWidth = 0.45 * koeff
+    Range(Data_out.Cells(1, 3), Data_out.Cells(1, 3)).ColumnWidth = 0.5 * koeff
     Range(Data_out.Cells(1, 4), Data_out.Cells(1, 4)).ColumnWidth = 0.07 * koeff
     Range(Data_out.Cells(1, 5), Data_out.Cells(1, 5)).ColumnWidth = 0.1 * koeff
     Range(Data_out.Cells(1, 6), Data_out.Cells(1, 6)).ColumnWidth = 0.1 * koeff
@@ -2181,20 +2294,40 @@ Function FormatSpec_KZH(ByVal Data_out As Range, ByVal n_row As Integer, ByVal n
             If Data_out(2, i) = "Всего" Then Range(Cells(2, i), Cells(5, i)).Merge
         Next i
     End If
-
-    dblPoints = Application.CentimetersToPoints(1)
-    Range(Data_out.Cells(1, 1), Data_out.Cells(5, n_col)).RowHeight = dblPoints * 1
-    Range(Data_out.Cells(6, 1), Data_out.Cells(n_row, n_col)).Rows.AutoFit
-    koeff = 6
-    Range(Data_out.Cells(1, 1), Data_out.Cells(1, 1)).ColumnWidth = 4 * koeff
-    For i = 2 To n_col
-        Range(Data_out.Cells(1, i), Data_out.Cells(n_row, i)).ColumnWidth = 1.5 * koeff
-    Next i
+    r = FormatRowHigh(0.8, Data_out)
+    r = FormatColWidth(1.5, Data_out)
+    r = FormatColWidth(3, Data_out.Columns(1))
+    
     r = FormatFont(Data_out, n_row, n_col)
-    Range(Data_out.Cells(n_row, 1), Data_out.Cells(n_row, n_col)).Select
-    Selection.Font.Bold = True
-    Data_out.Cells(n_row, n_col).Select
-    With Selection.Interior
+    With Data_out.Range(Data_out.Cells(6, 2), Data_out.Cells(n_row, n_col))
+        .HorizontalAlignment = xlCenter
+        .VerticalAlignment = xlCenter
+        .WrapText = False
+        .Orientation = 0
+        .AddIndent = False
+        .IndentLevel = 0
+        .ShrinkToFit = True
+        .ReadingOrder = xlContext
+        .MergeCells = False
+    End With
+    n_del = 0
+    For i = 6 To n_row
+        flag = 1
+        For j = 2 To n_col
+            If Data_out(i, j) <> "-" Then flag = 0
+        Next j
+        If flag Then
+            Data_out.Rows(i).Delete Shift:=xlUp
+            n_del = n_del + 1
+        End If
+    Next i
+    n_row = n_row - n_del
+    If n_row = 7 Then
+        Data_out.Rows(7).Delete Shift:=xlUp
+        n_row = 6
+    End If
+    Range(Data_out.Cells(n_row, 1), Data_out.Cells(n_row, n_col)).Font.Bold = True
+    With Data_out.Cells(n_row, n_col).Interior
         .Pattern = xlSolid
         .PatternColorIndex = xlAutomatic
         .ThemeColor = xlThemeColorAccent3
@@ -2203,9 +2336,66 @@ Function FormatSpec_KZH(ByVal Data_out As Range, ByVal n_row As Integer, ByVal n
     End With
 End Function
 
+Function FormatSpec_NRM(ByVal Data_out As Range, ByVal n_row As Integer, ByVal n_col As Integer) As Boolean
+
+    r = FormatFont(Data_out, n_row, n_col)
+    Range(Data_out.Cells(1, 1), Data_out.Cells(n_row, n_col)).Rows.AutoFit
+    
+    Range(Data_out.Cells(1, 1), Data_out.Cells(n_row, 1)).ColumnWidth = 15
+    Range(Data_out.Cells(1, 2), Data_out.Cells(n_row, 2)).ColumnWidth = 25
+    Range(Data_out.Cells(1, 3), Data_out.Cells(n_row, 5)).ColumnWidth = 15
+
+    Range(Data_out.Cells(n_row, 1), Data_out.Cells(n_row, n_col)).Font.Bold = True
+    Range(Data_out.Cells(1, 1), Data_out.Cells(1, n_col)).Font.Bold = True
+    
+    Data_out.Range(Data_out.Cells(2, 1), Data_out.Cells(n_row, n_col)).Select
+    With Selection
+        .HorizontalAlignment = xlCenter
+        .VerticalAlignment = xlCenter
+        .WrapText = False
+        .Orientation = 0
+        .AddIndent = False
+        .IndentLevel = 0
+        .ShrinkToFit = True
+        .ReadingOrder = xlContext
+        .MergeCells = False
+    End With
+    Data_out.Cells(n_row, n_col).Select
+    With Selection.Interior
+        .Pattern = xlSolid
+        .PatternColorIndex = xlAutomatic
+        .ThemeColor = xlThemeColorAccent3
+        .TintAndShade = 0.599993896298105
+        .PatternTintAndShade = 0
+    End With
+   
+    Data_out.Range(Data_out.Cells(2, 5), Data_out.Cells(n_row - 1, 5)).Select
+    Selection.FormatConditions.AddColorScale ColorScaleType:=3
+    Selection.FormatConditions(Selection.FormatConditions.Count).SetFirstPriority
+    Selection.FormatConditions(1).ColorScaleCriteria(1).Type = _
+        xlConditionValueLowestValue
+    With Selection.FormatConditions(1).ColorScaleCriteria(1).FormatColor
+        .Color = 8109667
+        .TintAndShade = 0
+    End With
+    Selection.FormatConditions(1).ColorScaleCriteria(2).Type = _
+        xlConditionValuePercentile
+    Selection.FormatConditions(1).ColorScaleCriteria(2).Value = 50
+    With Selection.FormatConditions(1).ColorScaleCriteria(2).FormatColor
+        .Color = 8711167
+        .TintAndShade = 0
+    End With
+    Selection.FormatConditions(1).ColorScaleCriteria(3).Type = _
+        xlConditionValueHighestValue
+    With Selection.FormatConditions(1).ColorScaleCriteria(3).FormatColor
+        .Color = 7039480
+        .TintAndShade = 0
+    End With
+
+End Function
  
 Function FormatSpec_Pol(ByVal Data_out As Range) As Boolean
-    CSVfilename$ = ThisWorkbook.path & "\list\Спец_" & ActiveWorkbook.ActiveSheet.Name & ".txt"
+    CSVfilename$ = ThisWorkbook.path & "\list\Спец_" & ThisWorkbook.ActiveSheet.Name & ".txt"
     n = ExportList2CSV(Data_out, CSVfilename$)
     FormatSpec_Pol = True
 End Function
@@ -2303,6 +2493,12 @@ Function FormatSpec_Rule(ByVal Data_out As Range) As Boolean
  End Function
 
 Function FormatSpec_Ved(ByVal Data_out As Range, ByVal n_row As Integer, ByVal n_col As Integer) As Boolean
+    s_mat = 4
+    s_ar = 1.5
+    s1 = 1
+    s2 = 3
+    sp = 3
+    
     Cells.UnMerge
     Cells.NumberFormat = "@"
     Range(Data_out.Cells(1, 1), Data_out.Cells(2, 1)).Merge
@@ -2384,25 +2580,6 @@ Function FormatSpec_Ved(ByVal Data_out As Range, ByVal n_row As Integer, ByVal n
     For i = n_start_all + 1 To n_all
         Range(Data_out.Cells(i, 1), Data_out.Cells(i, 3)).Merge
     Next i
-    
-    s_mat = 200
-    s_ar = 30
-    s1 = 30
-    s2 = 120
-    sp = 100
-    sall = s1 + s2 + s_mat * 2 + s_ar * 2 + sp
-    
-
-    If Data_out.Cells(2, 7).Value = "Колонн" Then
-        sall = sall + s_mat + s_ar
-        If Data_out.Cells(2, 9).Value = "Низа стен/колонн" Then
-            sall = sall + s_mat + s_ar * 2
-        End If
-    Else
-        If Data_out.Cells(2, 7).Value = "Низа стен/колонн" Then
-            sall = sall + s_mat + s_ar * 2
-        End If
-    End If
     With Range(Data_out.Cells(1, 1), Data_out.Cells(n_start_all - 1, n_col)).Interior
         .PatternColorIndex = xlAutomatic
         .ThemeColor = xlThemeColorDark1
@@ -2573,9 +2750,7 @@ Function FormatSpec_Ved(ByVal Data_out As Range, ByVal n_row As Integer, ByVal n
         .TintAndShade = 0
         .Weight = xlThin
     End With
-    
-    
-    
+
     With Data_out.Font
         .Name = "ISOCPEUR"
         .FontStyle = "обычный"
@@ -2617,33 +2792,29 @@ Function FormatSpec_Ved(ByVal Data_out As Range, ByVal n_row As Integer, ByVal n
         .ThemeFont = xlThemeFontNone
     End With
     
-    Range(Data_out.Cells(1, 1), Data_out.Cells(1, 1)).ColumnWidth = s1
-    koeff = s1 / Range(Data_out.Cells(1, 1), Data_out.Cells(1, 1)).Width
+    r = FormatRowHigh(0.5, Data_out.Rows(1))
+    r = FormatRowHigh(0.8, Range(Data_out.Cells(2, 1), Data_out.Cells(n_row, n_col)))
     
-    dblPoints = Application.CentimetersToPoints(1)
-    Range(Data_out.Cells(1, 1), Data_out.Cells(n_row, n_col)).RowHeight = dblPoints * 0.9
-    Range(Data_out.Cells(1, 1), Data_out.Cells(n_row, n_col)).Rows.AutoFit
-    Range(Data_out.Cells(1, 1), Data_out.Cells(1, n_col)).RowHeight = dblPoints * 0.5
-    
-    Range(Data_out.Cells(1, 1), Data_out.Cells(1, 1)).ColumnWidth = s1 * koeff
-    Range(Data_out.Cells(1, 2), Data_out.Cells(1, 2)).ColumnWidth = s2 * koeff
-    Range(Data_out.Cells(1, 3), Data_out.Cells(1, 3)).ColumnWidth = s_mat * koeff
-    Range(Data_out.Cells(1, 4), Data_out.Cells(1, 4)).ColumnWidth = s_ar * koeff
-    Range(Data_out.Cells(1, 5), Data_out.Cells(1, 5)).ColumnWidth = s_mat * koeff
-    Range(Data_out.Cells(1, 6), Data_out.Cells(1, 6)).ColumnWidth = s_ar * koeff
+    r = FormatColWidth(s1, Data_out.Columns(1))
+    r = FormatColWidth(s2, Data_out.Columns(2))
+    r = FormatColWidth(s_mat, Data_out.Columns(3))
+    r = FormatColWidth(s_ar, Data_out.Columns(4))
+    r = FormatColWidth(s_mat, Data_out.Columns(5))
+    r = FormatColWidth(s_ar, Data_out.Columns(6))
+
     If Data_out.Cells(2, 7).Value = "Колонн" Then
-        Range(Data_out.Cells(1, 7), Data_out.Cells(1, 7)).ColumnWidth = s_mat * koeff
-        Range(Data_out.Cells(1, 8), Data_out.Cells(1, 8)).ColumnWidth = s_ar * koeff
+        r = FormatColWidth(s_mat, Data_out.Columns(7))
+        r = FormatColWidth(s_ar, Data_out.Columns(8))
         If Data_out.Cells(2, 9).Value = "Низа стен/колонн" Then
-            Range(Data_out.Cells(1, 9), Data_out.Cells(1, 9)).ColumnWidth = s_mat * koeff
-            Range(Data_out.Cells(1, 10), Data_out.Cells(1, 10)).ColumnWidth = s_ar * koeff
-            Range(Data_out.Cells(1, 11), Data_out.Cells(1, 11)).ColumnWidth = s_ar * koeff
+            r = FormatColWidth(s_mat, Data_out.Columns(9))
+            r = FormatColWidth(s_ar, Data_out.Columns(10))
+            r = FormatColWidth(s_ar, Data_out.Columns(11))
         End If
     Else
         If Data_out.Cells(2, 7).Value = "Низа стен/колонн" Then
-            Range(Data_out.Cells(1, 7), Data_out.Cells(1, 7)).ColumnWidth = s_mat * koeff
-            Range(Data_out.Cells(1, 8), Data_out.Cells(1, 8)).ColumnWidth = s_ar * koeff
-            Range(Data_out.Cells(1, 9), Data_out.Cells(1, 9)).ColumnWidth = s_ar * koeff
+            r = FormatColWidth(s_mat, Data_out.Columns(7))
+            r = FormatColWidth(s_ar, Data_out.Columns(8))
+            r = FormatColWidth(s_ar, Data_out.Columns(9))
         End If
     End If
     For n_c = 1 To n_col
@@ -2656,13 +2827,71 @@ Function FormatSpec_Ved(ByVal Data_out As Range, ByVal n_row As Integer, ByVal n
         g = Data_out.Cells(1, n_c).Value
         If InStr(g, "Номер") Then Data_out.Cells(1, n_c).Orientation = 90
     Next n_c
-    Range(Data_out.Cells(1, n_col), Data_out.Cells(1, n_col)).ColumnWidth = sp * koeff
+    r = FormatColWidth(sp, Data_out.Columns(n_col))
     FormatSpec_Ved = True
 End Function
 
-Function FormatTable(Optional ByVal pos_out As Variant) As Boolean
-    r = OutPrepare()
-    Set Sh = Application.ThisWorkbook.ActiveSheet
+Function FormatSpec_WIN(ByVal Data_out As Range, ByVal n_row As Integer, ByVal n_col As Integer) As Boolean
+    s1 = 1.5
+    s2 = 5.5
+    s3 = 6.5
+    sqty = 2
+    sprim = 2.5
+    
+    If by_floor Then
+        start_row = 3
+    Else
+        start_row = 2
+    End If
+    
+    For n_c = 1 To 2
+        n_start = start_row
+        n_end = start_row
+        temp_1 = Data_out.Cells(n_start, n_c).MergeArea.Cells(1, 1).Value
+        For i = start_row To n_row
+            temp_2 = Data_out.Cells(i, n_c).MergeArea.Cells(1, 1).Value
+            If temp_1 <> temp_2 And temp_2 <> Empty Then
+                temp_1 = temp_2
+                If n_end > n_start Then Range(Data_out.Cells(n_start, n_c), Data_out.Cells(n_end, n_c)).Merge
+                n_start = i
+            Else
+                n_end = i
+            End If
+            If i = n_row And temp_1 = temp_2 And temp_2 <> Empty Then
+                n_end = i
+                Range(Data_out.Cells(n_start, n_c), Data_out.Cells(n_end, n_c)).Merge
+            End If
+        Next i
+    Next n_c
+    
+    r = FormatColWidth(s1, Data_out.Columns(1))
+    r = FormatColWidth(s2, Data_out.Columns(2))
+    r = FormatColWidth(s3, Data_out.Columns(3))
+    r = FormatColWidth(sprim, Range(Data_out.Cells(1, n_col - 1), Data_out.Cells(n_row, n_col)))
+    If UserForm2.qtyOneSubpos_CB.Value Then
+        For i = 1 To 3
+            Range(Data_out.Cells(1, i), Data_out.Cells(2, i)).Merge
+        Next i
+        Range(Data_out.Cells(1, 4), Data_out.Cells(1, n_col - 3)).Merge
+        For i = n_col - 2 To n_col
+            Range(Data_out.Cells(1, i), Data_out.Cells(2, i)).Merge
+        Next i
+        r = FormatRowHigh(0.5, Data_out.Rows(1))
+        r = FormatRowHigh(0.8, Data_out.Rows(2))
+        r = FormatRowHigh(0.8, Range(Data_out.Cells(3, n_col), Data_out.Cells(n_row, n_col)))
+        r = FormatColWidth(sqty, Range(Data_out.Cells(1, 4), Data_out.Cells(n_row, n_col - 2)))
+        r = FormatRowPrint(Data_out, 2)
+    Else
+        r = FormatRowHigh(1.5, Data_out.Rows(1))
+        r = FormatRowHigh(0.8, Range(Data_out.Cells(2, n_col), Data_out.Cells(n_row, n_col)))
+        r = FormatColWidth(sqty, Range(Data_out.Cells(1, 4), Data_out.Cells(n_row, n_col - 2)))
+        r = FormatRowPrint(Data_out, 1)
+    End If
+    r = FormatFont(Data_out, n_row, n_col)
+End Function
+
+Function FormatTable(ByVal nm As String, Optional ByVal pos_out As Variant) As Boolean
+    Set Sh = Application.ThisWorkbook.Sheets(nm)
     If IsError(pos_out) Then
         lsize = SheetGetSize(Sh)
         n_row = lsize(1)
@@ -2675,6 +2904,7 @@ Function FormatTable(Optional ByVal pos_out As Variant) As Boolean
         Sh.Range(Sh.Cells(1, 1), Sh.Cells(n_row, n_col)) = pos_out
         Set Data_out = Sh.Range(Sh.Cells(1, 1), Sh.Cells(n_row, n_col))
     End If
+    
     type_spec = SpecGetType(Sh.Name)
     If type_spec <> 7 Then r = FormatClear()
     Select Case type_spec
@@ -2696,8 +2926,11 @@ Function FormatTable(Optional ByVal pos_out As Variant) As Boolean
             r = FormatSpec_Pol(Data_out)
         Case 13
             r = FormatSpec_ASGR(Data_out, n_row, n_col)
+        Case 14
+            r = FormatSpec_NRM(Data_out, n_row, n_col)
+        Case 20
+            r = FormatSpec_WIN(Data_out, n_row, n_col)
     End Select
-    r = OutEnded()
     FormatTable = True
 End Function
 
@@ -2717,16 +2950,26 @@ Function GetAllFileNamesUsingFSO(ByVal FolderPath As String, ByVal mask As Strin
     End If
 End Function
 
+Function GetAreaList(razm As String) As Double
+    ab = Split(razm, "x")
+    If UBound(ab) < 1 Then ab = Split(razm, "х")
+    If UBound(ab) < 1 Then ab = Split(razm, "*")
+    If UBound(ab) < 1 Then
+        GetAreaList = 0
+        Exit Function
+    End If
+    aa = ConvTxt2Num(ab(0))
+    bb = ConvTxt2Num(ab(1))
+    GetAreaList = aa * bb
+End Function
+
 Function GetGOSTForKlass(ByVal klass As String) As String
     If IsEmpty(gost2fklass) Then r = ReadReinforce()
     GetGOSTForKlass = gost2fklass.Item(klass)
 End Function
 
-Function GetHeightSheet() As Double
-    Set Sh = Application.ThisWorkbook.ActiveSheet
-    Sh.ResetAllPageBreaks
-    lsize = SheetGetSize(Sh)
-    n_row = lsize(1)
+Function GetHeightSheet(ByRef Sh As Variant) As Double
+    n_row = SheetGetSize(Sh)(1)
     h_sheet = 0
     For i = 1 To n_row
         h_row_point = Sh.Rows(i).RowHeight
@@ -2734,6 +2977,17 @@ Function GetHeightSheet() As Double
         h_sheet = h_sheet + h_row_mm
     Next i
     GetHeightSheet = h_sheet
+End Function
+
+Function GetWidthSheet(ByRef Sh As Variant) As Double
+    n_col = SheetGetSize(Sh)(2)
+    w_sheet = 0
+    For i = 1 To n_col
+        w_col_point = Sh.Columns(i).Width
+        w_col_mm = w_col_point / 72 * 25.4
+        w_sheet = w_sheet + w_col_mm
+    Next i
+    GetWidthSheet = w_sheet
 End Function
 
 Function GetListFile(ByRef mask As String) As Variant
@@ -2885,6 +3139,7 @@ End Function
 Function LogNewSheet(ByVal log_sheet_name As String)
     ThisWorkbook.Worksheets.Add.Name = log_sheet_name
     Set log_sheet = Application.ThisWorkbook.Sheets(log_sheet_name)
+    ThisWorkbook.Worksheets(log_sheet_name).Move After:=ThisWorkbook.Sheets(1)
     Sheets(log_sheet_name).Visible = False
     i = 0
     i = i + 1: log_sheet.Cells(1, i) = "Время"
@@ -2911,8 +3166,7 @@ Function LogNewSheet(ByVal log_sheet_name As String)
     i = i + 1: log_sheet.Cells(1, i).ColumnWidth = 40
     i = i + 1: log_sheet.Cells(1, i).ColumnWidth = 9
     i = i + 1: log_sheet.Cells(1, i).ColumnWidth = 20
-    
-    
+
     Range(log_sheet.Cells(1, i), log_sheet.Cells(1, n_col)).ColumnWidth = 8
     
     With Range(log_sheet.Cells(1, 1), log_sheet.Cells(1000, n_col))
@@ -2934,6 +3188,7 @@ Function LogWrite(ByVal sheet_name As String, ByVal suffix As String, ByVal rezu
     log_sheet_name = "|Лог|"
     If Not SheetExist(log_sheet_name) Then r = LogNewSheet(log_sheet_name)
     Set log_sheet = Application.ThisWorkbook.Sheets(log_sheet_name)
+    log_sheet.Visible = False
     j = SheetGetSize(log_sheet)(1) + 1
     i = 0
     i = i + 1: log_sheet.Cells(j, i) = Now
@@ -2951,6 +3206,7 @@ Function LogWrite(ByVal sheet_name As String, ByVal suffix As String, ByVal rezu
     i = i + 1: log_sheet.Cells(j, i) = UserForm2.qtyOneSubpos_CB
     i = i + 1: log_sheet.Cells(j, i) = UserForm2.show_subpos_CB
     i = i + 1: log_sheet.Cells(j, i) = UserForm2.ignore_subpos_CB
+    
 End Function
 
 Function ManualAdd(ByVal lastfileadd As String) As Boolean
@@ -3022,7 +3278,7 @@ Function ManualCatchChange(ByVal Target As Range)
     For Each ceil In Target.Cells
         type_izm = Empty
         nr = nr + 1
-        If nr > 50 Then Exit Function
+        If nr > 200 Then Exit Function
         n_colum = ceil.Column
         n_row = ceil.row
         name_colum = Cells(2, n_colum).Value
@@ -3051,6 +3307,7 @@ Function ManualCatchChange(ByVal Target As Range)
             'Cells(n_row, col_man_diametr).ClearContents
             klass = ceil.Value
             addr = pr_adress.Item(klass)
+            If IsArray(addr) Then addr = addr(1)
             If Not IsEmpty(addr) And Not IsEmpty(klass) Then
                 With Cells(n_row, col_man_diametr).Validation
                                 .Delete
@@ -3081,12 +3338,12 @@ Function ManualCatchChange(ByVal Target As Range)
         If type_izm = "Прокат" Then
             gost = Cells(n_row, col_man_pr_gost_pr)
             prof = Cells(n_row, col_man_pr_prof)
-            If Not IsEmpty(pr_adress.Item(gost)) Then
+            If Not IsEmpty(pr_adress.Item(gost)) And Not IsEmpty(gost) And Not IsEmpty(prof) Then
                 Cells(n_row, col_man_obozn) = pr_adress.Item(gost)(2)
                 If Not IsEmpty(prof) Then
                     If Not IsEmpty(pr_adress.Item(gost & prof)) Then
                         Cells(n_row, col_man_weight) = pr_adress.Item(gost & prof)(1)
-                        If InStr(Cells(n_row, col_man_pr_gost_pr).Value, "Лист_") Then
+                        If InStr(Cells(n_row, col_man_pr_gost_pr).Value, "Лист") Then
                             If GetAreaList(Cells(n_row, col_man_naen).Value) <> Cells(n_row, col_man_pr_length).Value Then
                                 Cells(n_row, col_man_pr_length).Value = GetAreaList(Cells(n_row, col_man_naen).Value)
                                 Cells(n_row, col_man_pr_length).Interior.Color = XlRgbColor.rgbLightGrey
@@ -3105,6 +3362,7 @@ Function ManualCatchChange(ByVal Target As Range)
 End Function
 
 Function ManualCeilAlert(ByVal ceil As Variant, ByVal txt As String)
+    On Error Resume Next
     ceil.AddComment (txt)
     ceil.Comment.Shape.TextFrame.AutoSize = True
     ceil.Comment.Visible = False
@@ -3135,16 +3393,14 @@ Function ManualCeilSetValue(ByRef ceil As Variant, ByVal val As Variant, ByVal m
     End If
 End Function
 
-Function ManualCheck() As Boolean
+Function ManualCheck(nm) As Boolean
     'Проверка корректности заполнения ручной спецификации
     If IsEmpty(pr_adress) Then r = ReadPrSortament()
-    r = OutPrepare()
-    nm = Application.ThisWorkbook.ActiveSheet.Name
-    If SpecGetType(nm) <> 7 Then
+    If SpecGetType(nm) <> 7 And SpecGetType(nm) <> 15 Then
         MsgBox ("Перейдите на лист с ручной спецификацией" & vbLf & "(заканчивается на _спец) и повторите")
-        r = OutEnded()
         Exit Function
     End If
+    If Not SheetCheckName(nm) Then Exit Function
     Set Data_out = Application.ThisWorkbook.Sheets(nm)
     r = FormatClear()
     Data_out.Cells.ClearFormats
@@ -3154,6 +3410,7 @@ Function ManualCheck() As Boolean
     spec = Data_out.Range(Data_out.Cells(1, 1), Data_out.Cells(n_row, max_col_man))
     r = FormatFont(Data_out.Range(Data_out.Cells(1, 1), Data_out.Cells(n_row, max_col_man)), n_row, max_col_man)
     n_err = 0
+    Set dsubpos = CreateObject("Scripting.Dictionary")
     For i = 3 To n_row
         row = ArrayRow(spec, i)
         type_el = ManualType(row)
@@ -3165,19 +3422,16 @@ Function ManualCheck() As Boolean
         Weight = row(col_man_weight) ' Масса, кг
         prim = row(col_man_prim) ' Примечание (на лист)
         
-        If subpos = Empty Then
-            'subpos = "-"
-            'Data_out.Cells(i, col_man_subpos).value = subpos
+        If Not IsNumeric(qty) And Not IsEmpty(qty) Then
+            qty = ConvTxt2Num(qty)
+            If Not IsNumeric(qty) Then
+                r = ManualCeilAlert(Data_out.Cells(i, col_man_qty), "Проверьте разделитель")
+                n_err = n_err + 1
+            Else
+                r = ManualCeilSetValue(Data_out.Cells(i, col_man_qty), qty, "check")
+            End If
         End If
-        If pos = Empty Then
-            'pos = " "
-            'Data_out.Cells(i, col_man_pos).value = pos
-        End If
-        
-        If type_el <> t_prokat Then
-            Data_out.Range(Data_out.Cells(i, col_man_pr_length), Data_out.Cells(i, col_man_pr_ogn)).ClearContents
-        End If
-        
+
         Select Case type_el
             Case t_sys 'Отмечаем вспомогательные строки
                 With Data_out.Range(Data_out.Cells(i, 1), Data_out.Cells(i, max_col_man)).Interior
@@ -3211,12 +3465,34 @@ Function ManualCheck() As Boolean
                     r = ManualCeilAlert(Data_out.Cells(i, col_man_prim), "Проверьте единицы измерения.")
                     n_err = n_err + 1
                 End If
+                If InStr(naen, "Бетон") <> 0 Then
+                    With Data_out.Range(Data_out.Cells(i, 3), Data_out.Cells(i, col_man_prim)).Interior
+                        .Pattern = xlSolid
+                        .PatternColorIndex = xlAutomatic
+                        .Color = XlRgbColor.rgbLightBlue
+                        .TintAndShade = 0
+                        .PatternTintAndShade = 0
+                    End With
+                    If IsEmpty(obozn) Then
+                        r = ManualCeilAlert(Data_out.Cells(i, col_man_obozn), "Отсутствует ГОСТ на бетон")
+                        n_err = n_err + 1
+                    End If
+                    If prim <> "куб.м." Then
+                        r = ManualCeilAlert(Data_out.Cells(i, col_man_obozn), "Бетон должен быть в куб.м.")
+                        n_err = n_err + 1
+                    End If
+                    Data_out.Cells(i, col_man_weight).Value = "-"
+                End If
             Case t_prokat
                 pr_length = row(col_man_pr_length) ' Прокат
                 pr_gost_pr = row(col_man_pr_gost_pr) ' ГОСТ профиля
                 pr_prof = row(col_man_pr_prof) ' Профиль
                 pr_type = row(col_man_pr_type) ' Тип конструкции
                 pr_st = row(col_man_pr_st) ' Сталь
+                If IsEmpty(pr_st) Then
+                    r = ManualCeilAlert(Data_out.Cells(i, col_man_pr_st), "Не указана марка стали.")
+                    n_err = n_err + 1
+                End If
                 Data_out.Cells(i, col_man_weight).Interior.Color = XlRgbColor.rgbLightGrey
                 If IsEmpty(qty) Then
                     r = ManualCeilAlert(Data_out.Cells(i, col_man_qty), "Необходимо указать количество")
@@ -3231,22 +3507,107 @@ Function ManualCheck() As Boolean
                 End If
                 
             Case t_subpos 'Правила для маркировки сборок
-                With Data_out.Range(Data_out.Cells(i, 1), Data_out.Cells(i, max_col_man)).Interior
-                    .Pattern = xlSolid
-                    .PatternColorIndex = xlAutomatic
-                    .Color = XlRgbColor.rgbLightCoral
-                    .TintAndShade = 0
-                    .PatternTintAndShade = 0
-                End With
+                If qty = Empty Then
+                    With Data_out.Range(Data_out.Cells(i, 1), Data_out.Cells(i, max_col_man)).Interior
+                        .Pattern = xlSolid
+                        .PatternColorIndex = xlAutomatic
+                        .Color = XlRgbColor.rgbLightGreen
+                        .TintAndShade = 0
+                        .PatternTintAndShade = 0
+                    End With
+                    suff = ""
+                    If IsEmpty(obozn) Then
+                        r = ManualCeilAlert(Data_out.Cells(i, col_man_obozn), "Нужна ссылка на лист")
+                        n_err = n_err + 1
+                    End If
+                Else
+                    With Data_out.Range(Data_out.Cells(i, 1), Data_out.Cells(i, max_col_man)).Interior
+                        .Pattern = xlSolid
+                        .PatternColorIndex = xlAutomatic
+                        .Color = XlRgbColor.rgbLightCoral
+                        .TintAndShade = 0
+                        .PatternTintAndShade = 0
+                    End With
+                    suff = "_par"
+                End If
+                ky = pos & " " & obozn & " " & naen & suff
+                If dsubpos.exists(ky) Then
+                    dsubpos.Item(ky) = dsubpos.Item(ky) + 1
+                    dsubpos.Item(ky + "_adr") = dsubpos.Item(ky + "_adr") + "+" + Data_out.Cells(i, 1).Address
+                Else
+                    dsubpos.Item(ky) = 1
+                    dsubpos.Item(ky + "_adr") = Data_out.Cells(i, 1).Address
+                End If
             Case t_error
                 r = ManualCeilAlert(Data_out.Cells(i, col_man_length), "Проверьте правильность заполнения.")
                 r = ManualCeilAlert(Data_out.Cells(i, col_man_pr_length), "Проверьте правильность заполнения.")
                 n_err = n_err + 1
+            Case -2
+                r = ManualCeilAlert(Data_out.Cells(i, col_man_subpos), "Пустая строка")
+                n_err = n_err + 1
+            Case 0
+                With Data_out.Range(Data_out.Cells(i, 1), Data_out.Cells(i, max_col_man)).Interior
+                    .Pattern = xlSolid
+                    .PatternColorIndex = xlAutomatic
+                    .ThemeColor = xlThemeColorDark1
+                    .TintAndShade = -0.08
+                    .PatternTintAndShade = 0
+                End With
+                With Data_out.Range(Data_out.Cells(i, 1), Data_out.Cells(i, max_col_man))
+                    .Borders(xlDiagonalDown).LineStyle = xlNone
+                    .Borders(xlDiagonalUp).LineStyle = xlNone
+                    .Borders(xlEdgeLeft).LineStyle = xlNone
+                    .Borders(xlEdgeRight).LineStyle = xlNone
+                    .Borders(xlInsideVertical).LineStyle = xlNone
+                    .Borders(xlInsideHorizontal).LineStyle = xlNone
+                End With
         End Select
+
+        If type_el <> t_prokat Then
+            Data_out.Range(Data_out.Cells(i, col_man_pr_length), Data_out.Cells(i, col_man_pr_ogn)).ClearContents
+        End If
+    Next
+    For Each ky In dsubpos.keys()
+        If InStr(ky, "_adr") = 0 Then
+            If dsubpos.Item(ky) > 1 Then
+                For Each adr In Split(dsubpos.Item(ky + "_adr"), "+")
+                    adr = Replace(adr, "$", "")
+                    If InStr(ky, "_par") = 0 Then
+                        r = ManualCeilAlert(Data_out.Range(adr), "Повторное определение вложенной сборки (" & dsubpos.Item(ky) & " раза)")
+                        n_err = n_err + 1
+                    Else
+                        r = ManualCeilAlert(Data_out.Range(adr), "Эта сборка повторяется " & dsubpos.Item(ky) & " раза. Не ошибка, но подозрительно.")
+                    End If
+                Next
+            End If
+            For i = 3 To n_row
+                subpos = spec(i, col_man_subpos) ' Марка элемента
+                pos = spec(i, col_man_pos) ' Поз.
+                obozn = spec(i, col_man_obozn) ' Обозначение
+                naen = spec(i, col_man_naen) ' Наименование
+                qty = spec(i, col_man_qty) ' Кол-во на один элемент
+                prim = spec(i, col_man_prim) ' Примечание (на лист)
+                Weight = spec(i, col_man_weight) ' Масса, кг
+                kyt = pos & " " & obozn & " " & naen
+                If subpos <> pos And kyt = ky Then
+                    If Not IsEmpty(prim) Then
+                        r = ManualCeilAlert(Data_out.Cells(i, col_man_prim), "Вхождения сборок - только в штуках. Удали " + prim)
+                        n_err = n_err + 1
+                    End If
+                    If Int(qty) - qty <> 0 Then
+                        r = ManualCeilAlert(Data_out.Cells(i, col_man_qty), "Дробное количество сборок")
+                        n_err = n_err + 1
+                    End If
+                    If Not IsEmpty(Weight) Then
+                        r = ManualCeilAlert(Data_out.Cells(i, col_man_weight), "Масса для сборки считается автоматически. Удали " + Str(Weight))
+                        n_err = n_err + 1
+                    End If
+                End If
+            Next i
+        End If
     Next
     Range("A1").Select
     r = FormatManual(nm)
-    r = OutEnded()
     If (n_err) Then
         MsgBox ("Обнаружено " & Str(n_err) & " ошибок, см. примечания к ячейкам")
         ManualCheck = False
@@ -3287,7 +3648,6 @@ Function ManualDiff(ByVal add_array As Variant, ByVal man_arr As Variant, ByVal 
 End Function
 
 Function ManualPaste2Sheet(ByRef array_in As Variant) As Boolean
-    r = OutPrepare()
     Set Sh = Application.ThisWorkbook.ActiveSheet
     If SpecGetType(Sh.Name) <> 7 Then
         MsgBox ("Перейдите на лист с ручной спецификацией (заканчивается на _спец) и повторите")
@@ -3297,8 +3657,7 @@ Function ManualPaste2Sheet(ByRef array_in As Variant) As Boolean
     startpos = SheetGetSize(Sh)(1) + 2
     endpos = startpos + UBound(array_in, 1) - 1
     Sh.Range(Sh.Cells(startpos, 1), Sh.Cells(endpos, max_col_man)) = array_in
-    r = OutEnded()
-    r = ManualCheck()
+    r = ManualCheck(Sh.Name)
 End Function
 
 Function ManualSpec(ByVal nm As String, Optional ByVal add_array As Variant) As Variant
@@ -3315,9 +3674,17 @@ Function ManualSpec(ByVal nm As String, Optional ByVal add_array As Variant) As 
     n_row = sheet_size(1)
     If n_row = istart Then n_row = n_row + 1
     spec = spec_sheet.Range(spec_sheet.Cells(1, 1), spec_sheet.Cells(n_row, max_col_man))
+    If SheetExist(izd_sheet_name + "_спец.И") And nm <> izd_sheet_name Then
+        Set spec_izd_sheet = Application.ThisWorkbook.Sheets(izd_sheet_name + "_спец.И")
+        spec_izd_size = SheetGetSize(spec_izd_sheet)
+        n_izd_row = spec_izd_size(1)
+        spec_izd = spec_izd_sheet.Range(spec_izd_sheet.Cells(3, 1), spec_izd_sheet.Cells(n_izd_row, max_col_man))
+        spec = ArrayCombine(spec, spec_izd)
+        n_row = n_row + UBound(spec_izd, 1)
+        Erase spec_izd
+    End If
     Dim pos_out: ReDim pos_out(n_row - istart, max_col): n_row_out = 0
     Dim param
-    r = ManualCheck()
     Dim add_okr_array
     n_add_okr = 0
     For i = istart To n_row
@@ -3327,25 +3694,26 @@ Function ManualSpec(ByVal nm As String, Optional ByVal add_array As Variant) As 
     n_add_okr = 0
     For i = istart To n_row
         row = ArrayRow(spec, i)
-
-        subpos = Trim(Replace(row(col_man_subpos), ".", "@"))  ' Марка элемента
-        pos = Trim(Replace(row(col_man_pos), ".", "@"))  ' Поз.
-        obozn = Trim(row(col_man_obozn)) ' Обозначение
-        naen = Trim(row(col_man_naen)) ' Наименование
-        qty = row(col_man_qty) ' Кол-во на один элемент
-        Weight = row(col_man_weight) ' Масса, кг
-        prim = Trim(row(col_man_prim)) ' Примечание (на лист)
-        
-        If qty = Empty Or qty <= 0 Then qty = 1
         type_el = ManualType(row)
-        If type_el > 0 Then
+        If type_el > 0 And type_el <> t_sys Then
+            subpos = Trim(Replace(row(col_man_subpos), subpos_delim, "@"))  ' Марка элемента
+            pos = Trim(Replace(row(col_man_pos), subpos_delim, "@"))  ' Поз.
+            obozn = Trim(row(col_man_obozn)) ' Обозначение
+            naen = Trim(row(col_man_naen)) ' Наименование
+            qty = row(col_man_qty) ' Кол-во на один элемент
+            Weight = row(col_man_weight) ' Масса, кг
+            prim = Trim(row(col_man_prim)) ' Примечание (на лист)
+            If qty = Empty Or qty <= 0 Then qty = 1
+            If type_el = t_subpos Then nSubPos = qty
+            If nSubPos = Empty Or nSubPos <= 0 Then nSubPos = 1
+            
             n_row_out = n_row_out + 1
-
+            
             pos_out(n_row_out, col_marka) = pos
             pos_out(n_row_out, col_sub_pos) = subpos
             pos_out(n_row_out, col_type_el) = type_el
             pos_out(n_row_out, col_pos) = pos
-            pos_out(n_row_out, col_qty) = qty
+            pos_out(n_row_out, col_qty) = qty * nSubPos
             
             Select Case type_el
             Case t_arm
@@ -3423,6 +3791,7 @@ Function ManualSpec(ByVal nm As String, Optional ByVal add_array As Variant) As 
                 pos_out(n_row_out, col_m_naen) = naen
                 pos_out(n_row_out, col_m_weight) = Weight
                 pos_out(n_row_out, col_m_edizm) = prim
+                pos_out(n_row_out, col_qty) = qty
             End Select
             If flag_add And Not IsEmpty(mod_array) Then
                 'Изменяем строки с одинаковыми контрольными суммами
@@ -3488,15 +3857,15 @@ Function ManualSpec(ByVal nm As String, Optional ByVal add_array As Variant) As 
             'Из за того, что в дальнейшем количество элементов в сборке делится на количество сборок - нужно домножить количества
             'Для этого сначала получим количество сборок
             'Далее будем вытаскивать элементы для каждой сборки и домножать
-            For j = 1 To UBound(sub_pos_arr, 1)
-                subpos = sub_pos_arr(j, col_sub_pos)
-                qty = sub_pos_arr(j, col_qty)
-                For i = 1 To UBound(pos_out, 1)
-                    If pos_out(i, col_type_el) <> t_subpos And pos_out(i, col_sub_pos) = subpos Then
-                        pos_out(i, col_qty) = pos_out(i, col_qty) * qty
-                    End If
-                Next i
-            Next j
+    'For j = 1 To UBound(sub_pos_arr, 1)
+        'subpos = sub_pos_arr(j, col_sub_pos)
+        'qty = sub_pos_arr(j, col_qty)
+        'For i = 1 To UBound(pos_out, 1)
+            'If pos_out(i, col_type_el) <> t_subpos And pos_out(i, col_sub_pos) = subpos Then
+                'pos_out(i, col_qty) = pos_out(i, col_qty) * qty
+            'End If
+        'Next i
+    'Next j
             'Проверим массив на наличие вложенных сборок
             'Признак вложенной сборки - её позиция и наименование встречаются в других сборках
             'На данный момент все вложенные сборки являются изделием (t_izd)
@@ -3524,19 +3893,26 @@ Function ManualSpec(ByVal nm As String, Optional ByVal add_array As Variant) As 
                     naen = pos_out(j, col_m_naen)
                     If subpos_el.exists(pos & naen) Then
                         subpos = pos_out(j, col_sub_pos)
-                        pos_out(j, col_marka) = subpos & "." & pos_out(j, col_pos)
+                        pos_out(j, col_marka) = subpos & subpos_delim & pos_out(j, col_pos)
                         pos_out(j, col_sub_pos) = pos_out(j, col_pos)
                         pos_out(j, col_type_el) = t_subpos
                         qty = pos_out(j, col_qty)
                         el = subpos_el.Item(pos & naen)
-                        qty_from_list = ArraySelectParam(el, t_subpos, col_type_el)(1, col_qty)
+                        arr_sub = ArraySelectParam(el, t_subpos, col_type_el)
+                        If IsEmpty(arr_sub) Then
+                            qty_from_list = 1
+                            r = LogWrite("Повторное определение сборки " & pos, "ERROR", 0)
+                        Else
+                            qty_from_list = arr_sub(1, col_qty)
+                            If qty_from_list <> 1 Then r = LogWrite("Подозрительное количество сборок " & pos, "ERROR", qty_from_list)
+                        End If
                         For k = 1 To UBound(el, 1)
                             If el(k, col_type_el) <> t_subpos Then
                                 c_size = UBound(subarray, 2)
                                 For i = 1 To max_col
                                     subarray(i, c_size) = el(k, i)
                                 Next i
-                                subarray(col_marka, c_size) = subpos & "." & el(k, col_pos)
+                                subarray(col_marka, c_size) = subpos & subpos_delim & el(k, col_pos)
                                 subarray(col_qty, c_size) = el(k, col_qty) * qty / qty_from_list
                                 ReDim Preserve subarray(max_col, c_size + 1)
                             End If
@@ -3551,14 +3927,170 @@ Function ManualSpec(ByVal nm As String, Optional ByVal add_array As Variant) As 
     'Erase pos_out
 End Function
 
-Function ManualType(ByVal row As Variant) As Integer
+Function ManualSpec_batch(type_out)
+    r = LogWrite("Автовывод", "Начало", "-")
+    n_out = 0
+    r = OutPrepare()
+    For Each objWh In ThisWorkbook.Worksheets
+        nm = objWh.Name
+        type_spec = SpecGetType(nm)
+        If type_spec = 7 Then
+            For Each tspec In type_out
+                If Not IsEmpty(tspec) Then
+                    sheet_out = Spec_Select(nm, tspec, True)
+                    r = ExportSheet(sheet_out)
+                    n_out = n_out + 1
+                End If
+            Next
+        End If
+    Next objWh
+    r = SheetIndex()
+    r = LogWrite("Автовывод", "Конец", Str(n_out))
+    r = OutEnded()
+End Function
 
+Function ManualSpec_NewSubpos()
+    r = OutPrepare()
+    nm_out = izd_sheet_name + "_спец.И"
+    If SheetExist(nm_out) Then
+        Worksheets(nm_out).Activate
+    Else
+        ThisWorkbook.Worksheets.Add.Name = nm_out
+    End If
+    Worksheets(nm_out).Move After:=ThisWorkbook.Sheets(ThisWorkbook.Sheets.Count)
+    Set out_sheet = ThisWorkbook.Sheets(nm_out)
+    r = FormatClear()
+    r = FormatManual(nm_out)
+    r = FormatManual(nm_out)
+    n_last = SheetGetSize(out_sheet)(1) + 2
+    flag = Empty
+    If UserForm2.fromthiswbCB.Value Then
+        For Each objWh In ThisWorkbook.Worksheets
+            nm = objWh.Name
+            type_spec = SpecGetType(nm)
+            If type_spec = 7 Then
+                Set spec_sheet = ThisWorkbook.Sheets(nm)
+                n_row = SheetGetSize(spec_sheet)(1)
+                spec = spec_sheet.Range(spec_sheet.Cells(1, 1), spec_sheet.Cells(n_row, max_col_man))
+                For i = 1 To n_row
+                    subpos = spec(i, col_man_subpos) ' Марка элемента
+                    pos = spec(i, col_man_pos) ' Поз.
+                    qty = spec(i, col_man_qty) ' Кол-во на один элемент
+                    Weight = spec(i, col_man_weight) ' Масса, кг
+                    If (subpos = pos) And IsEmpty(qty) And IsEmpty(Weight) And Not IsEmpty(pos) And InStr(pos, "!") = 0 Then
+                        flag = pos
+                        n_last = n_last + 1
+                    End If
+                    If subpos = flag And Not IsEmpty(flag) Then
+                        For j = 1 To max_col_man
+                            out_sheet.Cells(n_last, j).Value = spec(i, j)
+                        Next j
+                        spec_sheet.Cells(i, 1) = "!" & spec_sheet.Cells(i, 1)
+                        spec_sheet.Cells(i, 2) = "!" & spec_sheet.Cells(i, 2)
+                        n_last = n_last + 1
+                    End If
+                Next i
+                If Not IsEmpty(flag) Then
+                    n_last = n_last + 1
+                    flag = Empty
+                End If
+            End If
+        Next
+    End If
+    r = ManualCheck(nm_out)
+    r = OutEnded()
+End Function
+
+
+Function ManualSpec_Merge()
+    r = OutPrepare()
+    nm_out = "Сводная_спец"
+    If SheetExist(nm_out) Then Worksheets(nm_out).Delete
+    ThisWorkbook.Worksheets.Add.Name = nm_out
+    Worksheets(nm_out).Move After:=ThisWorkbook.Sheets(3)
+    Set out_sheet = ThisWorkbook.Sheets(nm_out)
+    Worksheets(nm_out).Cells.Clear
+    r = FormatClear()
+    r = FormatManual(nm_out)
+    r = FormatManual(nm_out)
+    n_row_out = 4
+    If UserForm2.fromthiswbCB.Value Then
+        For Each objWh In ThisWorkbook.Worksheets
+            nm = objWh.Name
+            type_spec = SpecGetType(nm)
+            If type_spec = 7 And nm <> nm_out Then
+                Set spec_sheet = ThisWorkbook.Sheets(nm)
+                n_row = SheetGetSize(spec_sheet)(1) + 4
+                spec = spec_sheet.Range(spec_sheet.Cells(2, 1), spec_sheet.Cells(n_row, max_col_man))
+                n_row = n_row - 3
+                n_row_out_start = n_row_out
+                n_row_out_end = n_row_out + n_row
+                out_sheet.Cells(n_row_out_start - 1, 1) = "!!!"
+                out_sheet.Cells(n_row_out_start - 1, 2) = "!!!"
+                out_sheet.Cells(n_row_out_start - 1, 3) = "C ЛИСТА"
+                out_sheet.Cells(n_row_out_start - 1, 4) = nm
+                out_sheet.Hyperlinks.Add anchor:=out_sheet.Cells(n_row_out_start - 1, 4), Address:="", SubAddress:="'" & nm & "'" & "!D3"
+                
+                out_sheet.Range(out_sheet.Cells(n_row_out_start, 1), out_sheet.Cells(n_row_out_end, max_col_man)) = spec
+                n_row_out = n_row_out_end + 3
+            End If
+        Next
+    End If
+    If UserForm2.fromfileCB.Value Then
+        Set coll = FilenamesCollection(ThisWorkbook.path, ".xlsm")
+        For Each snm In coll
+            If InStr(snm, "Спец") And InStr(snm, "~$") = 0 And InStr(snm, ThisWorkbook.Name) = 0 Then
+                Set spec_book = GetObject(snm)
+                snm_short = Split(snm, "\")(UBound(Split(snm, "\")))
+                listsheet = GetListOfSheet(spec_book)
+                For Each nm In listsheet
+                    type_spec = SpecGetType(nm)
+                    If type_spec = 7 Then
+                        Set spec_sheet = spec_book.Sheets(nm)
+                        n_row = SheetGetSize(spec_sheet)(1) + 4
+                        spec = spec_sheet.Range(spec_sheet.Cells(2, 1), spec_sheet.Cells(n_row, max_col_man))
+                        n_row = n_row - 3
+                        n_row_out_start = n_row_out
+                        n_row_out_end = n_row_out + n_row
+                        out_sheet.Cells(n_row_out_start - 1, 1) = "!!!"
+                        out_sheet.Cells(n_row_out_start - 1, 2) = "!!!"
+                        out_sheet.Cells(n_row_out_start - 1, 3) = "ИЗ ФАЙЛА"
+                        out_sheet.Cells(n_row_out_start - 1, 4) = snm_short & " - " & nm
+                        out_sheet.Range(out_sheet.Cells(n_row_out_start, 1), out_sheet.Cells(n_row_out_end, max_col_man)) = spec
+                        n_row_out = n_row_out_end + 3
+                    End If
+                Next
+                spec_book.Close True
+            End If
+        Next
+    End If
+    n_row = SheetGetSize(out_sheet)(1)
+    For i = n_row To 3 Step -1
+        If Trim$(out_sheet.Cells(i, 1)) = Empty And Trim$(out_sheet.Cells(i, 4)) = Empty Then out_sheet.Rows(i).Delete Shift:=xlUp
+        If Trim$(out_sheet.Cells(i, 4)) = Empty And out_sheet.Cells(i, 5) = 0 Then out_sheet.Rows(i).Delete Shift:=xlUp
+        If InStr(out_sheet.Cells(i, 1), "!!") <> 0 And InStr(out_sheet.Cells(i, 3), "ИЗ ФАЙЛА") = 0 And InStr(out_sheet.Cells(i, 3), "C ЛИСТА") = 0 Then out_sheet.Rows(i).Delete Shift:=xlUp
+    Next
+    r = ManualCheck(nm_out)
+    r = OutEnded()
+End Function
+
+
+Function ManualType(ByVal row As Variant) As Integer
+    tempt = 0
     For i = 1 To max_col_man
         If IsError(row(i)) Then
             ManualType = t_sys
             Exit Function
         End If
+        If IsEmpty(row(i)) Then tempt = tempt + 1
     Next i
+    
+    If tempt = max_col_man Then
+        type_el = 0
+        ManualType = type_el
+        Erase row
+        Exit Function
+    End If
 
     subpos = row(col_man_subpos)  ' Марка элемента
     pos = row(col_man_pos)  ' Поз.
@@ -3579,15 +4111,14 @@ Function ManualType(ByVal row As Variant) As Integer
     pr_st = row(col_man_pr_st) ' Сталь
     
     type_el = t_izd ' По умолчанию - изделие
-    If IsEmpty(naen) Then type_el = 0 'Пустая строка
- 
     isSys = (InStr(subpos, "!") > 0 Or InStr(pos, "!") > 0)
-    isSPos = ((subpos = pos) And Not IsEmpty(subpos) And (InStr(subpos, "!") = 0) And (InStr(pos, "!") = 0))
-    isArm = (Not IsEmpty(Length) Or Not IsEmpty(diametr) Or Not IsEmpty(klass))
-    isProkat = (Not IsEmpty(pr_length) Or Not IsEmpty(pr_gost_pr) Or Not IsEmpty(pr_prof) Or Not IsEmpty(pr_prof))
-    isMat = (InStr(prim, "кв.м.") > 0 Or InStr(prim, "куб.м.") > 0 Or InStr(naen, "Бетон") > 0)
+    isSPos = ((subpos = pos) And Not IsEmpty(subpos) And Not isSys)
+    isArm = ((Not IsEmpty(Length) Or Not IsEmpty(diametr) Or Not IsEmpty(klass)) And Not isSys)
+    isProkat = ((Not IsEmpty(pr_length) Or Not IsEmpty(pr_gost_pr) Or Not IsEmpty(pr_prof) Or Not IsEmpty(pr_prof)) And Not isSys)
+    isMat = ((InStr(prim, "кв.м.") > 0 Or InStr(prim, "куб.м.") > 0 Or InStr(naen, "Бетон") > 0) And Not isSys)
     isEr = ((isSPos And isArm) Or (isSPos And isProkat) Or (isSPos And isMat) Or (isArm And isProkat) Or (isArm And isMat) Or (isProkat And isMat)) 'Проверим - не подходит ли элемент к нескольким типам
     
+    If Not isSys And tempt < 3 Then type_el = -2
     If isSys Then type_el = t_sys
     If isSPos Then type_el = t_subpos
     If isArm Then type_el = t_arm
@@ -3676,8 +4207,8 @@ Function ReadPos(ByVal lastfileadd As String) As Variant
     n_row = sheet_size(1)
     n_col = 6
     spec = add_sheet.Range(add_sheet.Cells(1, 1), add_sheet.Cells(n_row, n_col))
-    Dim add_array: ReDim add_array(n_row - istart, max_col): n_row_out = 0
-    For i = istart + 1 To n_row
+    Dim add_array: ReDim add_array(n_row - istart + 1, max_col): n_row_out = 0
+    For i = istart To n_row
         pos = spec(i, col_add_pos): subpos = pos
         obozn = spec(i, col_add_obozn)
         naen = spec(i, col_add_naen)
@@ -3702,10 +4233,8 @@ Function ReadPos(ByVal lastfileadd As String) As Variant
 End Function
 
 Function ReadPrSortament()
-    r = OutPrepare()
-    r = SheetNew("!System")
+    If Not SheetExist("!System") Then ThisWorkbook.Worksheets.Add.Name = "!System"
     Set Sh = Application.ThisWorkbook.Sheets("!System") 'На этом скрытом листе будем хранить данные для списков
-    Sh.Cells.Clear
     Set tpr_adress = CreateObject("Scripting.Dictionary") 'В этом словаре будем хранить адреса
     'Сначала - металл
     SortamentPath = SetPath()
@@ -3818,8 +4347,6 @@ Function ReadPrSortament()
     Sh.Cells(4, n_start) = "Тип 3"
     Sh.Cells(5, n_start) = "Тип 4"
     tpr_adress.Item("Окраска") = "'!System'!" & Sh.Range(Sh.Cells(1, n_start), Sh.Cells(5, n_start)).Address
-      
-    r = OutEnded()
     Set pr_adress = tpr_adress
     ReadPrSortament = True
 End Function
@@ -3909,7 +4436,7 @@ End Function
 
 Function SetPath()
     On Error Resume Next
-    form = ActiveWorkbook.VBProject.VBComponents("UserForm2").Name
+    form = ThisWorkbook.VBProject.VBComponents("UserForm2").Name
     isFormExistis = 0
     If Not IsEmpty(form) Then isFormExistis = CBool(Len(form))
     If isFormExistis Then
@@ -3932,6 +4459,37 @@ Function SheetExist(ByVal NameSheet As String) As Boolean
         End If
     Next objWh
     SheetExist = False
+End Function
+
+Function SheetCheckName(ByVal NameSheet As String) As Boolean
+    n_err = 0
+    If InStr(NameSheet, "_") <> InStrRev(NameSheet, "_") Then
+        MsgBox ("В имени листа может быть только один нижний пробел ('_')")
+        n_err = n_err + 1
+    End If
+    If n_err > 0 Then
+        SheetCheckName = False
+        Exit Function
+    End If
+    SheetCheckName = True
+End Function
+
+Function SheetClear(type_out)
+    n_del = 0
+    For Each objWh In ThisWorkbook.Worksheets
+        nm = objWh.Name
+        If InStr(nm, "архикад") = 0 And Left(nm, 1) <> "|" And Left(nm, 1) <> "!" Then
+            type_spec = SpecGetType(nm)
+            For Each tdel In type_out
+                If Not IsEmpty(tdel) And tdel = type_spec Then
+                    ThisWorkbook.Sheets(nm).Delete
+                    n_del = n_del + 1
+                    r = LogWrite(nm, "", "DEL")
+                End If
+            Next
+        End If
+    Next objWh
+    SheetClear = n_del
 End Function
 
 Function SheetGetSize(ByVal objLst As Variant) As Variant
@@ -3959,57 +4517,230 @@ End Function
 Function SheetHideAll()
     Worksheets("|Содержание|").Activate
     Dim sheet As Worksheet
-    With ActiveWorkbook
-        For Each sheet In ActiveWorkbook.Worksheets
+    With ThisWorkbook
+        For Each sheet In ThisWorkbook.Worksheets
             If Left(sheet.Name, 1) = "!" Then Sheets(sheet.Name).Visible = False
         Next
     End With
 End Function
 
+Function SheetImport(ByVal nm As String) As Boolean
+    Set importbook = Nothing
+    On Error Resume Next
+    Set importbook = GetObject(nm)
+    On Error GoTo 0
+    If Not importbook Is Nothing Then
+        listsheet = GetListOfSheet(importbook)
+        For Each sheet_name In listsheet
+            If SpecGetType(sheet_name) > 0 Then
+                If SheetExist(sheet_name) Then
+                    For n = 1 To 100
+                        sn = Str(n) + " " + sheet_name
+                        If Not SheetExist(sn) Then Exit For
+                    Next n
+                    importbook.Sheets(sheet_name).Name = sn
+                    sheet_name = sn
+                End If
+                importbook.Sheets(sheet_name).Copy Before:=ThisWorkbook.Sheets(1)
+            End If
+        Next
+        importbook.Close SaveChanges:=False
+        SheetImport = True
+    Else
+        SheetImport = False
+    End If
+End Function
+
 Function SheetIndex()
-    Worksheets("|Содержание|").Activate
+    inx_name = "|Содержание|"
+    If SheetExist(inx_name) Then
+        ThisWorkbook.Worksheets(inx_name).Activate
+    Else
+        ThisWorkbook.Worksheets.Add.Name = inx_name
+        ThisWorkbook.Worksheets(inx_name).Activate
+    End If
+    ThisWorkbook.Worksheets(inx_name).Move Before:=ThisWorkbook.Sheets(1)
     Dim sheet As Worksheet
     Dim cell As Range
-    Range("A3:D500").ClearContents
-    With ActiveWorkbook
-        For Each sheet In ActiveWorkbook.Worksheets
+    Worksheets(inx_name).Cells.Clear
+    r = FormatClear()
+    With ThisWorkbook
+        For Each sheet In ThisWorkbook.Worksheets
+            tspec = SpecGetType(sheet.Name)
+            Select Case tspec
+                Case 1, 2, 3, 4, 5, 13, 20
+                    With ThisWorkbook.Sheets(sheet.Name).Tab
+                        .Color = 0
+                        .TintAndShade = 0
+                    End With
+                Case 6, 7, 9, 10, 11, 12, 14, 8
+                    ThisWorkbook.Worksheets(sheet.Name).Move After:=ThisWorkbook.Sheets(2)
+                    With ThisWorkbook.Sheets(sheet.Name).Tab
+                        .ThemeColor = xlThemeColorAccent4
+                        .TintAndShade = 0.4
+                    End With
+                Case 15
+                    ThisWorkbook.Worksheets(sheet.Name).Move After:=ThisWorkbook.Sheets(2)
+                    With ThisWorkbook.Sheets(sheet.Name).Tab
+                        .ThemeColor = xlThemeColorAccent5
+                        .TintAndShade = 0.5
+                    End With
+                Case Else
+                    With ThisWorkbook.Sheets(sheet.Name).Tab
+                        .Color = 0
+                        .TintAndShade = 1
+                    End With
+            End Select
+            If sheet.Name = inx_name Then
+                With ThisWorkbook.Sheets(sheet.Name).Tab
+                    .Color = 5287936
+                    .TintAndShade = 0
+                End With
+            End If
+        Next
+    End With
+    With ThisWorkbook
+        For Each sheet In ThisWorkbook.Worksheets
             If Sheets(sheet.Name).Visible = 0 And Left(sheet.Name, 1) <> "|" And Left(sheet.Name, 1) <> "!" Then sheet.Name = "!" & sheet.Name
             If Left(sheet.Name, 1) = "|" Then
-                Set cell = Worksheets(1).Cells(sheet.Index + 2, 1)
-                .Worksheets(1).Hyperlinks.Add anchor:=cell, Address:="", SubAddress:="'" & sheet.Name & "'" & "!A1"
+                Set cell = Worksheets(inx_name).Cells(sheet.Index + 2, 1)
+                ThisWorkbook.Worksheets(inx_name).Hyperlinks.Add anchor:=cell, Address:="", SubAddress:="'" & sheet.Name & "'" & "!A1"
                 cell.Formula = sheet.Name
                 Sheets(sheet.Name).Visible = True
             Else
                 If Left(sheet.Name, 1) = "!" Then
-                    Set cell = Worksheets(1).Cells(sheet.Index + 2, 2)
-                    .Worksheets(1).Hyperlinks.Add anchor:=cell, Address:="", SubAddress:="'" & sheet.Name & "'" & "!B2"
+                    Set cell = Worksheets(inx_name).Cells(sheet.Index + 2, 2)
+                    ThisWorkbook.Worksheets(inx_name).Hyperlinks.Add anchor:=cell, Address:="", SubAddress:="'" & sheet.Name & "'" & "!B2"
                     cell.Formula = sheet.Name
                     Sheets(sheet.Name).Visible = False
                 Else
-                    If SpecGetType(sheet.Name) = 7 Or Right(sheet.Name, 4) = "_поз" Or Right(sheet.Name, 8) = "_правила" Then
-                        Set cell = Worksheets(1).Cells(sheet.Index + 2, 3)
-                        .Worksheets(1).Hyperlinks.Add anchor:=cell, Address:="", SubAddress:="'" & sheet.Name & "'" & "!C3"
-                        cell.Formula = sheet.Name
-                        Sheets(sheet.Name).Visible = True
-                    Else
-                        Set cell = Worksheets(1).Cells(sheet.Index + 2, 4)
-                        .Worksheets(1).Hyperlinks.Add anchor:=cell, Address:="", SubAddress:="'" & sheet.Name & "'" & "!D4"
-                        cell.Formula = sheet.Name
-                        Sheets(sheet.Name).Visible = True
-
-                    End If
+                    tspec = SpecGetType(sheet.Name)
+                    Select Case tspec
+                    Case 6, 7, 9, 10, 11, 12, 14, 15, 8
+                        Set cell = Worksheets(inx_name).Cells(sheet.Index + 2, 3)
+                        ThisWorkbook.Worksheets(inx_name).Hyperlinks.Add anchor:=cell, Address:="", SubAddress:="'" & sheet.Name & "'" & "!C3"
+                    Case 1, 2, 3, 4, 5, 13, 0, 20
+                        Set cell = Worksheets(inx_name).Cells(sheet.Index + 2, 4)
+                        ThisWorkbook.Worksheets(inx_name).Hyperlinks.Add anchor:=cell, Address:="", SubAddress:="'" & sheet.Name & "'" & "!D4"
+                    End Select
+                    cell.Formula = sheet.Name
+                    Sheets(sheet.Name).Visible = True
                 End If
             End If
             Sheets("|Содержание|").Visible = True
         Next
     End With
-    Range("A3:C500").Rows.AutoFit
+    ThisWorkbook.Worksheets(inx_name).Activate
+    Range("A3:C600").Rows.AutoFit
+    Columns("A:E").Select
+    Selection.ColumnWidth = 36
+    With Selection
+        .HorizontalAlignment = xlGeneral
+        .VerticalAlignment = xlCenter
+        .WrapText = False
+        .Orientation = 0
+        .AddIndent = False
+        .IndentLevel = 0
+        .ShrinkToFit = False
+        .ReadingOrder = xlContext
+        .MergeCells = False
+    End With
+    With Selection
+        .HorizontalAlignment = xlCenter
+        .VerticalAlignment = xlCenter
+        .WrapText = False
+        .Orientation = 0
+        .AddIndent = False
+        .IndentLevel = 0
+        .ShrinkToFit = False
+        .ReadingOrder = xlContext
+        .MergeCells = False
+    End With
+    With Selection
+        .HorizontalAlignment = xlCenter
+        .VerticalAlignment = xlCenter
+        .WrapText = True
+        .Orientation = 0
+        .AddIndent = False
+        .IndentLevel = 0
+        .ShrinkToFit = False
+        .ReadingOrder = xlContext
+        .MergeCells = False
+    End With
+    Selection.FormatConditions.Add Type:=xlTextString, String:="_спец", _
+        TextOperator:=xlContains
+    Selection.FormatConditions(Selection.FormatConditions.Count).SetFirstPriority
+    With Selection.FormatConditions(1).Interior
+        .PatternColorIndex = xlAutomatic
+        .ThemeColor = xlThemeColorAccent6
+        .TintAndShade = 0.399945066682943
+    End With
+    Selection.FormatConditions(1).StopIfTrue = False
+    Selection.FormatConditions.Add Type:=xlTextString, String:="!", _
+        TextOperator:=xlContains
+    Selection.FormatConditions(Selection.FormatConditions.Count).SetFirstPriority
+    With Selection.FormatConditions(1).Interior
+        .PatternColorIndex = xlAutomatic
+        .ThemeColor = xlThemeColorDark1
+        .TintAndShade = -0.14996795556505
+    End With
+    Selection.FormatConditions(1).StopIfTrue = False
+    Selection.FormatConditions.Add Type:=xlExpression, Formula1:= _
+        "=ДЛСТР(СЖПРОБЕЛЫ(A1))=0"
+    Selection.FormatConditions(Selection.FormatConditions.Count).SetFirstPriority
+    With Selection.FormatConditions(1).Font
+        .ThemeColor = xlThemeColorDark1
+        .TintAndShade = -0.349986266670736
+    End With
+    With Selection.FormatConditions(1).Interior
+        .PatternColorIndex = xlAutomatic
+        .ThemeColor = xlThemeColorDark1
+        .TintAndShade = -0.349986266670736
+    End With
+    Selection.FormatConditions(1).StopIfTrue = False
+    Selection.FormatConditions.Add Type:=xlTextString, String:="|", _
+        TextOperator:=xlContains
+    Selection.FormatConditions(Selection.FormatConditions.Count).SetFirstPriority
+    With Selection.FormatConditions(1).Interior
+        .PatternColorIndex = xlAutomatic
+        .ThemeColor = xlThemeColorAccent3
+        .TintAndShade = 0.599963377788629
+    End With
+    Selection.FormatConditions(1).StopIfTrue = False
+    Selection.FormatConditions.Add Type:=xlTextString, String:="_кж", _
+        TextOperator:=xlContains
+    Selection.FormatConditions(Selection.FormatConditions.Count).SetFirstPriority
+    With Selection.FormatConditions(1).Interior
+        .PatternColorIndex = xlAutomatic
+        .ThemeColor = xlThemeColorLight2
+        .TintAndShade = 0.799981688894314
+    End With
+    Selection.FormatConditions(1).StopIfTrue = False
+    Selection.FormatConditions.Add Type:=xlTextString, String:="_км", _
+        TextOperator:=xlContains
+    Selection.FormatConditions(Selection.FormatConditions.Count).SetFirstPriority
+    With Selection.FormatConditions(1).Interior
+        .PatternColorIndex = xlAutomatic
+        .ThemeColor = xlThemeColorAccent2
+        .TintAndShade = 0.599963377788629
+    End With
+    Selection.FormatConditions(1).StopIfTrue = False
+    Selection.FormatConditions.Add Type:=xlTextString, String:="_поз", _
+        TextOperator:=xlContains
+    Selection.FormatConditions(Selection.FormatConditions.Count).SetFirstPriority
+    With Selection.FormatConditions(1).Interior
+        .PatternColorIndex = xlAutomatic
+        .ThemeColor = xlThemeColorAccent6
+        .TintAndShade = 0.599963377788629
+    End With
+    Selection.FormatConditions(1).StopIfTrue = False
+    Range("A1").Select
 End Function
 
 Function SheetNew(ByVal NameSheet As String)
     On Error Resume Next
     If SheetExist(NameSheet) Then
-       Worksheets(NameSheet).Cells.Clear
+        Worksheets(NameSheet).Cells.Clear
     Else
         ThisWorkbook.Worksheets.Add.Name = NameSheet
     End If
@@ -4026,8 +4757,8 @@ End Function
 Function SheetShowAll()
     Worksheets("|Содержание|").Activate
     Dim sheet As Worksheet
-    With ActiveWorkbook
-        For Each sheet In ActiveWorkbook.Worksheets
+    With ThisWorkbook
+        For Each sheet In ThisWorkbook.Worksheets
             Sheets(sheet.Name).Visible = True
         Next
     End With
@@ -4037,10 +4768,10 @@ Function SpecArm(ByVal arm As Variant, ByVal n_arm As Integer, ByVal type_spec A
     Dim pos_out
     If UserForm2.qtyOneSubpos_CB.Value Then
         n_txt = vbLf & "(" & nSubPos & " шт.)"
-        
     Else
         n_txt = "," & vbLf & "на все"
     End If
+    If UserForm2.show_qty_spec.Value Then n_txt = "" & ",**"
     un_chsum_arm = ArrayUniqValColumn(arm, col_chksum)
     pos_chsum_arm = UBound(un_chsum_arm, 1)
     If type_spec = 1 Or UserForm2.arm_pm_CB.Value Or (type_spec = 3 And UserForm2.ignore_subpos_CB.Value) Then
@@ -4086,7 +4817,6 @@ Function SpecArm(ByVal arm As Variant, ByVal n_arm As Integer, ByVal type_spec A
                 n_el = qty / nSubPos
                 If k_zap_total > 1 Then n_el = (qty / nSubPos) + Round((k_zap_total - 1) * (qty / nSubPos), 0)
                 length_pos = arm(j, col_length) / 1000
-                l_spec = (length_pos * n_el)
                 Select Case type_spec
                 Case 1
                     pos_out(i, 1) = arm(j, col_sub_pos) & n_txt
@@ -4098,12 +4828,12 @@ Function SpecArm(ByVal arm As Variant, ByVal n_arm As Integer, ByVal type_spec A
                     If fon Then
                         If prim = "п.м." Then prim = ""
                         pos_out(i, 3) = symb_diam & diametr & " " & klass & " L= п.м." & prim
-                        pos_out(i, 4) = pos_out(i, 4) + l_spec
-                        pos_out(i, 5) = weight_pm
+                        pos_out(i, 4) = pos_out(i, 4) + Round_w(length_pos * k_zap_total, n_round_l) * n_el
+                        pos_out(i, 5) = Round_w(weight_pm, n_round_w)
                     Else
                         pos_out(i, 3) = symb_diam & diametr & " " & klass & " L=" & length_pos * 1000 & "мм." & prim
                         pos_out(i, 4) = pos_out(i, 4) + n_el
-                        pos_out(i, 5) = Round_w(weight_pm * length_pos, n_round_w)
+                        pos_out(i, 5) = Round_w(weight_pm * length_pos * k_zap_total, n_round_w)
                     End If
                 Case Else
                     If (UserForm2.keep_pos_CB.Value And UserForm2.arm_pm_CB.Value) Or Not (UserForm2.arm_pm_CB.Value) Then
@@ -4114,13 +4844,13 @@ Function SpecArm(ByVal arm As Variant, ByVal n_arm As Integer, ByVal type_spec A
                     pos_out(i, 2) = GetGOSTForKlass(klass)
                     If fon Then
                         pos_out(i, 3) = symb_diam & diametr & " " & klass & " L= п.м." & prim
-                        pos_out(i, 4) = pos_out(i, 4) + l_spec
+                        pos_out(i, 4) = pos_out(i, 4) + Round_w(length_pos * k_zap_total, n_round_l) * n_el
                         pos_out(i, 5) = weight_pm
-                        pos_out(i, 6) = pos_out(i, 6) + l_spec * weight_pm
+                        pos_out(i, 6) = pos_out(i, 6) + Round_w(Round_w(length_pos * weight_pm * k_zap_total, n_round_w) * n_el, 2)
                     Else
                         pos_out(i, 3) = symb_diam & diametr & " " & klass & " L=" & length_pos * 1000 & "мм." & prim
                         pos_out(i, 4) = pos_out(i, 4) + n_el
-                        pos_out(i, 5) = Round_w(weight_pm * length_pos, n_round_w)
+                        pos_out(i, 5) = Round_w(weight_pm * length_pos * k_zap_total, n_round_w)
                         pos_out(i, 6) = pos_out(i, 6) + n_el * pos_out(i, 5)
                     End If
                 End Select
@@ -4129,7 +4859,6 @@ Function SpecArm(ByVal arm As Variant, ByVal n_arm As Integer, ByVal type_spec A
     Next i
     
     For i = 1 To UBound(pos_out, 1)
-        pos_out(i, 4) = Round_w(pos_out(i, 4), n_round_l)
         If type_spec = 13 Then pos_out(i, 7) = t_arm
     Next
     
@@ -4143,9 +4872,9 @@ Function SpecArm(ByVal arm As Variant, ByVal n_arm As Integer, ByVal type_spec A
     Erase arm, pos_out
 End Function
 
-Function SpecGetType(ByVal nm As String) As String
+Function SpecGetType(ByVal nm As String) As Integer
     On Error Resume Next
-    form = ActiveWorkbook.VBProject.VBComponents("UserForm2").Name
+    form = ThisWorkbook.VBProject.VBComponents("UserForm2").Name
     If IsEmpty(form) Then
         SpecGetType = 7
         Exit Function
@@ -4176,6 +4905,12 @@ Function SpecGetType(ByVal nm As String) As String
                     spec = 12
                 Case "грс"
                     spec = 13
+                Case "норм"
+                    spec = 14
+                Case "спец.И"
+                    spec = 15
+                Case "зап"
+                    spec = 20
                 Case Else
                     spec = 2
                 End Select
@@ -4193,11 +4928,11 @@ Function SpecIzd(ByVal izd As Variant, ByVal n_izd As Integer, ByVal type_spec A
     
     If UserForm2.qtyOneSubpos_CB.Value Then
         n_txt = vbLf & "(" & nSubPos & " шт.)"
-        
     Else
         n_txt = "," & vbLf & "на все"
         nSubPos = 1
     End If
+    If UserForm2.show_qty_spec.Value Then n_txt = "" & ",**"
 
     un_chsum_izd = ArrayUniqValColumn(izd, col_chksum)
     pos_chsum_izd = UBound(un_chsum_izd, 1)
@@ -4263,7 +4998,6 @@ Function SpecIzd(ByVal izd As Variant, ByVal n_izd As Integer, ByVal type_spec A
     
     
     For i = 1 To UBound(pos_out, 1)
-        If IsNumeric(pos_out(i, 6)) Then pos_out(i, 6) = Round_w(pos_out(i, 6), n_round_w)
         If type_spec = 13 Then pos_out(i, 7) = t_izd
     Next
     
@@ -4285,7 +5019,7 @@ Function SpecMaterial(ByVal mat As Variant, ByVal n_mat As Integer, ByVal type_s
         n_txt = "," & vbLf & "на все"
         nSubPos = 1
     End If
-
+    If UserForm2.show_qty_spec.Value Then n_txt = ",**"
     un_pos_mat = ArrayUniqValColumn(mat, col_chksum)
     pos_mat = UBound(un_pos_mat, 1)
     
@@ -4328,7 +5062,6 @@ Function SpecMaterial(ByVal mat As Variant, ByVal n_mat As Integer, ByVal type_s
     
     
     For i = 1 To UBound(pos_out, 1)
-        pos_out(i, 4) = Round_w(pos_out(i, 4), n_round_w)
         If type_spec = 13 Then pos_out(i, 7) = t_mat
     Next
     
@@ -4344,7 +5077,6 @@ End Function
 
 Function SpecOneSubpos(ByVal all_data As Variant, ByVal subpos As String, ByVal type_spec As Integer) As Variant
     nSubPos = GetNSubpos(subpos, type_spec)
-    
     If Not UserForm2.qtyOneSubpos_CB.Value Then nSubPos = 1
     If (type_spec = 3 And UserForm2.ignore_subpos_CB.Value) Then nSubPos = 1
     'Добавляем загаловок для сборки
@@ -4368,6 +5100,7 @@ Function SpecOneSubpos(ByVal all_data As Variant, ByVal subpos As String, ByVal 
                 Else
                     pos_naen(n_n, 1) = naen & ", на все"
                 End If
+                If UserForm2.show_qty_spec.Value Then pos_naen(n_n, 1) = naen & ",**"
             End If
         Else
             pos_naen(n_n, 1) = " Прочие элементы "
@@ -4382,6 +5115,8 @@ Function SpecOneSubpos(ByVal all_data As Variant, ByVal subpos As String, ByVal 
     Dim mat(): ReDim mat(n_row, max_col)
     Dim izd(): ReDim izd(n_row, max_col)
     Dim subp(): ReDim subp(n_row, max_col)
+    
+    hh = ArraySelectParam(all_data, "Кр1", col_sub_pos)
     
     n_arm = 0: n_prokat = 0: n_mat = 0: n_izd = 0: n_subpos = 0
     For i = 1 To n_row
@@ -4447,6 +5182,9 @@ Function SpecOneSubpos(ByVal all_data As Variant, ByVal subpos As String, ByVal 
                         Next j
                         If pos_data.Item("weight").Item(сurrent_subpos) > 0 Then
                             subp(n_subpos, col_m_weight) = pos_data.Item("weight").Item(сurrent_subpos)
+                        Else
+                            hh = pos_data.Item("weight").Item(сurrent_subpos)
+                            hh = 1
                         End If
                 End Select
         End If
@@ -4514,6 +5252,9 @@ Function SpecOneSubpos(ByVal all_data As Variant, ByVal subpos As String, ByVal 
     Else
         Select Case type_spec
             Case 1
+                If Not UserForm2.show_type_CB.Value Then
+                    pos_out = ArraySort(pos_out, 2)
+                End If
                 For i = 1 To UBound(pos_out, 1)
                     If IsNumeric(pos_out(i, 4)) Then
                         k = pos_out(i, 4)
@@ -4527,7 +5268,22 @@ Function SpecOneSubpos(ByVal all_data As Variant, ByVal subpos As String, ByVal 
                     End If
                     pos_out(1, 6) = pos_out(1, 6) + k * m
                 Next i
-                pos_out(1, 6) = Round_w(pos_out(1, 6), 0)
+                If UserForm2.qtyOneSubpos_CB.Value Then
+                    subpos_we_group = pos_out(1, 6) / nSubPos
+                    subpos_we_spec = pos_data.Item("weight").Item(subpos) / nSubPos
+                Else
+                    subpos_we_group = pos_out(1, 6) / nSubPos
+                    subpos_we_spec = pos_data.Item("weight").Item(subpos) * GetNSubpos(subpos, type_spec)
+                End If
+                If Abs(subpos_we_group - subpos_we_spec) > 0.01 Then
+                    r = LogWrite(lastfilespec, subpos, "Небивка массы на " & Str(subpos_we_group - subpos_we_spec) & " груп=" & Str(subpos_we_group) & ", общая=" & Str(subpos_we_spec))
+                End If
+                If subpos_we_group <= 0.01 Then
+                    r = LogWrite(lastfilespec, subpos, "Проверьте вес " & Str(subpos_we_group))
+                End If
+                If subpos_we_spec <= 0.01 Then
+                    r = LogWrite(lastfilespec, subpos, "Проверьте вес " & Str(subpos_we_spec))
+                End If
             Case Else
                 If Not UserForm2.show_type_CB.Value Then
                     pos_out_sort = ArraySort(pos_out, 1)
@@ -4552,13 +5308,12 @@ Function SpecOneSubpos(ByVal all_data As Variant, ByVal subpos As String, ByVal 
 End Function
 
 Function SpecProkat(ByVal prokat As Variant, ByVal n_prokat As Integer, ByVal type_spec As Integer, Optional ByVal nSubPos As Integer = 1) As Variant
-    
     If UserForm2.qtyOneSubpos_CB.Value Then
         n_txt = vbLf & "(" & nSubPos & " шт.)"
     Else
         n_txt = "," & vbLf & "на все"
     End If
-    
+    If UserForm2.show_qty_spec.Value Then n_txt = "" & ",**"
     un_chsum_prokat = ArrayUniqValColumn(prokat, col_chksum)
     pos_chsum_prokat = UBound(un_chsum_prokat, 1)
     If type_spec = 1 Or UserForm2.pr_pm_CB.Value Or (type_spec = 3 And UserForm2.ignore_subpos_CB.Value) Then
@@ -4592,12 +5347,17 @@ Function SpecProkat(ByVal prokat As Variant, ByVal n_prokat As Integer, ByVal ty
             If current_chksum = un_chsum_prokat(i) Then
                 name_pr = GetShortNameForGOST(prokat(j, col_pr_gost_prof))
                 n_el = prokat(j, col_qty) / nSubPos
-                l = Round_w(prokat(j, col_pr_length) / 1000, n_round_l)
-                If UserForm2.pr_pm_CB.Value Then
-                    we = Round_w(prokat(j, col_pr_weight), n_round_w)
+                If InStr(1, name_pr, "Лист") Then
+                    l = prokat(j, col_pr_length) / 1000
                 Else
-                    we = Round_w(prokat(j, col_pr_weight) * l, n_round_w)
+                    l = Round_w(prokat(j, col_pr_length) / 1000, 3)
                 End If
+                If UserForm2.pr_pm_CB.Value Then
+                    we = prokat(j, col_pr_weight)
+                Else
+                    we = prokat(j, col_pr_weight) * l
+                End If
+                
                 Select Case type_spec
                     Case 1
                         If UserForm2.pr_pm_CB.Value Then
@@ -4608,18 +5368,28 @@ Function SpecProkat(ByVal prokat As Variant, ByVal n_prokat As Integer, ByVal ty
                                 pos_out(i, 2) = " "
                             End If
                             If InStr(1, name_pr, "Лист") Then
-                                pos_out(i, 3) = name_pr & prokat(j, col_pr_gost_prof) & " " & prokat(j, col_pr_naen) & " S = кв.м."
+                                naen_plate = SpecMetallPlate(prokat(j, col_pr_prof), prokat(j, col_pr_naen), l, we)
+                                pos_out(i, 3) = name_pr & prokat(j, col_pr_gost_prof) & " " & naen_plate(1)
+                                l = naen_plate(2)
+                                we = naen_plate(3)
                             Else
                                 pos_out(i, 3) = name_pr & prokat(j, col_pr_gost_prof) & " " & prokat(j, col_pr_prof) & " L = п.м."
                             End If
                             pos_out(i, 4) = pos_out(i, 4) + (l * n_el)
-                            pos_out(i, 5) = we
+                            pos_out(i, 5) = Round_w(we, n_round_w)
                         Else
                             pos_out(i, 1) = prokat(j, col_sub_pos) & n_txt
                             pos_out(i, 2) = prokat(j, col_pos)
-                            pos_out(i, 3) = name_pr & prokat(j, col_pr_prof) & " L=" & l * 1000 & "мм."
+                            If InStr(1, name_pr, "Лист") Then
+                                naen_plate = SpecMetallPlate(prokat(j, col_pr_prof), prokat(j, col_pr_naen), l, we)
+                                pos_out(i, 3) = name_pr & prokat(j, col_pr_gost_prof) & " " & naen_plate(1)
+                                l = naen_plate(2)
+                                we = naen_plate(3)
+                            Else
+                                pos_out(i, 3) = name_pr & prokat(j, col_pr_gost_prof) & " " & prokat(j, col_pr_prof) & " L=" & l * 1000 & "мм."
+                            End If
                             pos_out(i, 4) = pos_out(i, 4) + n_el
-                            pos_out(i, 5) = we
+                            pos_out(i, 5) = Round_w(we, n_round_w)
                         End If
                     Case Else
                         If UserForm2.pr_pm_CB.Value Then
@@ -4630,27 +5400,30 @@ Function SpecProkat(ByVal prokat As Variant, ByVal n_prokat As Integer, ByVal ty
                             End If
                             pos_out(i, 2) = prokat(j, col_pr_gost_prof)
                             If InStr(1, name_pr, "Лист") Then
-                                pos_out(i, 3) = name_pr & " " & prokat(j, col_pr_naen) & " S = кв.м."
+                                naen_plate = SpecMetallPlate(prokat(j, col_pr_prof), prokat(j, col_pr_naen), l, we)
+                                pos_out(i, 3) = name_pr & " " & naen_plate(1)
+                                l = naen_plate(2)
+                                we = naen_plate(3)
                             Else
                                 pos_out(i, 3) = name_pr & " " & prokat(j, col_pr_prof) & " L = п.м."
                             End If
                             pos_out(i, 4) = pos_out(i, 4) + (l * n_el)
-                            If pos_out(i, 5) <> we And pos_out(i, 5) > 0 Then
-                                hh = 1
-                            End If
                             pos_out(i, 5) = we
-                            pos_out(i, 6) = pos_out(i, 6) + Round_w((l * n_el * we), n_round_w)
+                            pos_out(i, 6) = pos_out(i, 6) + Round_w(l * we, n_round_w) * n_el
                         Else
                             pos_out(i, 1) = prokat(j, col_pos)
                             pos_out(i, 2) = prokat(j, col_pr_gost_prof)
                             If InStr(1, name_pr, "Лист") Then
-                                pos_out(i, 3) = name_pr & " " & prokat(j, col_pr_naen) & " S=" & l & "кв.м."
+                                naen_plate = SpecMetallPlate(prokat(j, col_pr_prof), prokat(j, col_pr_naen), l, we)
+                                pos_out(i, 3) = name_pr & " " & naen_plate(1)
+                                l = naen_plate(2)
+                                we = naen_plate(3)
                             Else
                                 pos_out(i, 3) = name_pr & prokat(j, col_pr_prof) & " L=" & l * 1000 & "мм."
                             End If
                             pos_out(i, 4) = pos_out(i, 4) + n_el
-                            pos_out(i, 5) = we
-                            pos_out(i, 6) = pos_out(i, 6) + Round_w((n_el * we), n_round_w)
+                            pos_out(i, 5) = Round_w(we, n_round_w)
+                            pos_out(i, 6) = pos_out(i, 6) + n_el * pos_out(i, 5)
                         End If
                 End Select
             End If
@@ -4673,6 +5446,51 @@ Function SpecProkat(ByVal prokat As Variant, ByVal n_prokat As Integer, ByVal ty
     Erase prokat, pos_out
 End Function
 
+Function SpecMetallPlate(ByVal prokat_prof As String, ByVal prokat_naen As String, ByVal l As Double, ByVal we As Double) As Variant
+    Dim array_out: ReDim array_out(3)
+    If (UserForm2.keep_pos_CB.Value And UserForm2.pr_pm_CB.Value) Or Not UserForm2.pr_pm_CB.Value Then
+        If Not UserForm2.pr_pm_CB.Value Then we = we / l
+        t_list = ConvTxt2Num(Trim(Right(prokat_prof, Len(prokat_prof) - 2))) / 1000
+        razm_list = Trim(Right(prokat_naen, Len(prokat_naen) - 2))
+        abc = Split(razm_list, "x")
+        If UBound(abc) < 1 Then abc = Split(razm_list, "х")
+        If UBound(abc) < 1 Then abc = Split(razm_list, "*")
+        If UBound(abc) > 0 Then
+            a = 0: b = 0: t = 100000: s = 0
+            For nn = 0 To UBound(abc)
+                k = ConvTxt2Num(abc(nn)) / 1000
+                If k > a Then a = k
+                If k < t Then t = k
+                s = s + k
+            Next nn
+            b = s - a - t
+            If t <> t_list Then MsgBox ("Ошибка в наименовании листа " & prokat_prof & " " & prokat_naen)
+            If Round(b * 1000, 1) = 0 Then
+                l_plate = Round(l / a, 3)
+                we_plate = Round(we / a, 2)
+            Else
+                l_plate = 1
+                we_plate = Round(l * we, 2)
+            End If
+            naen_plate = prokat_naen
+            If UserForm2.pr_pm_CB.Value And Round(b * 1000, 1) = 0 Then naen_plate = prokat_naen & " L=п.м."
+            If Not UserForm2.pr_pm_CB.Value And Round(b * 1000, 1) = 0 Then naen_plate = prokat_naen & " L=" & l_plate * 1000 & "мм."
+        Else
+            naen_plate = prokat_naen & " S=" & l & "кв.м."
+            we_plate = we
+            l_plate = l
+        End If
+    Else
+        naen_plate = prokat_prof & " S=кв.м."
+        we_plate = we
+        l_plate = l
+    End If
+    array_out(1) = naen_plate
+    array_out(2) = l_plate
+    array_out(3) = we_plate
+    SpecMetallPlate = array_out
+End Function
+
 Function SpecSubpos(ByVal subp As Variant, ByVal n_subp As Integer, ByVal type_spec As Integer, ByVal nSubPos As Integer) As Variant
     
     If UserForm2.qtyOneSubpos_CB.Value Then
@@ -4680,7 +5498,7 @@ Function SpecSubpos(ByVal subp As Variant, ByVal n_subp As Integer, ByVal type_s
     Else
         n_txt = "," & vbLf & "на все"
     End If
-
+    If UserForm2.show_qty_spec.Value Then n_txt = "" & ",**"
     un_chsum_subp = ArrayUniqValColumn(subp, col_chksum)
     pos_chsum_subp = UBound(un_chsum_subp, 1)
     If type_spec = 1 Then
@@ -4704,7 +5522,7 @@ Function SpecSubpos(ByVal subp As Variant, ByVal n_subp As Integer, ByVal type_s
             If current_chksum = un_chsum_subp(i) Then
                 n_el = subp(j, col_qty) / nSubPos
                 pos = subp(j, col_pos)
-                Weight = Round_w(subp(j, col_m_weight), n_round_w)
+                Weight = subp(j, col_m_weight)
                 Select Case type_spec
                 Case 1
                     pos_out(i, 1) = subpos & n_txt
@@ -4865,6 +5683,7 @@ Function Spec_AS(ByRef all_data As Variant, ByVal type_spec As Integer) As Varia
                 nSubPos = 1
                 pos_out(2, n_col_sb) = subpos
             End If
+            If UserForm2.show_qty_spec.Value Then pos_out(2, n_col_sb) = subpos & ",**"
             pos_out_tmp = SpecOneSubpos(all_data, subpos, type_spec)
             For i = 1 To UBound(pos_out_tmp, 1)
                 Select Case pos_out_tmp(i, 7)
@@ -4920,7 +5739,7 @@ Function Spec_AS(ByRef all_data As Variant, ByVal type_spec As Integer) As Varia
             End If
             If IsNumeric(pos_out(i, end_col)) Then
                 If Round_w(pos_out(i, end_col), 0) > 0 Then
-                    pos_out(i, end_col) = Str(Round_w(pos_out(i, end_col), 0)) & " кг."
+                    pos_out(i, end_col) = Str(pos_out(i, end_col)) & " кг."
                 Else
                     pos_out(i, end_col) = "-"
                 End If
@@ -4931,7 +5750,7 @@ Function Spec_AS(ByRef all_data As Variant, ByVal type_spec As Integer) As Varia
             pos_out_sort = ArraySort(pos_out, 1)
             n_row = 2
             For i = 1 To UBound(pos_out, 1)
-                If pos_out_sort(i, 1) <> "Поз." And pos_out_sort(i, 1) <> sb_naen And pos_out_sort(i, 3) <> "" Then
+                If pos_out_sort(i, 1) <> "Поз." And pos_out_sort(i, 3) <> "" Then
                     n_row = n_row + 1
                     For j = 1 To UBound(pos_out, 2)
                         pos_out(n_row, j) = pos_out_sort(i, j)
@@ -4945,7 +5764,7 @@ Function Spec_AS(ByRef all_data As Variant, ByVal type_spec As Integer) As Varia
             If pos_out(i, 3) <> "" Then
                 If IsNumeric(ConvTxt2Num(pos_out(i, 6))) Then
                     If Round_w(pos_out(i, 6), 0) > 0 Then
-                        pos_out(i, 6) = Str(Round_w(pos_out(i, 6), 0)) & " кг."
+                        pos_out(i, 6) = Str(pos_out(i, 6)) & " кг."
                     Else
                         pos_out(i, 6) = "-"
                     End If
@@ -4977,6 +5796,112 @@ Function Spec_AS2arr(ByVal filename As String) As Variant
     Spec_AS2arr = ArrayEmp2Space(spec)
 End Function
 
+Function Spec_WIN(ByRef all_data As Variant) As Variant
+    all_data = ArraySelectParam(all_data, t_wind, col_type_el)
+    If IsEmpty(all_data) Then Spec_WIN = Empty: Exit Function
+    un_chsum = ArrayUniqValColumn(all_data, col_chksum)
+    pos_chsum = UBound(un_chsum, 1)
+    un_floor = ArrayUniqValColumn(all_data, col_w_nfloor)
+    For i = 1 To pos_chsum
+        un_chsum(i) = Split(un_chsum(i), "_")(0)
+    Next i
+    un_chsum = ArrayUniqValColumn(un_chsum, 1)
+    pos_chsum = UBound(un_chsum, 1)
+    Dim pos_zag
+    If UserForm2.qtyOneSubpos_CB.Value Then
+        ReDim pos_zag(2, UBound(un_floor) + 6)
+        pos_zag(1, 1) = "Позиция"
+        pos_zag(1, 2) = "Обозначение"
+        pos_zag(1, 3) = "Наименование"
+        pos_zag(1, 4) = "Количество"
+        i = 4
+        floor_start = i
+        For Each tfloor In un_floor
+            For j = 1 To UBound(all_data, 1)
+                If tfloor = all_data(j, col_w_nfloor) Then
+                    pos_zag(2, i) = all_data(j, col_w_floor)
+                    Exit For
+                End If
+            Next j
+            i = i + 1
+        Next
+        floor_end = i - 1
+        pos_zag(1, i) = "Всего"
+        n_col_qty = i
+        i = i + 1
+        pos_zag(1, i) = "Масса ед., кг"
+        i = i + 1
+        pos_zag(1, i) = "Примечание"
+    Else
+        ReDim pos_zag(1, 6)
+        pos_zag(1, 1) = "Позиция"
+        pos_zag(1, 2) = "Обозначение"
+        pos_zag(1, 3) = "Наименование"
+        pos_zag(1, 4) = "Кол-во"
+        pos_zag(1, 5) = "Масса ед., кг"
+        pos_zag(1, 6) = "Примечание"
+        n_col_qty = 4
+    End If
+    Dim pos_out(): ReDim pos_out(pos_chsum, UBound(pos_zag, 2))
+    pos_wind = "окно"
+    pos_door = "дверь"
+    n_row_out = 0
+    For Each t In Array(pos_wind, pos_door)
+        el_data = ArraySelectParam(all_data, t, col_pos)
+        un_sub_pos_el = ArrayUniqValColumn(el_data, col_sub_pos)
+        If Not IsEmpty(un_sub_pos_el) Then
+            For Each sub_pos In un_sub_pos_el
+                pos_dat = ArraySelectParam(all_data, sub_pos, col_sub_pos)
+                'Поставим заполнение впереди
+                un_pos = ArrayCombine(Array(t), ArrayUniqValColumn(pos_dat, col_pos))
+                For i = 1 To UBound(un_pos)
+                    If un_pos(i) = t And i > 1 Then un_pos(i) = Empty
+                Next i
+                For Each pos_el In un_pos
+                    If Not IsEmpty(pos_el) Then n_row_out = n_row_out + 1
+                    For i = 1 To UBound(pos_dat)
+                        tpos = pos_dat(i, col_pos)
+                        If tpos = pos_el Then
+                            sub_pos = Replace(pos_dat(i, col_sub_pos), "zap", "")
+                            pos = pos_dat(i, col_pos) & " "
+                            If pos = t & " " Then pos = ""
+                            obozn = pos_dat(i, col_w_obozn)
+                            naen = pos & pos_dat(i, col_w_naen)
+                            qty = pos_dat(i, col_qty)
+                            Weight = pos_dat(i, col_w_weight)
+                            prim = pos_dat(i, col_w_prim)
+                            pos_out(n_row_out, 1) = sub_pos
+                            pos_out(n_row_out, 2) = obozn
+                            pos_out(n_row_out, 3) = naen
+                            If UserForm2.qtyOneSubpos_CB.Value Then
+                                Floor = pos_dat(i, col_w_floor)
+                                For k = floor_start To floor_end
+                                    If pos_zag(2, k) = Floor Then pos_out(n_row_out, k) = pos_out(n_row_out, k) + qty
+                                Next k
+                            End If
+                            pos_out(n_row_out, n_col_qty) = pos_out(n_row_out, n_col_qty) + qty
+                            pos_out(n_row_out, n_col_qty + 1) = Weight
+                            If IsEmpty(pos_out(n_row_out, n_col_qty + 2)) Then pos_out(n_row_out, n_col_qty + 2) = prim
+                        End If
+                    Next i
+                Next
+            Next
+        End If
+    Next
+    If UserForm2.qtyOneSubpos_CB.Value Then
+        For k = floor_start To floor_end
+            For Each deltxt In Array("План", "НА")
+                pos_zag(2, k) = Replace(pos_zag(2, k), deltxt, "")
+            Next
+            pos_zag(2, k) = Trim(pos_zag(2, k))
+            For i = 1 To n_row_out
+                If IsEmpty(pos_out(i, k)) Then pos_out(i, k) = "-"
+            Next i
+        Next k
+    End If
+    Spec_WIN = ArrayCombine(pos_zag, pos_out)
+End Function
+
 Function Spec_KM(ByRef all_data As Variant) As Variant
     prokat = ArraySelectParam(all_data, t_prokat, col_type_el)
     If IsEmpty(prokat) Then
@@ -4997,7 +5922,7 @@ Function Spec_KM(ByRef all_data As Variant) As Variant
     Else
         ed_izm = "т."
         koef = 1000
-        n_okr = n_round_w
+        n_okr = 1
         w_format = "0.00"
     End If
 
@@ -5345,6 +6270,7 @@ Function Spec_KZH(ByRef all_data As Variant) As Variant
             nSubPos = 1
             n_txt = subpos & ", " & "на все"
         End If
+        If UserForm2.show_qty_spec.Value Then n_txt = "" & ",**"
         pos_out(k, 1) = n_txt
         If subpos = "-" Then pos_out(k, 1) = "Прочие"
         weight_index.Item("row" & subpos) = k
@@ -5409,7 +6335,7 @@ Function Spec_KZH(ByRef all_data As Variant) As Variant
                 End If
                 If Not UserForm2.qtyOneSubpos_CB.Value Then nSubPos = 1
                 l_spec = (length_pos * qty) / nSubPos
-                w_pos = Round_w(weight_pm * l_spec * k_zap_total, n_round_w)
+                w_pos = weight_pm * l_spec * k_zap_total
                 i_col_d = weight_index.Item("col" & tkeyd)
                 i_col_s1 = weight_index.Item("col" & tkesum_1)
                 i_col_s2 = weight_index.Item("col" & n_type & "Всего")
@@ -5424,13 +6350,17 @@ Function Spec_KZH(ByRef all_data As Variant) As Variant
         pos_out(n_row + sum_row, 1) = "Итого"
         For i = 2 To UBound(pos_out, 2)
             For j = 6 To n_row
-                pos_out(n_row + sum_row, i) = pos_out(n_row + sum_row, i) + pos_out(j, i)
+                pos_out(n_row + sum_row, i) = pos_out(n_row + sum_row, i) + Round_w(pos_out(j, i), n_round_wkzh)
             Next
         Next
     End If
     For i = 2 To UBound(pos_out, 2)
         For j = 6 To n_row
-            If IsEmpty(pos_out(j, i)) Then pos_out(j, i) = "-"
+            If IsEmpty(pos_out(j, i)) Then
+                pos_out(j, i) = "-"
+            Else
+                pos_out(j, i) = Round_w(pos_out(j, i), n_round_wkzh)
+            End If
         Next
     Next
     Spec_KZH = pos_out
@@ -5472,11 +6402,24 @@ Function Spec_POL(ByRef out_data As Variant) As Variant
     Spec_POL = pos_out
 End Function
 
-Function Spec_Select(ByVal lastfilespec As String, ByVal suffix As String)
+Function Spec_Select(ByVal lastfilespec As String, ByVal suffix As String, Optional quiet As Boolean = False) As String
+    tt = ConvTxt2Num(UserForm2.Kzap.Text)
+    If IsNumeric(tt) Then
+        If tt > 1 And tt < 2 Then
+            k_zap_total = tt
+        Else
+            k_zap_total = 1
+        End If
+    End If
     If SpecGetType(lastfilespec) = 7 Then
         nm = Split(lastfilespec, "_")(0) & suffix
     Else
         nm = lastfilespec & suffix
+    End If
+    If Not SheetCheckName(nm) Then
+        r = LogWrite(lastfilespec, suffix, "Ошибка имени листа или файла")
+        If Not (quiet) Then MsgBox ("Данные отсутвуют")
+        Exit Function
     End If
     type_spec = SpecGetType(nm)
     Select Case type_spec
@@ -5490,50 +6433,48 @@ Function Spec_Select(ByVal lastfilespec As String, ByVal suffix As String)
     End Select
     If IsEmpty(all_data) Then
         r = LogWrite(lastfilespec, suffix, "Данные отсутвуют")
-        MsgBox ("Данные отсутвуют")
+        If Not (quiet) Then MsgBox ("Данные отсутвуют")
         Exit Function
-    End If
-    If SheetExist(nm) Then
-        Worksheets(nm).Activate
-    Else
-        ThisWorkbook.Worksheets.Add.Name = nm
-    End If
-    tt = ConvTxt2Num(UserForm2.Kzap.Text)
-    If IsNumeric(tt) Then
-        If tt > 1 And tt < 2 Then
-            k_zap_total = tt
-        Else
-            k_zap_total = 1
-        End If
     End If
     Select Case type_spec
         Case 1, 2, 3, 13
-            MsgBox ("Коэффицент запаса для объёма, площади и длин " & CStr(k_zap_total))
+            If Not (quiet) Then MsgBox ("Коэффицент запаса для объёма, площади и длин " & CStr(k_zap_total))
             pos_out = Spec_AS(all_data, type_spec)
         Case 4
             pos_out = Spec_KM(all_data)
         Case 5
-            MsgBox ("Коэффицент запаса для веса " & CStr(k_zap_total))
+            If Not (quiet) Then MsgBox ("Коэффицент запаса для веса " & CStr(k_zap_total))
             pos_out = Spec_KZH(all_data)
         Case 11
-            MsgBox ("Коэффицент запаса площади отделки -" & CStr(k_zap_total))
+            If Not (quiet) Then MsgBox ("Коэффицент запаса площади отделки -" & CStr(k_zap_total))
             pos_out = Spec_VED(all_data)
         Case 12
-            MsgBox ("Коэффицент запаса площади пола -" & CStr(k_zap_total))
+            If Not (quiet) Then MsgBox ("Коэффицент запаса площади пола -" & CStr(k_zap_total))
             pos_out = Spec_POL(all_data)
+        Case 14
+            pos_out = Spec_NRM(all_data)
+        Case 20
+            pos_out = Spec_WIN(all_data)
     End Select
     If Not IsEmpty(pos_out) Then
-        Worksheets(nm).Cells.Clear
-        r = FormatTable(pos_out)
-        r = FormatTable()
+        If SheetExist(nm) Then
+            Worksheets(nm).Activate
+            Worksheets(nm).Cells.Clear
+        Else
+            ThisWorkbook.Worksheets.Add.Name = nm
+        End If
+        Worksheets(nm).Move After:=ThisWorkbook.Sheets(ThisWorkbook.Sheets.Count)
+        r = FormatTable(nm, pos_out)
+        r = FormatTable(nm)
         r = LogWrite(lastfilespec, suffix, "ОК")
+        Spec_Select = nm
     Else
         r = LogWrite(lastfilespec, suffix, "Данные отсутвуют")
-        MsgBox ("Данные отсутвуют")
+        If Not (quiet) Then MsgBox ("Данные отсутвуют")
     End If
 End Function
 
-Function VedAddArea(ByRef zone As Variant, ByRef materials As Variant, ByVal mat_draft As String, ByVal mat_fin As String, ByVal num As String, ByVal area_mat As Double, Optional ByVal perim As Double = 0) As Integer
+Function VedAddArea(ByRef zone As Variant, ByRef materials As Variant, ByVal mat_draft As String, ByVal mat_fin As String, ByVal num As String, ByVal area_mat As Double, Optional ByVal perim As Double = 0, Optional ByVal h_pan As Double = 0) As Integer
     If UserForm2.separate_material_CB.Value Then
         razd = ";"
         mat_fin = Trim(mat_fin)
@@ -5541,6 +6482,7 @@ Function VedAddArea(ByRef zone As Variant, ByRef materials As Variant, ByVal mat
         razd = "&"
         mat_fin = " " + mat_fin
     End If
+    mat_fin = Replace(mat_fin, "@", ";b@")
     mat_draft = Trim(mat_draft)
     mat_draft = "a@" & Replace(mat_draft, razd, ";a@")
     mat_draft = Replace(mat_draft, "@ ", "@")
@@ -5582,6 +6524,12 @@ Function VedAddArea(ByRef zone As Variant, ByRef materials As Variant, ByVal mat
                     zone.Item(num + "n;" + mat) = naen_mat
                 End If
                 
+                If h_pan > 0 Then
+                    If Not zone.exists(num + "h;" + mat) Then
+                        zone.Item(num + "h;" + mat) = h_pan
+                    End If
+                End If
+                
                 If materials.exists(mat) Then
                     materials.Item(mat + ";a") = materials.Item(mat + ";a") + area_mat
                 Else
@@ -5593,7 +6541,73 @@ Function VedAddArea(ByRef zone As Variant, ByRef materials As Variant, ByVal mat
     End If
     VedAddArea = flag
 End Function
-
+Function Spec_NRM(ByRef all_data As Variant) As Variant
+    UserForm2.qtyOneSubpos_CB.Value = False
+    pos_out_arm = Spec_KZH(all_data)
+    pos_out_bet = Spec_AS(all_data, 13)
+    un_pos_bet = ArrayUniqValColumn(ArrayTranspose(ArrayRow(pos_out_bet, 2)), 1)
+    n_add = 2
+    For j = 1 To UBound(un_pos_bet)
+        If IsEmpty(un_pos_bet(j)) Then n_add = n_add - 1
+    Next j
+    Dim pos_out_norm: ReDim pos_out_norm(UBound(un_pos_bet) + n_add, 5)
+    
+    n_out = 1
+    pos_out_norm(n_out, 1) = "Поз."
+    pos_out_norm(n_out, 2) = "Марка бетона"
+    pos_out_norm(n_out, 3) = "Объём" & vbLf & "бетона, куб.м."
+    pos_out_norm(n_out, 4) = "Вес арматуры, кг."
+    pos_out_norm(n_out, 5) = "Расход, кг/куб.м"
+    sum_bet = 0: sum_arm = 0
+    For j = 1 To UBound(un_pos_bet)
+        pos = un_pos_bet(j)
+        If Not IsEmpty(pos) Then
+            n_col_bet = 0
+            For i = 1 To UBound(pos_out_bet, 2)
+                If InStr(pos_out_bet(2, i), pos) Then
+                    n_col_bet = i
+                    Exit For
+                End If
+            Next i
+            n_row_bet = 0
+            For i = 3 To UBound(pos_out_bet, 1)
+                If InStr(pos_out_bet(i, 3), "Бетон") And InStr(pos_out_bet(i, n_col_bet), "-") = 0 Then
+                    n_row_bet = i
+                    Exit For
+                End If
+            Next i
+            v_bet = 0
+            If n_col_bet > 0 And n_row_bet > 0 Then v_bet = pos_out_bet(n_row_bet, n_col_bet)
+            v_arm = 0
+            If v_bet > 0 Then
+                For i = 1 To UBound(pos_out_arm, 1)
+                    If InStr(pos_out_arm(i, 1), pos) Then
+                        v_arm = pos_out_arm(i, UBound(pos_out_arm, 2))
+                        Exit For
+                    End If
+                Next i
+            End If
+            If v_bet > 0 And v_arm > 0 Then
+                n_out = n_out + 1
+                pos_out_norm(n_out, 1) = pos
+                pos_out_norm(n_out, 2) = pos_out_bet(n_row_bet, 3)
+                pos_out_norm(n_out, 3) = v_bet
+                pos_out_norm(n_out, 4) = v_arm
+                pos_out_norm(n_out, 5) = Round(pos_out_norm(n_out, 4) / pos_out_norm(n_out, 3), 0)
+                sum_bet = sum_bet + pos_out_bet(n_row_bet, n_col_bet)
+                sum_arm = sum_arm + pos_out_norm(n_out, 4)
+            End If
+        End If
+    Next j
+    n_out = n_out + 1
+    pos_out_norm(n_out, 1) = "Итого"
+    pos_out_norm(n_out, 2) = " "
+    pos_out_norm(n_out, 3) = sum_bet
+    pos_out_norm(n_out, 4) = sum_arm
+    pos_out_norm(n_out, 5) = Round(sum_arm / sum_bet, 0)
+    If n_out <> UBound(pos_out_norm, 1) Then pos_out_norm = ArrayRedim(pos_out_norm, n_out)
+    Spec_NRM = pos_out_norm
+End Function
 Function Spec_VED(ByRef all_data As Variant) As Variant
     out_data = all_data(1)
     rules = all_data(2)
@@ -5642,18 +6656,24 @@ Function Spec_VED(ByRef all_data As Variant) As Variant
             fin_wall = zone_el(1, col_s_mwall_zone)
             fin_column = zone_el(1, col_s_mcolumn_zone)
             wall = ArraySelectParam(out_data, num, col_s_numb_zone, "СТЕНА", col_s_type)
-            n_wall = UBound(wall, 1)
-            wall_len = 0
-            door_len = 0
-            For i = 1 To n_wall
-                door_len = door_len + wall(i, col_s_doorlen_zone) / 1000
-                wall_len = wall_len + wall(i, col_s_walllen_zone) / 1000
-            Next i
+            If Not IsEmpty(wall) Then
+                n_wall = UBound(wall, 1)
+                wall_len = 0
+                door_len = 0
+                For i = 1 To n_wall
+                    door_len = door_len + wall(i, col_s_doorlen_zone) / 1000
+                    wall_len = wall_len + wall(i, col_s_walllen_zone) / 1000
+                Next i
+            Else
+                n_wall = 0
+                wall_len = 0
+                door_len = 0
+            End If
             '----------------------
             '        КОЛОННЫ
             '----------------------
             'Добавить возможность выбора наличия отверстий
-            column_perim_in_wall = perim_total - wall_len - free_len - perim_hole
+            column_perim_in_wall = perim_total - wall_len - free_len + perim_hole
             column_perim = perim_hole
             column_perim_total = column_perim + column_perim_in_wall
             column_pan_area = column_perim_total * h_pan
@@ -5667,28 +6687,34 @@ Function Spec_VED(ByRef all_data As Variant) As Variant
                 n_row_c = n_row_c + VedAddArea(zone, materials, c, fin_column, num + ";c", column_area)
                 is_column = True
             End If
-            If column_pan_area > 0 Then n_row_pn = n_row_pn + VedAddArea(zone, materials, c, fin_pan, num + ";pn", column_pan_area)
+            If column_pan_area > 0 Then n_row_pn = n_row_pn + VedAddArea(zone, materials, c, fin_pan, num + ";pn", column_pan_area, 0, h_pan)
             '----------------------
             '        СТЕНЫ
             '----------------------
             un_wall = ArrayUniqValColumn(wall, col_s_mat_wall)
-            For Each w In un_wall
-                wall_by_key = ArraySelectParam(wall, w, col_s_mat_wall)
-                n_wall = UBound(wall_by_key, 1)
-                wall_len = 0
-                door_len = 0
-                wall_area = 0
-                For i = 1 To n_wall
-                    door_len = door_len + wall_by_key(i, col_s_doorlen_zone) / 1000
-                    wall_len = wall_len + wall_by_key(i, col_s_walllen_zone) / 1000
-                    wall_area = wall_area + wall_by_key(i, col_s_area_wall)
-                Next i
-                pan_area = (wall_len - door_len) * h_pan
-                wall_area = wall_area - pan_area
-                n_row_w = n_row_w + VedAddArea(zone, materials, w, fin_wall, num + ";w", wall_area)
-                n_row_pn = n_row_pn + VedAddArea(zone, materials, w, fin_pan, num + ";pn", pan_area)
-            Next
-            If h_pan > 0 Then is_pan = True
+            If Not IsEmpty(un_wall) Then
+                For Each w In un_wall
+                    wall_by_key = ArraySelectParam(wall, w, col_s_mat_wall)
+                    n_wall = UBound(wall_by_key, 1)
+                    wall_len = 0
+                    door_len = 0
+                    wall_area = 0
+                    For i = 1 To n_wall
+                        door_len = door_len + wall_by_key(i, col_s_doorlen_zone) / 1000
+                        wall_len = wall_len + wall_by_key(i, col_s_walllen_zone) / 1000
+                        wall_area = wall_area + wall_by_key(i, col_s_area_wall)
+                    Next i
+                    pan_area = (wall_len - door_len) * h_pan
+                    wall_area = wall_area - pan_area
+                    n_row_w = n_row_w + VedAddArea(zone, materials, w, fin_wall, num + ";w", wall_area)
+                    n_row_pn = n_row_pn + VedAddArea(zone, materials, w, fin_pan, num + ";pn", pan_area, 0, h_pan)
+                Next
+            Else
+                n_row_w = n_row_w + VedAddArea(zone, materials, "", fin_wall, num + ";w", wall_area)
+            End If
+            If h_pan > 0 Then
+                is_pan = True
+            End If
             '----------------------
             '        ПОТОЛКИ
             '----------------------
@@ -5710,13 +6736,12 @@ Function Spec_VED(ByRef all_data As Variant) As Variant
                         n_row_pot = n_row_pot + VedAddArea(zone, materials, p, fin_pot, num + ";pot", pot_area, pot_perim)
                     Next
                     diff_area_pot = area_total - area_total_pot
+                    If Abs(diff_area_pot) > 0.1 Then
+                        'MsgBox ("Разница площади помещения и потолка в помещении " & num & " = " & Str(diff_area_pot))
+                        r = LogWrite("Разница площади помещения " & area_total & " и потолка " & area_total_pot & " в помещении " & num, "Ошибка", diff_area_pot)
+                    End If
                 Else
                     n_row_pot = n_row_pot + VedAddArea(zone, materials, "", fin_pot, num + ";pot", area_total, perim_total)
-                End If
-
-                If Abs(diff_area_pot) > 0.1 Then
-                    'MsgBox ("Разница площади помещения и потолка в помещении " & num & " = " & Str(diff_area_pot))
-                    r = LogWrite("Ведомость отделки", "Ошибка ", num & " = " & Str(diff_area_pot))
                 End If
             Else
                 n_row_pot = n_row_pot + VedAddArea(zone, materials, "", fin_pot, num + ";pot", area_total, perim_total)
@@ -5811,8 +6836,8 @@ Function Spec_VED(ByRef all_data As Variant) As Variant
             Next w
         Else
             n_row_w = n_row_w + 1
-            pos_out(n_row_w, 3) = "-"
-            pos_out(n_row_w, 4) = "-"
+            pos_out(n_row_w, 5) = "-"
+            pos_out(n_row_w, 6) = "-"
         End If
          '-- КОЛОННЫ ---
         If is_column Then
@@ -5835,7 +6860,7 @@ Function Spec_VED(ByRef all_data As Variant) As Variant
         End If
          '-- ПАНЕЛИ ---
         If is_pan Then
-            If zone.exists(num + ";p") Then
+            If zone.exists(num + ";pn") Then
                 panel = ArraySort(zone.Item(num + ";pn").keys())
                 For Each p In panel
                     n_row_pan = n_row_pan + 1
@@ -5865,10 +6890,10 @@ Function Spec_VED(ByRef all_data As Variant) As Variant
     Spec_VED = pos_out
 End Function
 
+
 Function VedAddRules(ByVal nm As String, ByVal add_rule As Variant) As Boolean
     nm_rule = ""
     nm = Split(nm, "_")(0)
-    If UBound(add_rule, 1) < 1 Then Exit Function
     If UBound(Split(add_rule(0), ";"), 1) < 1 Then Exit Function
     listsheet = GetListOfSheet(ThisWorkbook)
     For Each nlist In listsheet
@@ -5973,6 +6998,7 @@ End Function
 
 Function VedNewListRules(ByVal nm As String) As Boolean
     ThisWorkbook.Worksheets.Add.Name = nm & "_правила"
+    Worksheets(nm & "_правила").Move After:=ThisWorkbook.Sheets(ThisWorkbook.Sheets.Count)
     Worksheets(nm & "_правила").Activate
     Cells(1, 1).Value = "Имя многослойной конструкции (целиком или часть имени)"
     Cells(1, 2).Value = "Слой"
@@ -6041,9 +7067,18 @@ Function VedRead(ByVal lastfilespec As String) As Variant
                 material = out_data(i, col_s_type_pol)
                 out_data(i, col_s_type_pol) = VedNameMat(layer, material, rules)
             End If
-            If out_data(i, col_s_mun_zone) = 1 Then
-                n_mun = ConvNum2Txt(out_data(i, col_s_n_mun_zone))
-                If n_mun <> "" Then out_data(i, col_s_numb_zone) = ConvNum2Txt(out_data(i, col_s_n_mun_zone))
+            If out_data(i, col_s_type) = "ОБЪЕКТ" Then
+                If IsNumeric(out_data(i, col_s_mun_zone)) Then
+                    n_mun = ConvNum2Txt(out_data(i, col_s_n_mun_zone))
+                    If n_mun <> out_data(i, col_s_numb_zone) Then r = LogWrite("Перебит номер зоны c " & out_data(i, col_s_numb_zone) & " на " & n_mun, "Инфо", out_data(i, col_s_type_el))
+                    If n_mun <> "" Then
+                        out_data(i, col_s_numb_zone) = ConvNum2Txt(out_data(i, col_s_n_mun_zone))
+                    Else
+                        r = LogWrite("Невозможно получить номер зоны", "Ошибка", out_data(i, col_s_numb_zone))
+                    End If
+                Else
+                    out_data(i, col_s_numb_zone) = out_data(i, col_s_n_mun_zone)
+                End If
             End If
         End If
         For j = 1 To n_col_a
@@ -6101,6 +7136,21 @@ Function VedReadPol(ByVal lastfilespec As String) As Variant
             n_zone = ConvNum2Txt(out_data(i, col_s_numb_zone))
             out_data(i, col_s_numb_zone) = n_zone
         End If
+        
+        If out_data(i, col_s_type) = "ОБЪЕКТ" Then
+            If IsNumeric(out_data(i, col_s_mun_zone)) Then
+                n_mun = ConvNum2Txt(out_data(i, col_s_n_mun_zone))
+                If n_mun <> out_data(i, col_s_numb_zone) Then r = LogWrite(out_data(i, col_s_numb_zone) & "->" & n_mun, out_data(i, col_s_type_el), "Перебит номер зоны")
+                If n_mun <> "" Then
+                    out_data(i, col_s_numb_zone) = ConvNum2Txt(out_data(i, col_s_n_mun_zone))
+                Else
+                    r = LogWrite("Невозможно получить номер зоны", out_data(i, col_s_numb_zone), "ERROR")
+                End If
+            Else
+                out_data(i, col_s_numb_zone) = out_data(i, col_s_n_mun_zone)
+            End If
+        End If
+        
         If n_col_a >= col_s_type_el Then out_data(i, col_s_type_pol) = ConvNum2Txt(out_data(i, col_s_type_pol))
         If n_col_a >= col_s_tipverh_l Then
             out_data(i, col_s_tipverh_l) = ConvNum2Txt(out_data(i, col_s_tipverh_l))
