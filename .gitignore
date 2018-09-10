@@ -1,7 +1,4 @@
-/import/*
-
-/list/*
-
+*.pdf
 *.zip
 
 /data/code/old/*
