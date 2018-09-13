@@ -2,7 +2,7 @@ Attribute VB_Name = "calc"
 Option Compare Text
 Option Base 1
 
-Public Const macro_version As String = "3.15"
+Public Const macro_version As String = "3.16"
 Public symb_diam As String 'Символ диаметра в спецификацию
 'Тип округления
 ' 1 - округление в большую сторону
@@ -108,6 +108,7 @@ Public Const col_s_areal_l As Integer = 30
 Public Const col_s_areaniz_l As Integer = 31
 Public Const col_s_areapl_l As Integer = 32
 Public Const max_s_col As Integer = 32
+Public Const isErrorNoFin As Boolean = True 'Выводить ошибку, если в зоне не задана отделка
 '-------------------------------------------------------
 'Описание файла сортамента
 Public Const col_gost_spec As Integer = 1
@@ -150,6 +151,7 @@ Public pr_adress As Variant
 Public k_zap_total As Double
 Public w_format As String 'Формат вывода в техничку
 Public pos_data As Variant
+
 
 Function ArrayCol(ByVal array_in As Variant, ByVal col As Integer) As Variant
     If IsEmpty(array_in) Then ArrayCol = Empty: Exit Function
@@ -2498,7 +2500,6 @@ Function FormatSpec_Ved(ByVal Data_out As Range, ByVal n_row As Integer, ByVal n
     s1 = 1
     s2 = 3
     sp = 3
-    
     Cells.UnMerge
     Cells.NumberFormat = "@"
     Range(Data_out.Cells(1, 1), Data_out.Cells(2, 1)).Merge
@@ -2828,6 +2829,17 @@ Function FormatSpec_Ved(ByVal Data_out As Range, ByVal n_row As Integer, ByVal n
         If InStr(g, "Номер") Then Data_out.Cells(1, n_c).Orientation = 90
     Next n_c
     r = FormatColWidth(sp, Data_out.Columns(n_col))
+    
+    Data_out.FormatConditions.Add Type:=xlTextString, String:="НЕТ ОТДЕЛКИ", TextOperator:=xlContains
+    With Data_out.FormatConditions(1).Font
+        .Color = -16383844
+        .TintAndShade = 0
+    End With
+    With Data_out.FormatConditions(1).Interior
+        .PatternColorIndex = xlAutomatic
+        .Color = 13551615
+        .TintAndShade = 0
+    End With
     FormatSpec_Ved = True
 End Function
 
@@ -6391,6 +6403,7 @@ Function Spec_POL(ByRef out_data As Variant) As Variant
         Next i
         t_zone = ""
         For i = 1 To UBound(t_un_zone, 1) - 1
+            t_un_zone(i) = Replace(t_un_zone(i), ",", ".")
             t_zone = t_zone + t_un_zone(i) + ", "
         Next i
         t_zone = t_zone + t_un_zone(i)
@@ -6483,13 +6496,22 @@ Function VedAddArea(ByRef zone As Variant, ByRef materials As Variant, ByVal mat
         mat_fin = " " + mat_fin
     End If
     mat_fin = Replace(mat_fin, "@", ";b@")
+    If Trim(mat_fin) = "0" Then mat_fin = "---"
     mat_draft = Trim(mat_draft)
     mat_draft = "a@" & Replace(mat_draft, razd, ";a@")
     mat_draft = Replace(mat_draft, "@ ", "@")
     If InStr(mat_draft, "=") > 0 Then
         name_mat = Array(Trim(Left(mat_draft, Len(mat_draft) - 1)))
     Else
-        name_mat = Split((mat_draft & ";b@" & mat_fin), razd)
+        If InStr(mat_fin, "--") > 0 And razd = "&" Then
+            If isErrorNoFin Then
+                name_mat = Split((mat_draft & ";b@" & "НЕТ ОТДЕЛКИ"), razd)
+            Else
+                name_mat = Split((mat_draft), razd)
+            End If
+        Else
+            name_mat = Split((mat_draft & ";b@" & mat_fin), razd)
+        End If
     End If
     flag = 0
     If perim > 0 Then
@@ -6502,7 +6524,8 @@ Function VedAddArea(ByRef zone As Variant, ByRef materials As Variant, ByVal mat
     If area_mat > 0 Then
         For Each mat In name_mat
             mat = Trim(mat)
-            naen_mat = StrConv(Trim(Replace(Replace(mat, "a@", ""), "b@", "")), vbProperCase)
+            naen_mat = Trim(Replace(Replace(mat, "a@", ""), "b@", ""))
+            If Left(naen_mat, 1) <> "" Then naen_mat = StrConv(Left(naen_mat, 1), vbUpperCase) + Right(naen_mat, Len(naen_mat) - 1)
             If Left(naen_mat, 1) = ";" Then naen_mat = Trim(Right(naen_mat, Len(naen_mat) - 1))
             If naen_mat <> "" And Not IsEmpty(naen_mat) And InStr(naen_mat, "--") = 0 Then
                 If Not zone.exists(num) Then
@@ -6802,7 +6825,7 @@ Function Spec_VED(ByRef all_data As Variant) As Variant
         n_row_w = n_row
         n_row_c = n_row
         n_row_pan = n_row
-        pos_out(n_row + 1, 1) = num
+        pos_out(n_row + 1, 1) = "'" + Replace(num, ",", ".")
         pos_out(n_row + 1, 2) = zone.Item(num + ";name")
         '-- ПОТОЛКИ ---
         If Not zone.exists(num + ";pot") Then
@@ -7035,7 +7058,7 @@ Function VedRead(ByVal lastfilespec As String) As Variant
     End If
     n_row_a = UBound(out_data, 1) - 2
     n_col_a = UBound(out_data, 2)
-    n_zone = 99
+    n_zone = 999999
     For i = 1 To n_row_a
         If out_data(i, col_s_numb_zone) = 0 Then
             out_data(i, col_s_numb_zone) = n_zone
@@ -7122,7 +7145,7 @@ Function VedReadPol(ByVal lastfilespec As String) As Variant
         ReDim add_pol(col_s_areapl_l, n_row_a)
         n_add = 0
     End If
-    n_zone = 9999
+    n_zone = 999999
     For i = 1 To n_row_a
         If out_data(i, col_s_numb_zone) = 0 Then
             out_data(i, col_s_numb_zone) = n_zone
