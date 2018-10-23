@@ -15,11 +15,12 @@ Attribute VB_Creatable = False
 Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
 
+
 Option Compare Text
 Option Base 1
 Public CodePath, MaterialPath, SortamentPath As String
 Public lastsheet, lastconstrtype, lastconstr, lastfile, lastfilespec, lastfileadd, materialbook_index As Variant
-Const form_version As String = "3.4"
+Const form_version As String = "3.5"
 
 Private Sub ClearSheetButton_Click()
     r = OutPrepare()
