@@ -14,6 +14,7 @@ Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
 Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
+
 Option Compare Text
 Option Base 1
 
@@ -141,9 +142,9 @@ Private Sub use_tmp_CB_Click()
 End Sub
 
 Private Sub UserForm_Initialize()
-    MaterialPath = CheckPath(MaterialPatht.text)
-    SortamentPath = CheckPath(SortamentPatht.text)
-    CodePath = CheckPath(CodePatht.text)
+    MaterialPath = CheckPath(MaterialPatht.Text)
+    SortamentPath = CheckPath(SortamentPatht.Text)
+    CodePath = CheckPath(CodePatht.Text)
     If use_tmp_CB.Value Then Set materialbook_index = ReadConstr()
     r = CheckVersion()
     FormRebild
@@ -158,7 +159,7 @@ Function CheckPath(ByVal path) As String
 End Function
 
 Private Sub CodePatht_Change()
-    CodePath = CheckPath(CodePatht.text)
+    CodePath = CheckPath(CodePatht.Text)
 End Sub
 
 Private Sub CommandButtonAdd2Man_Click()
@@ -266,7 +267,7 @@ Private Sub ListButton_Click()
 End Sub
 
 Private Sub MaterialPatht_Change()
-    MaterialPath = CheckPath(MaterialPatht.text)
+    MaterialPath = CheckPath(MaterialPatht.Text)
 End Sub
 
 Private Sub MultiPage1_Change()
@@ -333,7 +334,7 @@ Private Sub ShowButton_Click()
 End Sub
 
 Private Sub SortamentPatht_Change()
-    SortamentPath = CheckPath(SortamentPatht.text)
+    SortamentPath = CheckPath(SortamentPatht.Text)
 End Sub
 
 'Private Sub UserForm_QueryClose(Cancel As Integer, CloseMode As Integer)

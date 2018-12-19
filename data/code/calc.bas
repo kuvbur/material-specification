@@ -1546,18 +1546,18 @@ Function ExportSheet2Pdf(ByVal Data_out As Range, ByVal filename As String, Opti
                 .DifferentFirstPageHeaderFooter = False
                 .ScaleWithDocHeaderFooter = True
                 .AlignMarginsHeaderFooter = True
-                .EvenPage.LeftHeader.text = ""
-                .EvenPage.CenterHeader.text = ""
-                .EvenPage.RightHeader.text = ""
-                .EvenPage.LeftFooter.text = ""
-                .EvenPage.CenterFooter.text = ""
-                .EvenPage.RightFooter.text = ""
-                .FirstPage.LeftHeader.text = ""
-                .FirstPage.CenterHeader.text = ""
-                .FirstPage.RightHeader.text = ""
-                .FirstPage.LeftFooter.text = ""
-                .FirstPage.CenterFooter.text = ""
-                .FirstPage.RightFooter.text = ""
+                .EvenPage.LeftHeader.Text = ""
+                .EvenPage.CenterHeader.Text = ""
+                .EvenPage.RightHeader.Text = ""
+                .EvenPage.LeftFooter.Text = ""
+                .EvenPage.CenterFooter.Text = ""
+                .EvenPage.RightFooter.Text = ""
+                .FirstPage.LeftHeader.Text = ""
+                .FirstPage.CenterHeader.Text = ""
+                .FirstPage.RightHeader.Text = ""
+                .FirstPage.LeftFooter.Text = ""
+                .FirstPage.CenterFooter.Text = ""
+                .FirstPage.RightFooter.Text = ""
             End With
         Case 1
             With ActiveSheet.PageSetup
@@ -1592,18 +1592,18 @@ Function ExportSheet2Pdf(ByVal Data_out As Range, ByVal filename As String, Opti
                 .DifferentFirstPageHeaderFooter = False
                 .ScaleWithDocHeaderFooter = True
                 .AlignMarginsHeaderFooter = True
-                .EvenPage.LeftHeader.text = ""
-                .EvenPage.CenterHeader.text = ""
-                .EvenPage.RightHeader.text = ""
-                .EvenPage.LeftFooter.text = ""
-                .EvenPage.CenterFooter.text = ""
-                .EvenPage.RightFooter.text = ""
-                .FirstPage.LeftHeader.text = ""
-                .FirstPage.CenterHeader.text = ""
-                .FirstPage.RightHeader.text = ""
-                .FirstPage.LeftFooter.text = ""
-                .FirstPage.CenterFooter.text = ""
-                .FirstPage.RightFooter.text = ""
+                .EvenPage.LeftHeader.Text = ""
+                .EvenPage.CenterHeader.Text = ""
+                .EvenPage.RightHeader.Text = ""
+                .EvenPage.LeftFooter.Text = ""
+                .EvenPage.CenterFooter.Text = ""
+                .EvenPage.RightFooter.Text = ""
+                .FirstPage.LeftHeader.Text = ""
+                .FirstPage.CenterHeader.Text = ""
+                .FirstPage.RightHeader.Text = ""
+                .FirstPage.LeftFooter.Text = ""
+                .FirstPage.CenterFooter.Text = ""
+                .FirstPage.RightFooter.Text = ""
             End With
     End Select
     On Error Resume Next
@@ -4653,7 +4653,7 @@ Function SheetSetOption(ByVal sheetn As String)
         sheet_option.comparemode = 1
     End If
     If IsEmpty(sheet_option.Item(sheetn & ";data")) Then r = SheetReadOption()
-    UserForm2.Kzap.text = sheet_option.Item(sheetn & ";k_zap")
+    UserForm2.Kzap.Text = sheet_option.Item(sheetn & ";k_zap")
     UserForm2.arm_pm_CB.Value = sheet_option.Item(sheetn & ";arm_pm")
     UserForm2.pr_pm_CB.Value = sheet_option.Item(sheetn & ";pr_pm")
     UserForm2.keep_pos_CB = sheet_option.Item(sheetn & ";keep_pos")
@@ -4972,7 +4972,7 @@ Function SheetReadOption()
             sheetn = existssheet(i, 1)
             kz = existssheet(i, 7)
             If IsEmpty(existssheet(i, 7)) Then
-                UserForm2.Kzap.text = "1.0"
+                UserForm2.Kzap.Text = "1.0"
                 UserForm2.arm_pm_CB.Value = False
                 UserForm2.pr_pm_CB.Value = False
                 UserForm2.keep_pos_CB = False
@@ -5018,7 +5018,7 @@ Function SheetWriteOption(ByVal sheetn As String, Optional ByVal flag As Boolean
     End If
     tdate = Right(Str(DatePart("yyyy", Now)), 2) & Str(DatePart("m", Now)) & Str(DatePart("d", Now))
     stamp = tdate + "/" + Str(DatePart("h", Now)) + Str(DatePart("n", Now)) + Str(DatePart("s", Now))
-    sheet_option.Item(sheetn & ";k_zap") = UserForm2.Kzap.text
+    sheet_option.Item(sheetn & ";k_zap") = UserForm2.Kzap.Text
     sheet_option.Item(sheetn & ";data") = stamp
     sheet_option.Item(sheetn & ";arm_pm") = UserForm2.arm_pm_CB.Value
     sheet_option.Item(sheetn & ";pr_pm") = UserForm2.pr_pm_CB.Value
@@ -6699,7 +6699,7 @@ End Function
 'End Function
 Function Spec_Select(ByVal lastfilespec As String, ByVal suffix As String, Optional quiet As Boolean = False) As String
     r = SheetWriteOption(lastfilespec, True)
-    tt = ConvTxt2Num(UserForm2.Kzap.text)
+    tt = ConvTxt2Num(UserForm2.Kzap.Text)
     If IsNumeric(tt) Then
         If tt > 1 And tt < 2 Then
             k_zap_total = tt

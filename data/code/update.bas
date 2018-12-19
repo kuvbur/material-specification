@@ -3,7 +3,7 @@ Option Compare Text
 Option Base 1
 
 Public Const update_version As String = "3.0"
-
+Public Const CODE_UPD As Boolean = False
 Function CheckVersion()
     If Ping() Then
         msg_upd = ""
@@ -89,12 +89,13 @@ Function ExportAllMod() As Boolean
     If Not CreateObject("Scripting.FileSystemObject").FolderExists(UserForm2.CodePath) Then
         MkDir (UserForm2.CodePath)
     End If
-    r = ExportMod("UserForm2")
-    r = ExportMod("calc")
-    r = ExportMod("common")
-    r = ExportMod("update")
+    pathtmp = "old\"
+    If CODE_UPD Then pathtmp = ""
+    r = ExportMod("UserForm2", pathtmp, UserForm2.form_ver.Caption)
+    r = ExportMod("calc", pathtmp, macro_version)
+    r = ExportMod("common", pathtmp, common_version)
+    r = ExportMod("update", pathtmp, update_version)
 End Function
-
 
 Function NameAllMod() As Boolean
     Application.ScreenUpdating = False
@@ -106,12 +107,16 @@ Function NameAllMod() As Boolean
     Application.ScreenUpdating = True
 End Function
 
-Function ExportMod(ByVal namemod As String, Optional ByVal pathtmp As String = "") As Boolean
+Function ExportMod(ByVal namemod As String, Optional ByVal pathtmp As String = "", Optional ByVal in_ver As String = "") As Boolean
         tdate = ""
-        If pathtmp = "old\" Then tdate = "_" & CStr(in_ver) & "_" & Replace(Right(Str(DatePart("yyyy", Now)), 2) & Str(DatePart("m", Now)) & Str(DatePart("d", Now)), " ", "")
+        If pathtmp = "old\" Then
+            tdate = "_" & CStr(in_ver) & "_" & Replace(Right(Str(DatePart("yyyy", Now)), 2) & Str(DatePart("m", Now)) & Str(DatePart("d", Now)), " ", "")
+            If Not CreateObject("Scripting.FileSystemObject").FolderExists(UserForm2.CodePath & pathtmp) Then
+                MkDir (UserForm2.CodePath & pathtmp)
+            End If
+        End If
         On Error Resume Next
         ThisWorkbook.VBProject.VBComponents.Item(namemod).Export UserForm2.CodePath & pathtmp & namemod & tdate & ".bas"
-orkbook.VBProject.VBComponents.Item(namemod).Export UserForm2.CodePath & pathtmp & CStr(in_ver) & "_" & namemod & tdate & ".bas"
 End Function
 
 Function IsModFileEx(ByVal namemod As String, Optional ByVal pathtmp As String = "") As Boolean
