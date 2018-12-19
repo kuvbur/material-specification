@@ -10,11 +10,11 @@ Function CheckVersion()
         common_git = DownloadMod("common" & ".bas")
         common_local = ConvTxtNum(common_version)
         If common_git > common_local Then msg_upd = msg_upd & "Загружена новая версия модуля common -" & CStr(common_git) & vbNewLine
-        
+
         calc_git = DownloadMod("calc" & ".bas")
         calc_local = ConvTxtNum(macro_version)
         If calc_git > calc_local Then msg_upd = msg_upd & "Загружена новая версия модуля calc -" & CStr(calc_git) & vbNewLine
-        
+
         r = DownloadMod("UserForm2.frx")
         form_git = DownloadMod("UserForm2" & ".bas")
         form_local = ConvTxtNum(UserForm2.form_ver.Caption)
@@ -72,9 +72,11 @@ Function DownloadMod(ByVal namemod As String) As Variant
         Set ts = fso.OpenTextFile(gitdir & "/" & namemod, 1, True): txt$ = ts.ReadAll: ts.Close
         Set ts = Nothing: Set fso = Nothing
         txt = Trim(txt): Err.Clear
+        seach_txt = "version As String ="
         For Each tRows In Split(txt, vbNewLine)
-            If InStr(tRows, "version As String =") Then
-                Version_file = ConvTxtNum(Split(tRows, """")(1))
+            If InStr(tRows, seach_txt) Then
+                k = Mid(tRows, InStr(tRows, seach_txt) + Len(seach_txt), 6)
+                Version_file = ConvTxtNum(Split(k, """")(1))
             End If
         Next
     Else

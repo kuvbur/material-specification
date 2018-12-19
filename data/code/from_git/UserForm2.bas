@@ -14,13 +14,13 @@ Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
 Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
-
-
 Option Compare Text
 Option Base 1
+
+Const form_version As String = "3.7"
 Public CodePath, MaterialPath, SortamentPath As String
 Public lastsheet, lastconstrtype, lastconstr, lastfile, lastfilespec, lastfileadd, materialbook_index As Variant
-Const form_version As String = "3.5"
+
 
 Private Sub ClearSheetButton_Click()
     r = OutPrepare()
@@ -141,10 +141,11 @@ Private Sub use_tmp_CB_Click()
 End Sub
 
 Private Sub UserForm_Initialize()
-    MaterialPath = CheckPath(MaterialPatht.Text)
-    SortamentPath = CheckPath(SortamentPatht.Text)
-    CodePath = CheckPath(CodePatht.Text)
+    MaterialPath = CheckPath(MaterialPatht.text)
+    SortamentPath = CheckPath(SortamentPatht.text)
+    CodePath = CheckPath(CodePatht.text)
     If use_tmp_CB.Value Then Set materialbook_index = ReadConstr()
+    r = CheckVersion()
     FormRebild
 End Sub
 
@@ -157,7 +158,7 @@ Function CheckPath(ByVal path) As String
 End Function
 
 Private Sub CodePatht_Change()
-    CodePath = CheckPath(CodePatht.Text)
+    CodePath = CheckPath(CodePatht.text)
 End Sub
 
 Private Sub CommandButtonAdd2Man_Click()
@@ -265,7 +266,7 @@ Private Sub ListButton_Click()
 End Sub
 
 Private Sub MaterialPatht_Change()
-    MaterialPath = CheckPath(MaterialPatht.Text)
+    MaterialPath = CheckPath(MaterialPatht.text)
 End Sub
 
 Private Sub MultiPage1_Change()
@@ -288,7 +289,6 @@ Sub remat()
         lastconstr = materialbook_index.Item(lastconstrtype & "constr")(1)
         r = ReList(ListBoxNaenIns, materialbook_index.Item(lastconstrtype & "constr"))
     End If
-    
     listFile = GetListFile("*.txt")
     Dim listspec: ReDim listspec(1): n_man = 0
     Dim listadd: ReDim listadd(1): n_add = 0
@@ -319,8 +319,8 @@ Sub remat()
     Next i
     r = ReList(ListBoxFileSpec, listspec)
     r = ReList(ListBoxName, listadd)
-    lastfile = listspec(1)
-    lastfilespec = listspec(1)
+    lastfile = ThisWorkbook.ActiveSheet.Name
+    lastfilespec = ThisWorkbook.ActiveSheet.Name
     lastfileadd = listadd(1)
 End Sub
 
@@ -333,7 +333,7 @@ Private Sub ShowButton_Click()
 End Sub
 
 Private Sub SortamentPatht_Change()
-    SortamentPath = CheckPath(SortamentPatht.Text)
+    SortamentPath = CheckPath(SortamentPatht.text)
 End Sub
 
 'Private Sub UserForm_QueryClose(Cancel As Integer, CloseMode As Integer)
