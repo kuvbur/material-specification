@@ -1,7 +1,10 @@
 *.pdf
 *.zip
 
+~$*.*
 /data/code/old/*
 
 /data/code/git/*
+
+/data/code/from_git/*
 

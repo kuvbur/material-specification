@@ -2,7 +2,7 @@ Attribute VB_Name = "calc"
 Option Compare Text
 Option Base 1
 
-Public Const macro_version As String = "3.21"
+Public Const macro_version As String = "3.22"
 Public symb_diam As String 'Символ диаметра в спецификацию
 'Тип округления
 ' 1 - округление в большую сторону
@@ -3483,6 +3483,14 @@ Function ManualCheck(nm) As Boolean
 
         Select Case type_el
             Case t_sys 'Отмечаем вспомогательные строки
+                If InStr(obozn, "сновной") > 0 And InStr(naen, "етон") > 0 And InStr(subpos, "!!") > 0 Then
+                    r = ManualCeilAlert(Data_out.Cells(i, col_man_subpos), "Впишите марку элемента")
+                    n_err = n_err + 1
+                End If
+                If InStr(obozn, "ейсмика") > 0 Or InStr(naen, "ейсмика") > 0 And InStr(subpos, "!!") > 0 Then
+                    r = ManualCeilAlert(Data_out.Cells(i, col_man_subpos), "Впишите марку элемента")
+                    n_err = n_err + 1
+                End If
                 If InStr(obozn, "сновной") > 0 And InStr(naen, "етон") > 0 And InStr(subpos, "!!") = 0 Then ank_subpos.Item(subpos & "_бет") = Trim(Replace(Replace(naen, "Бетон", ""), "бетон", ""))
                 If InStr(obozn, "ейсмика") > 0 Or InStr(naen, "ейсмика") > 0 And InStr(subpos, "!!") = 0 Then ank_subpos.Item(subpos & "_kseism") = 1.3
                 With Data_out.Range(Data_out.Cells(i, 1), Data_out.Cells(i, max_col_man)).Interior
