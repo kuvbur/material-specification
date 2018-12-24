@@ -2,7 +2,7 @@ Attribute VB_Name = "calc"
 Option Compare Text
 Option Base 1
 
-Public Const macro_version As String = "3.22"
+Public Const macro_version As String = "3.23"
 Public symb_diam As String 'Символ диаметра в спецификацию
 'Тип округления
 ' 1 - округление в большую сторону
@@ -5569,13 +5569,14 @@ Function SpecOneSubpos(ByVal all_data As Variant, ByVal subpos As String, ByVal 
                         n_row = n_n
                     End If
                     For i = 1 To UBound(pos_out, 1)
-                        If pos_out_sort(i, 1) <> "Поз." And pos_out_sort(i, 1) <> sb_naen And pos_out_sort(i, 3) <> "" Then
+                        If pos_out_sort(i, 1) <> "Поз." And pos_out_sort(i, 1) <> sb_naen And pos_out_sort(i, 3) <> "" And Not IsEmpty(pos_out_sort(i, 3)) Then
                             n_row = n_row + 1
                             For j = 1 To UBound(pos_out, 2)
                                 pos_out(n_row, j) = pos_out_sort(i, j)
                             Next j
                         End If
                     Next i
+                    If n_row <> UBound(pos_out, 1) Then pos_out = ArrayRedim(pos_out, n_row)
                 End If
         End Select
         SpecOneSubpos = pos_out
