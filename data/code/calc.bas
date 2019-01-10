@@ -1,7 +1,7 @@
 Attribute VB_Name = "calc"
 Option Compare Text
 Option Base 1
-Public Const macro_version As String = "3.25"
+Public Const macro_version As String = "3.26"
 '-------------------------------------------------------
 'Типы элементов (столбец col_type_el)
 Public Const t_arm As Integer = 10
@@ -151,6 +151,7 @@ Public type_okrugl As Integer
 Public n_round_l As Integer 'Длина
 Public n_round_w As Integer 'Вес
 Public n_round_wkzh As Integer 'Вес в ведомости расхода стали
+Public del_dor_perim As Boolean
 Public n_round_area As Integer 'Площадь в ведомость отделки
 Public ignore_pos As String 'Игнорировать элементы, содержащих ЭТО в позиции или марке
 Public subpos_delim As String 'Разделитель основной и вложенной сборки
@@ -185,6 +186,7 @@ Function INISet()
         def_decode = INIReadKeyVal("ЛИСТЫ", "def_decode")
         Debug_mode = INIReadKeyVal("DEBUG", "Debug_mode")
         check_version = INIReadKeyVal("DEBUG", "check_version")
+        del_dor_perim = INIReadKeyVal("DEBUG", "del_dor_perim")
         flag = False
     Else
         flag = True
@@ -206,6 +208,7 @@ Function INISet()
     If IsEmpty(check_on_active) Or flag Then check_on_active = True
     If IsEmpty(def_decode) Or flag Then def_decode = False
     If IsEmpty(check_version) Or flag Then check_version = True
+    If IsEmpty(del_dor_perim) Or flag Then del_dor_perim = False
     '----Запись умолчаний, если файл не найден
     If flag Then
         t = INIWriteKeyVal("РАСЧЁТЫ", "type_okrugl", type_okrugl)
@@ -225,6 +228,7 @@ Function INISet()
         t = INIWriteKeyVal("ЛИСТЫ", "def_decode", def_decode)
         t = INIWriteKeyVal("DEBUG", "Debug_mode", False)
         t = INIWriteKeyVal("DEBUG", "check_version", True)
+        t = INIWriteKeyVal("DEBUG", "del_dor_perim", False)
     End If
     isINIset = True
 End Function
@@ -5234,6 +5238,7 @@ Function SheetDefultOption(ByVal sheetn As String)
 End Function
 
 Function SheetWriteOption(ByVal sheetn As String)
+    If IsEmpty(sheet_option) Then r = SheetReadOption()
     If IsEmpty(sheet_option.Item(sheetn & ";data")) Then r = SheetReadOption()
     tdate = Right(Str(DatePart("yyyy", Now)), 2) & Str(DatePart("m", Now)) & Str(DatePart("d", Now))
     stamp = tdate + "/" + Str(DatePart("h", Now)) + Str(DatePart("n", Now)) + Str(DatePart("s", Now))
@@ -6876,6 +6881,37 @@ End Function
 
 Function Spec_POL(ByRef out_data As Variant) As Variant
     isrim = 0
+    Set zone = CreateObject("Scripting.Dictionary")
+    zone.comparemode = 1
+    un_n_zone = ArrayUniqValColumn(out_data, col_s_numb_zone)
+    For Each num In un_n_zone
+        perim_total = 0
+        perim_hole = 0
+        free_len = 0
+        wall_len = 0
+        door_len = 0
+        n_wall = 0
+        If IsNumeric(num) Then num = CStr(num)
+        zone_el = ArraySelectParam(out_data, num, col_s_numb_zone, "ЗОНА", col_s_type)
+        If Not IsEmpty(zone_el) Then
+            If UBound(zone_el, 1) > 1 Then MsgBox ("Зоны с одинаковыми именами считаются не правильно - " + num)
+            perim_total = zone_el(1, col_s_perim_zone)
+            perim_hole = zone_el(1, col_s_perimhole_zone)
+            free_len = zone_el(1, col_s_freelen_zone)
+            wall = ArraySelectParam(out_data, num, col_s_numb_zone, "СТЕНА", col_s_type)
+            If Not IsEmpty(wall) Then
+                For i = 1 To UBound(wall, 1)
+                    door_len = door_len + wall(i, col_s_doorlen_zone)
+                    wall_len = wall_len + wall(i, col_s_walllen_zone)
+                Next i
+            End If
+        End If
+        zone.Item(num + ";perim_total") = perim_total
+        zone.Item(num + ";perim_hole") = perim_hole
+        zone.Item(num + ";free_len") = free_len
+        zone.Item(num + ";wall_len") = wall_len
+        zone.Item(num + ";door_len") = door_len
+    Next
     pol = ArraySelectParam(out_data, "Пол", col_s_type_el)
     un_pol = ArrayUniqValColumn(pol, col_s_type_pol)
     n_type_pol = UBound(un_pol, 1)
@@ -6898,6 +6934,22 @@ Function Spec_POL(ByRef out_data As Variant) As Variant
             pol_area = pol_area + t_pol(i, col_s_area_pol)
             pol_perim = pol_perim + t_pol(i, col_s_perim_pol)
         Next i
+        
+        perim_total = 0
+        perim_hole = 0
+        free_len = 0
+        wall_len = 0
+        door_len = 0
+        For Each num In t_un_zone
+            If IsNumeric(num) Then num = CStr(num)
+            perim_total = zone.Item(num + ";perim_total") + perim_total
+            perim_hole = zone.Item(num + ";perim_hole") + perim_hole
+            free_len = zone.Item(num + ";free_len") + free_len
+            wall_len = zone.Item(num + ";wall_len") + wall_len
+            door_len = zone.Item(num + ";door_len") + door_len
+        Next
+        If del_dor_perim Then pol_perim = pol_perim - door_len
+        
         t_zone = ""
         For i = 1 To UBound(t_un_zone, 1) - 1
             t_un_zone(i) = Replace(t_un_zone(i), ",", ".")
@@ -8289,13 +8341,13 @@ Function VedReadPol(ByVal lastfilespec As String) As Variant
             End If
         Next j
     Next i
-    zone = ArraySelectParam(out_data, "ЗОНА", col_s_type)
-    out_data = ArraySelectParam(out_data, "ОБЪЕКТ", col_s_type, "Пол", col_s_type_el)
+'    zone = ArraySelectParam(out_data, "ЗОНА", col_s_type)
+'    out_data = ArraySelectParam(out_data, "ОБЪЕКТ", col_s_type, "Пол", col_s_type_el)
     If n_add > 0 Then
         ReDim Preserve add_pol(col_s_areapl_l, n_add)
         add_pol = ArrayTranspose(add_pol)
         out_data = ArrayCombine(out_data, add_pol)
     End If
-    out_data = ArrayCombine(out_data, zone)
+'    out_data = ArrayCombine(out_data, zone)
     VedReadPol = out_data
 End Function
