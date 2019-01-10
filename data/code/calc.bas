@@ -1,7 +1,7 @@
 Attribute VB_Name = "calc"
 Option Compare Text
 Option Base 1
-Public Const macro_version As String = "3.26"
+Public Const macro_version As String = "3.28"
 '-------------------------------------------------------
 'Типы элементов (столбец col_type_el)
 Public Const t_arm As Integer = 10
@@ -152,6 +152,12 @@ Public n_round_l As Integer 'Длина
 Public n_round_w As Integer 'Вес
 Public n_round_wkzh As Integer 'Вес в ведомости расхода стали
 Public del_dor_perim As Boolean
+Public type_perim As Integer
+Public del_freelen_perim As Boolean
+Public add_holes_perim As Boolean
+Public show_mat_area As Boolean
+Public show_surf_area As Boolean
+Public show_perim As Boolean
 Public n_round_area As Integer 'Площадь в ведомость отделки
 Public ignore_pos As String 'Игнорировать элементы, содержащих ЭТО в позиции или марке
 Public subpos_delim As String 'Разделитель основной и вложенной сборки
@@ -186,7 +192,13 @@ Function INISet()
         def_decode = INIReadKeyVal("ЛИСТЫ", "def_decode")
         Debug_mode = INIReadKeyVal("DEBUG", "Debug_mode")
         check_version = INIReadKeyVal("DEBUG", "check_version")
-        del_dor_perim = INIReadKeyVal("DEBUG", "del_dor_perim")
+        del_dor_perim = INIReadKeyVal("ОТДЕЛКА", "del_dor_perim")
+        type_perim = INIReadKeyVal("ОТДЕЛКА", "type_perim")
+        del_freelen_perim = INIReadKeyVal("ОТДЕЛКА", "del_freelen_perim")
+        add_holes_perim = INIReadKeyVal("ОТДЕЛКА", "add_holes_perim")
+        show_mat_area = INIReadKeyVal("ОТДЕЛКА", "show_mat_area")
+        show_surf_area = INIReadKeyVal("ОТДЕЛКА", "show_surf_area")
+        show_perim = INIReadKeyVal("ОТДЕЛКА", "show_perim")
         flag = False
     Else
         flag = True
@@ -209,6 +221,12 @@ Function INISet()
     If IsEmpty(def_decode) Or flag Then def_decode = False
     If IsEmpty(check_version) Or flag Then check_version = True
     If IsEmpty(del_dor_perim) Or flag Then del_dor_perim = False
+    If IsEmpty(type_perim) Or flag Then type_perim = 1
+    If IsEmpty(del_freelen_perim) Or flag Then del_freelen_perim = False
+    If IsEmpty(add_holes_perim) Or flag Then add_holes_perim = False
+    If IsEmpty(show_mat_area) Or flag Then show_mat_area = True
+    If IsEmpty(show_surf_area) Or flag Then show_surf_area = True
+    If IsEmpty(show_perim) Or flag Then show_perim = True
     '----Запись умолчаний, если файл не найден
     If flag Then
         t = INIWriteKeyVal("РАСЧЁТЫ", "type_okrugl", type_okrugl)
@@ -228,7 +246,13 @@ Function INISet()
         t = INIWriteKeyVal("ЛИСТЫ", "def_decode", def_decode)
         t = INIWriteKeyVal("DEBUG", "Debug_mode", False)
         t = INIWriteKeyVal("DEBUG", "check_version", True)
-        t = INIWriteKeyVal("DEBUG", "del_dor_perim", False)
+        t = INIWriteKeyVal("ОТДЕЛКА", "del_dor_perim", False)
+        t = INIWriteKeyVal("ОТДЕЛКА", "type_perim", 1)
+        t = INIWriteKeyVal("ОТДЕЛКА", "del_freelen_perim", False)
+        t = INIWriteKeyVal("ОТДЕЛКА", "add_holes_perim", False)
+        t = INIWriteKeyVal("ОТДЕЛКА", "show_mat_area", True)
+        t = INIWriteKeyVal("ОТДЕЛКА", "show_surf_area", True)
+        t = INIWriteKeyVal("ОТДЕЛКА", "show_perim", True)
     End If
     isINIset = True
 End Function
@@ -2714,12 +2738,16 @@ Function FormatSpec_Ved(ByVal Data_out As Range, ByVal n_row As Integer, ByVal n
     Range(Data_out.Cells(1, 3), Data_out.Cells(1, n_col - 1)).Merge
     Range(Data_out.Cells(1, n_col), Data_out.Cells(2, n_col)).Merge
     For i = 1 To n_row
-        If InStr(Data_out.Cells(i, 1), "Общяя площадь отделки, кв.м.") > 0 Then
+        If InStr(Data_out.Cells(i, 1), "Общяя площадь") > 0 Or InStr(Data_out.Cells(i, 5), "Общяя площадь") > 0 Then
             n_all = n_row
             n_row = i - 1
             n_start_all = i
         End If
     Next i
+    If n_all = Empty Then
+        n_all = n_row
+        n_start_all = n_all
+    End If
     n_start = 3
     n_end = 3
     For i = 3 To n_row
@@ -2782,181 +2810,181 @@ Function FormatSpec_Ved(ByVal Data_out As Range, ByVal n_row As Integer, ByVal n
         Next n_c
     End If
     
-    Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_start_all, 4)).Merge
-    Range(Data_out.Cells(n_start_all, 5), Data_out.Cells(n_start_all, 8)).Merge
-    For i = n_start_all + 1 To n_all
-        Range(Data_out.Cells(i, 1), Data_out.Cells(i, 3)).Merge
-        Range(Data_out.Cells(i, 5), Data_out.Cells(i, 7)).Merge
-    Next i
-    With Range(Data_out.Cells(1, 1), Data_out.Cells(n_start_all - 1, n_col)).Interior
-        .PatternColorIndex = xlAutomatic
-        .ThemeColor = xlThemeColorDark1
-        .TintAndShade = -0.249977111117893
-        .Pattern = xlNone
-        .TintAndShade = 0
-        .PatternTintAndShade = 0
-    End With
-    Data_out.Borders(xlDiagonalDown).LineStyle = xlNone
-    Data_out.Borders(xlDiagonalUp).LineStyle = xlNone
-    With Range(Data_out.Cells(1, 1), Data_out.Cells(n_start_all - 1, n_col)).Borders(xlEdgeLeft)
-        .LineStyle = xlContinuous
-        .ColorIndex = 0
-        .TintAndShade = 0
-        .Weight = xlThin
-    End With
-    With Range(Data_out.Cells(1, 1), Data_out.Cells(n_start_all - 1, n_col)).Borders(xlEdgeTop)
-        .LineStyle = xlContinuous
-        .ColorIndex = 0
-        .TintAndShade = 0
-        .Weight = xlThin
-    End With
-    With Range(Data_out.Cells(1, 1), Data_out.Cells(n_start_all - 1, n_col)).Borders(xlEdgeBottom)
-        .LineStyle = xlContinuous
-        .ColorIndex = 0
-        .TintAndShade = 0
-        .Weight = xlThin
-    End With
-    With Range(Data_out.Cells(1, 1), Data_out.Cells(n_start_all - 1, n_col)).Borders(xlEdgeRight)
-        .LineStyle = xlContinuous
-        .ColorIndex = 0
-        .TintAndShade = 0
-        .Weight = xlThin
-    End With
-    With Range(Data_out.Cells(1, 1), Data_out.Cells(n_start_all - 1, n_col)).Borders(xlInsideVertical)
-        .LineStyle = xlContinuous
-        .ColorIndex = 0
-        .TintAndShade = 0
-        .Weight = xlThin
-    End With
-    With Range(Data_out.Cells(1, 1), Data_out.Cells(n_start_all - 1, n_col)).Borders(xlInsideHorizontal)
-        .LineStyle = xlContinuous
-        .ColorIndex = 0
-        .TintAndShade = 0
-        .Weight = xlThin
-    End With
-    Range(Data_out.Cells(1, 1), Data_out.Cells(n_start_all - 1, n_col)).Borders(xlDiagonalDown).LineStyle = xlNone
-    Range(Data_out.Cells(1, 1), Data_out.Cells(n_start_all - 1, n_col)).Borders(xlDiagonalUp).LineStyle = xlNone
-    With Range(Data_out.Cells(1, 1), Data_out.Cells(n_start_all - 1, n_col)).Borders(xlEdgeLeft)
-        .LineStyle = xlContinuous
-        .ColorIndex = 0
-        .TintAndShade = 0
-        .Weight = xlMedium
-    End With
-    With Range(Data_out.Cells(1, 1), Data_out.Cells(n_start_all - 1, n_col)).Borders(xlEdgeTop)
-        .LineStyle = xlContinuous
-        .ColorIndex = 0
-        .TintAndShade = 0
-        .Weight = xlMedium
-    End With
-    With Range(Data_out.Cells(1, 1), Data_out.Cells(n_start_all - 1, n_col)).Borders(xlEdgeBottom)
-        .LineStyle = xlContinuous
-        .ColorIndex = 0
-        .TintAndShade = 0
-        .Weight = xlMedium
-    End With
-    With Range(Data_out.Cells(1, 1), Data_out.Cells(n_start_all - 1, n_col)).Borders(xlEdgeRight)
-        .LineStyle = xlContinuous
-        .ColorIndex = 0
-        .TintAndShade = 0
-        .Weight = xlMedium
-    End With
-    With Range(Data_out.Cells(1, 1), Data_out.Cells(n_start_all - 1, n_col)).Borders(xlInsideVertical)
-        .LineStyle = xlContinuous
-        .ColorIndex = xlAutomatic
-        .TintAndShade = 0
-        .Weight = xlThin
-    End With
-    With Range(Data_out.Cells(1, 1), Data_out.Cells(n_start_all - 1, n_col)).Borders(xlInsideHorizontal)
-        .LineStyle = xlContinuous
-        .ColorIndex = xlAutomatic
-        .TintAndShade = 0
-        .Weight = xlThin
-    End With
-    
-    With Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Interior
-        .PatternColorIndex = xlAutomatic
-        .ThemeColor = xlThemeColorDark1
-        .TintAndShade = -0.249977111117893
-        .Pattern = xlNone
-        .TintAndShade = 0
-        .PatternTintAndShade = 0
-    End With
-    Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Borders(xlDiagonalDown).LineStyle = xlNone
-    Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Borders(xlDiagonalUp).LineStyle = xlNone
-    With Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Borders(xlEdgeLeft)
-        .LineStyle = xlContinuous
-        .ColorIndex = 0
-        .TintAndShade = 0
-        .Weight = xlThin
-    End With
-    With Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Borders(xlEdgeTop)
-        .LineStyle = xlContinuous
-        .ColorIndex = 0
-        .TintAndShade = 0
-        .Weight = xlThin
-    End With
-    With Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Borders(xlEdgeBottom)
-        .LineStyle = xlContinuous
-        .ColorIndex = 0
-        .TintAndShade = 0
-        .Weight = xlThin
-    End With
-    With Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Borders(xlEdgeRight)
-        .LineStyle = xlContinuous
-        .ColorIndex = 0
-        .TintAndShade = 0
-        .Weight = xlThin
-    End With
-    With Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Borders(xlInsideVertical)
-        .LineStyle = xlContinuous
-        .ColorIndex = 0
-        .TintAndShade = 0
-        .Weight = xlThin
-    End With
-    With Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Borders(xlInsideHorizontal)
-        .LineStyle = xlContinuous
-        .ColorIndex = 0
-        .TintAndShade = 0
-        .Weight = xlThin
-    End With
-    Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Borders(xlDiagonalDown).LineStyle = xlNone
-    Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Borders(xlDiagonalUp).LineStyle = xlNone
-    With Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Borders(xlEdgeLeft)
-        .LineStyle = xlContinuous
-        .ColorIndex = 0
-        .TintAndShade = 0
-        .Weight = xlMedium
-    End With
-    With Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Borders(xlEdgeTop)
-        .LineStyle = xlContinuous
-        .ColorIndex = 0
-        .TintAndShade = 0
-        .Weight = xlMedium
-    End With
-    With Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Borders(xlEdgeBottom)
-        .LineStyle = xlContinuous
-        .ColorIndex = 0
-        .TintAndShade = 0
-        .Weight = xlMedium
-    End With
-    With Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Borders(xlEdgeRight)
-        .LineStyle = xlContinuous
-        .ColorIndex = 0
-        .TintAndShade = 0
-        .Weight = xlMedium
-    End With
-    With Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Borders(xlInsideVertical)
-        .LineStyle = xlContinuous
-        .ColorIndex = xlAutomatic
-        .TintAndShade = 0
-        .Weight = xlThin
-    End With
-    With Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Borders(xlInsideHorizontal)
-        .LineStyle = xlContinuous
-        .ColorIndex = xlAutomatic
-        .TintAndShade = 0
-        .Weight = xlThin
-    End With
+    If show_mat_area Then
+        Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_start_all, 4)).Merge
+        Range(Data_out.Cells(n_start_all, 5), Data_out.Cells(n_start_all, 8)).Merge
+        For i = n_start_all + 1 To n_all
+            Range(Data_out.Cells(i, 1), Data_out.Cells(i, 3)).Merge
+            Range(Data_out.Cells(i, 5), Data_out.Cells(i, 7)).Merge
+        Next i
+    End If
+        With Range(Data_out.Cells(1, 1), Data_out.Cells(n_start_all - 1, n_col)).Interior
+            .PatternColorIndex = xlAutomatic
+            .ThemeColor = xlThemeColorDark1
+            .TintAndShade = -0.249977111117893
+            .Pattern = xlNone
+            .TintAndShade = 0
+            .PatternTintAndShade = 0
+        End With
+        With Range(Data_out.Cells(1, 1), Data_out.Cells(n_start_all - 1, n_col)).Borders(xlEdgeLeft)
+            .LineStyle = xlContinuous
+            .ColorIndex = 0
+            .TintAndShade = 0
+            .Weight = xlThin
+        End With
+        With Range(Data_out.Cells(1, 1), Data_out.Cells(n_start_all - 1, n_col)).Borders(xlEdgeTop)
+            .LineStyle = xlContinuous
+            .ColorIndex = 0
+            .TintAndShade = 0
+            .Weight = xlThin
+        End With
+        With Range(Data_out.Cells(1, 1), Data_out.Cells(n_start_all - 1, n_col)).Borders(xlEdgeBottom)
+            .LineStyle = xlContinuous
+            .ColorIndex = 0
+            .TintAndShade = 0
+            .Weight = xlThin
+        End With
+        With Range(Data_out.Cells(1, 1), Data_out.Cells(n_start_all - 1, n_col)).Borders(xlEdgeRight)
+            .LineStyle = xlContinuous
+            .ColorIndex = 0
+            .TintAndShade = 0
+            .Weight = xlThin
+        End With
+        With Range(Data_out.Cells(1, 1), Data_out.Cells(n_start_all - 1, n_col)).Borders(xlInsideVertical)
+            .LineStyle = xlContinuous
+            .ColorIndex = 0
+            .TintAndShade = 0
+            .Weight = xlThin
+        End With
+        With Range(Data_out.Cells(1, 1), Data_out.Cells(n_start_all - 1, n_col)).Borders(xlInsideHorizontal)
+            .LineStyle = xlContinuous
+            .ColorIndex = 0
+            .TintAndShade = 0
+            .Weight = xlThin
+        End With
+        Range(Data_out.Cells(1, 1), Data_out.Cells(n_start_all - 1, n_col)).Borders(xlDiagonalDown).LineStyle = xlNone
+        Range(Data_out.Cells(1, 1), Data_out.Cells(n_start_all - 1, n_col)).Borders(xlDiagonalUp).LineStyle = xlNone
+        With Range(Data_out.Cells(1, 1), Data_out.Cells(n_start_all - 1, n_col)).Borders(xlEdgeLeft)
+            .LineStyle = xlContinuous
+            .ColorIndex = 0
+            .TintAndShade = 0
+            .Weight = xlMedium
+        End With
+        With Range(Data_out.Cells(1, 1), Data_out.Cells(n_start_all - 1, n_col)).Borders(xlEdgeTop)
+            .LineStyle = xlContinuous
+            .ColorIndex = 0
+            .TintAndShade = 0
+            .Weight = xlMedium
+        End With
+        With Range(Data_out.Cells(1, 1), Data_out.Cells(n_start_all - 1, n_col)).Borders(xlEdgeBottom)
+            .LineStyle = xlContinuous
+            .ColorIndex = 0
+            .TintAndShade = 0
+            .Weight = xlMedium
+        End With
+        With Range(Data_out.Cells(1, 1), Data_out.Cells(n_start_all - 1, n_col)).Borders(xlEdgeRight)
+            .LineStyle = xlContinuous
+            .ColorIndex = 0
+            .TintAndShade = 0
+            .Weight = xlMedium
+        End With
+        With Range(Data_out.Cells(1, 1), Data_out.Cells(n_start_all - 1, n_col)).Borders(xlInsideVertical)
+            .LineStyle = xlContinuous
+            .ColorIndex = xlAutomatic
+            .TintAndShade = 0
+            .Weight = xlThin
+        End With
+        With Range(Data_out.Cells(1, 1), Data_out.Cells(n_start_all - 1, n_col)).Borders(xlInsideHorizontal)
+            .LineStyle = xlContinuous
+            .ColorIndex = xlAutomatic
+            .TintAndShade = 0
+            .Weight = xlThin
+        End With
+        
+        With Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Interior
+            .PatternColorIndex = xlAutomatic
+            .ThemeColor = xlThemeColorDark1
+            .TintAndShade = -0.249977111117893
+            .Pattern = xlNone
+            .TintAndShade = 0
+            .PatternTintAndShade = 0
+        End With
+        Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Borders(xlDiagonalDown).LineStyle = xlNone
+        Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Borders(xlDiagonalUp).LineStyle = xlNone
+        With Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Borders(xlEdgeLeft)
+            .LineStyle = xlContinuous
+            .ColorIndex = 0
+            .TintAndShade = 0
+            .Weight = xlThin
+        End With
+        With Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Borders(xlEdgeTop)
+            .LineStyle = xlContinuous
+            .ColorIndex = 0
+            .TintAndShade = 0
+            .Weight = xlThin
+        End With
+        With Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Borders(xlEdgeBottom)
+            .LineStyle = xlContinuous
+            .ColorIndex = 0
+            .TintAndShade = 0
+            .Weight = xlThin
+        End With
+        With Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Borders(xlEdgeRight)
+            .LineStyle = xlContinuous
+            .ColorIndex = 0
+            .TintAndShade = 0
+            .Weight = xlThin
+        End With
+        With Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Borders(xlInsideVertical)
+            .LineStyle = xlContinuous
+            .ColorIndex = 0
+            .TintAndShade = 0
+            .Weight = xlThin
+        End With
+        With Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Borders(xlInsideHorizontal)
+            .LineStyle = xlContinuous
+            .ColorIndex = 0
+            .TintAndShade = 0
+            .Weight = xlThin
+        End With
+        Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Borders(xlDiagonalDown).LineStyle = xlNone
+        Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Borders(xlDiagonalUp).LineStyle = xlNone
+        With Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Borders(xlEdgeLeft)
+            .LineStyle = xlContinuous
+            .ColorIndex = 0
+            .TintAndShade = 0
+            .Weight = xlMedium
+        End With
+        With Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Borders(xlEdgeTop)
+            .LineStyle = xlContinuous
+            .ColorIndex = 0
+            .TintAndShade = 0
+            .Weight = xlMedium
+        End With
+        With Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Borders(xlEdgeBottom)
+            .LineStyle = xlContinuous
+            .ColorIndex = 0
+            .TintAndShade = 0
+            .Weight = xlMedium
+        End With
+        With Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Borders(xlEdgeRight)
+            .LineStyle = xlContinuous
+            .ColorIndex = 0
+            .TintAndShade = 0
+            .Weight = xlMedium
+        End With
+        With Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Borders(xlInsideVertical)
+            .LineStyle = xlContinuous
+            .ColorIndex = xlAutomatic
+            .TintAndShade = 0
+            .Weight = xlThin
+        End With
+        With Range(Data_out.Cells(n_start_all, 1), Data_out.Cells(n_all, 4)).Borders(xlInsideHorizontal)
+            .LineStyle = xlContinuous
+            .ColorIndex = xlAutomatic
+            .TintAndShade = 0
+            .Weight = xlThin
+        End With
 
     With Data_out.Font
         .Name = "ISOCPEUR"
@@ -6929,12 +6957,11 @@ Function Spec_POL(ByRef out_data As Variant) As Variant
         t_pol = ArraySelectParam(pol, type_pol, col_s_type_pol)
         t_un_zone = ArrayUniqValColumn(t_pol, col_s_numb_zone)
         pol_area = 0
-        pol_perim = 0
+        pol_perim_el = 0
         For i = 1 To UBound(t_pol, 1)
             pol_area = pol_area + t_pol(i, col_s_area_pol)
-            pol_perim = pol_perim + t_pol(i, col_s_perim_pol)
+            pol_perim_el = pol_perim_el + t_pol(i, col_s_perim_pol)
         Next i
-        
         perim_total = 0
         perim_hole = 0
         free_len = 0
@@ -6948,8 +6975,17 @@ Function Spec_POL(ByRef out_data As Variant) As Variant
             wall_len = zone.Item(num + ";wall_len") + wall_len
             door_len = zone.Item(num + ";door_len") + door_len
         Next
+        Select Case type_perim
+            Case 1 'Из аксессуаров
+                pol_perim = pol_perim_el
+            Case 2 'Из длины стен
+                pol_perim = wall_len
+            Case 3 'Из периметра зоны
+                pol_perim = perim_total
+        End Select
         If del_dor_perim Then pol_perim = pol_perim - door_len
-        
+        If del_freelen_perim Then pol_perim = pol_perim - free_len
+        If add_holes_perim Then pol_perim = pol_perim + perim_hole
         t_zone = ""
         For i = 1 To UBound(t_un_zone, 1) - 1
             t_un_zone(i) = Replace(t_un_zone(i), ",", ".")
@@ -6959,7 +6995,7 @@ Function Spec_POL(ByRef out_data As Variant) As Variant
         pos_out(j, 1) = type_pol
         pos_out(j, 2) = t_zone
         pos_out(j, 3) = Round_w(pol_area * k_zap_total, n_round_area)
-        pos_out(j, 4) = Round_w(pol_perim / 1000, n_round_area)
+        pos_out(j, 4) = Round_w(pol_perim * k_zap_total / 1000, n_round_area)
         If InStr(type_pol, "I") Or InStr(type_pol, "V") Or InStr(type_pol, "X") Then isrim = isrim + 1
     Next j
     'TODO Добавить сортировку римских цифр
@@ -7651,27 +7687,35 @@ Function Spec_VED_GR(ByRef all_data As Variant) As Variant
                 n_row_pan = n_row_pan + 1
             End If
         End If
-        pos_out(n_row, n_col_out) = "Lперим=" + CStr(Round_w(materials_by_type.Item(type_name + ";pot_perim;") * k_zap_total, n_round_area)) + "п.м."
+        If show_perim Then pos_out(n_row, n_col_out) = "Lперим=" + CStr(Round_w(materials_by_type.Item(type_name + ";pot_perim;") * k_zap_total, n_round_area)) + "п.м."
         n_row = Application.WorksheetFunction.Max(n_row_p, n_row_w, n_row_c, n_row_pan)
     Next
-    pos_out(n_row, 1) = "Общяя площадь отделки, кв.м."
-    pos_out(n_row, 5) = "Общяя площадь поверхности, кв.м."
-    pos_out(n_row + 1, 5) = "Потолки"
-    pos_out(n_row + 2, 5) = "Стены(за вычетом панелей)"
-    pos_out(n_row + 3, 5) = "Колонны"
-    pos_out(n_row + 4, 5) = "Низ стен/колонн"
-    pos_out(n_row + 1, 8) = sum_pot
-    pos_out(n_row + 2, 8) = sum_wall
-    pos_out(n_row + 3, 8) = sum_column
-    pos_out(n_row + 4, 8) = sum_pan
-    materials_all = ArraySortABC(materials.keys(), 1)
-    For Each mat In materials_all
-        If Len(mat) > 2 Then
-            n_row = n_row + 1
-            pos_out(n_row, 1) = Replace(mat, fin_str, "")
-            pos_out(n_row, 4) = materials.Item(mat)
-        End If
-    Next
+    If show_surf_area Or show_mat_area Then n_row = n_row + 1
+    If show_surf_area Then
+        nn_col = 5
+        If Not show_mat_area Then nn_col = 1
+        pos_out(n_row, nn_col) = "Общяя площадь поверхности, кв.м."
+        pos_out(n_row + 1, nn_col) = "Потолки"
+        pos_out(n_row + 2, nn_col) = "Стены(за вычетом панелей)"
+        pos_out(n_row + 3, nn_col) = "Колонны"
+        pos_out(n_row + 4, nn_col) = "Низ стен/колонн"
+        pos_out(n_row + 1, nn_col + 3) = sum_pot
+        pos_out(n_row + 2, nn_col + 3) = sum_wall
+        pos_out(n_row + 3, nn_col + 3) = sum_column
+        pos_out(n_row + 4, nn_col + 3) = sum_pan
+    End If
+    If show_mat_area Then
+        pos_out(n_row, 1) = "Общяя площадь отделки, кв.м."
+        materials_all = ArraySortABC(materials.keys(), 1)
+        For Each mat In materials_all
+            If Len(mat) > 2 Then
+                n_row = n_row + 1
+                pos_out(n_row, 1) = Replace(mat, fin_str, "")
+                pos_out(n_row, 4) = materials.Item(mat)
+            End If
+        Next
+    End If
+    If Not show_mat_area And Not show_mat_area Then n_row = n_row + 1
     pos_out = ArrayRedim(pos_out, n_row)
     r = LogWrite("Ведомость отделки", "Итог", CStr(summ_area_pot))
     Spec_VED_GR = pos_out
@@ -7981,24 +8025,28 @@ Function Spec_VED(ByRef all_data As Variant) As Variant
         n_row = Application.WorksheetFunction.Max(n_row_p, n_row_w, n_row_c, n_row_pan)
     Next
     n_row = n_row + 1
-    pos_out(n_row, 1) = "Общяя площадь отделки, кв.м."
-    pos_out(n_row, 5) = "Общяя площадь поверхности, кв.м."
-    pos_out(n_row + 1, 5) = "Потолки"
-    pos_out(n_row + 2, 5) = "Стены(за вычетом панелей)"
-    pos_out(n_row + 3, 5) = "Колонны"
-    pos_out(n_row + 4, 5) = "Панели"
-    pos_out(n_row + 1, 8) = sum_pot
-    pos_out(n_row + 2, 8) = sum_wall
-    pos_out(n_row + 3, 8) = sum_column
-    pos_out(n_row + 4, 8) = sum_pan
-    material_all = ArraySort(materials.keys())
-    For Each mat In material_all
-        If (Right(mat, 2) <> ";a") Then
-            n_row = n_row + 1
-            pos_out(n_row, 1) = Replace(materials.Item(mat), fin_str, "")
-            pos_out(n_row, 4) = Round_w(materials.Item(mat + ";a") * k_zap_total, n_round_area)
-        End If
-    Next
+    If show_surf_area Then
+        pos_out(n_row, 5) = "Общяя площадь поверхности, кв.м."
+        pos_out(n_row + 1, 5) = "Потолки"
+        pos_out(n_row + 2, 5) = "Стены(за вычетом панелей)"
+        pos_out(n_row + 3, 5) = "Колонны"
+        pos_out(n_row + 4, 5) = "Панели"
+        pos_out(n_row + 1, 8) = sum_pot
+        pos_out(n_row + 2, 8) = sum_wall
+        pos_out(n_row + 3, 8) = sum_column
+        pos_out(n_row + 4, 8) = sum_pan
+    End If
+    If show_mat_area Then
+        pos_out(n_row, 1) = "Общяя площадь отделки, кв.м."
+        material_all = ArraySort(materials.keys())
+        For Each mat In material_all
+            If (Right(mat, 2) <> ";a") Then
+                n_row = n_row + 1
+                pos_out(n_row, 1) = Replace(materials.Item(mat), fin_str, "")
+                pos_out(n_row, 4) = Round_w(materials.Item(mat + ";a") * k_zap_total, n_round_area)
+            End If
+        Next
+    End If
     pos_out = ArrayRedim(pos_out, n_row)
     r = LogWrite("Ведомость отделки", "Итог", CStr(summ_area_pot))
     Spec_VED = pos_out
