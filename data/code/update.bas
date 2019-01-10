@@ -2,10 +2,9 @@ Attribute VB_Name = "update"
 Option Compare Text
 Option Base 1
 
-Public Const update_version As String = "3.0"
-Public Const CODE_UPD As Boolean = False
+Public Const update_version As String = "3.1"
 Function CheckVersion()
-    If Ping() Then
+    If Ping() And check_version Then
         msg_upd = ""
         common_git = DownloadMod("common" & ".bas")
         common_local = ConvTxtNum(common_version)
@@ -90,7 +89,7 @@ Function ExportAllMod() As Boolean
         MkDir (UserForm2.CodePath)
     End If
     pathtmp = "old\"
-    If CODE_UPD Then pathtmp = ""
+    If Debug_mode Then pathtmp = ""
     r = ExportMod("UserForm2", pathtmp, UserForm2.form_ver.Caption)
     r = ExportMod("calc", pathtmp, macro_version)
     r = ExportMod("common", pathtmp, common_version)

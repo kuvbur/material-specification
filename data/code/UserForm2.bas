@@ -18,10 +18,9 @@ Attribute VB_Exposed = False
 Option Compare Text
 Option Base 1
 
-Const form_version As String = "3.7"
+Const form_version As String = "3.9"
 Public CodePath, MaterialPath, SortamentPath As String
 Public lastsheet, lastconstrtype, lastconstr, lastfile, lastfilespec, lastfileadd, materialbook_index As Variant
-
 
 Private Sub ClearSheetButton_Click()
     r = OutPrepare()
@@ -146,7 +145,8 @@ Private Sub UserForm_Initialize()
     SortamentPath = CheckPath(SortamentPatht.Text)
     CodePath = CheckPath(CodePatht.Text)
     If use_tmp_CB.Value Then Set materialbook_index = ReadConstr()
-    r = CheckVersion()
+    r = INISet()
+    If check_version Then r = CheckVersion()
     FormRebild
 End Sub
 
@@ -232,6 +232,7 @@ Private Sub FormatButton_Click()
 End Sub
 
 Sub FormRebild()
+    r = INISet()
     calc_ver.Caption = macro_version
     com_ver.Caption = common_version
     form_ver.Caption = form_version

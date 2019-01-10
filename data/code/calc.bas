@@ -1,19 +1,7 @@
 Attribute VB_Name = "calc"
 Option Compare Text
 Option Base 1
-
-Public Const macro_version As String = "3.23"
-Public symb_diam As String 'Символ диаметра в спецификацию
-'Тип округления
-' 1 - округление в большую сторону
-' 2 - округление стандартным round
-' 3 - округление отключено
-Public Const type_okrugl As Integer = 1
-'Кол-во знаков после запятой
-Public Const n_round_l As Integer = 2 'Длина
-Public Const n_round_w As Integer = 2 'Вес
-Public Const n_round_wkzh As Integer = 1 'Вес в ведомости расхода стали
-Public Const n_round_area As Integer = 1 'Площадь в ведомость отделки
+Public Const macro_version As String = "3.25"
 '-------------------------------------------------------
 'Типы элементов (столбец col_type_el)
 Public Const t_arm As Integer = 10
@@ -109,8 +97,6 @@ Public Const col_s_areal_l As Integer = 31
 Public Const col_s_areaniz_l As Integer = 32
 Public Const col_s_areapl_l As Integer = 33
 Public Const max_s_col As Integer = 33
-Public Const isErrorNoFin As Boolean = True 'Выводить ошибку, если в зоне не задана отделка
-Public Const hole_in_zone As Boolean = False 'Считать отверстия в зонах колоннами
 '-------------------------------------------------------
 'Описание файла сортамента
 Public Const col_gost_spec As Integer = 1
@@ -129,11 +115,9 @@ Public Const col_man_qty As Integer = 5
 Public Const col_man_weight As Integer = 6
 Public Const col_man_prim As Integer = 7
 Public Const col_man_komment As Integer = 18
-
 Public Const col_man_ank As Integer = 19
 Public Const col_man_nahl As Integer = 20
 Public Const col_man_dgib As Integer = 21
-
 'Арматура
 Public Const col_man_length As Integer = 8
 Public Const col_man_diametr As Integer = 9
@@ -148,24 +132,189 @@ Public Const col_man_pr_okr As Integer = 16
 Public Const col_man_pr_ogn As Integer = 17
 Public Const max_col_man As Integer = col_man_dgib
 '-------------------------------------------------------
-Public Const ignore_pos As String = "!!" 'Игнорировать элементы, содержащих ЭТО в позиции или марке
-Public Const subpos_delim As String = "'" 'Разделитель основной и вложенной сборки
-Public Const izd_sheet_name As String = "Изделия"
-Public Const inx_name As String = "|Содержание|"
-
+Public symb_diam As String 'Символ диаметра в спецификацию
 Public gost2fklass, name_gost, reinforcement_specifications As Variant 'Разные массивы
 Public pr_adress As Variant
-
 Public k_zap_total As Double
 Public w_format As String 'Формат вывода в техничку
 Public pos_data As Variant
 Public sheet_option As Variant
+'-------------------------------------------------------
+'-----Переменные, читаемые из INI-----------------------
+'-------------------------------------------------------
+    'Тип округления
+    ' 1 - округление в большую сторону
+    ' 2 - округление стандартным round
+    ' 3 - округление отключено
+Public isINIset As Boolean
+Public type_okrugl As Integer
+Public n_round_l As Integer 'Длина
+Public n_round_w As Integer 'Вес
+Public n_round_wkzh As Integer 'Вес в ведомости расхода стали
+Public n_round_area As Integer 'Площадь в ведомость отделки
+Public ignore_pos As String 'Игнорировать элементы, содержащих ЭТО в позиции или марке
+Public subpos_delim As String 'Разделитель основной и вложенной сборки
+Public izd_sheet_name As String
+Public inx_name As String
+Public isErrorNoFin As Boolean 'Выводить ошибку, если в зоне не задана отделка
+Public hole_in_zone As Boolean 'Считать отверстия в зонах колоннами
+Public mem_option As Boolean 'Запоминать и восстанавливать нстройки листов
+Public check_on_active As Boolean 'Проверять листы с ручной спецификацией при переходе на них
+Public inx_on_new As Boolean 'Обновлять содежрание после создания нового листа
+Public def_decode As Boolean 'Декодировать независимо от настроек
+Public Debug_mode As Boolean 'Режим отладки
+Public check_version As Boolean 'Проверять версию при загрузке
 
-'Sub test()
-'    r = OutPrepare()
-'    r = Spec_Select("Ведомость отделки АБК", "_вед")
-'    r = OutEnded()
-'End Sub
+Function INISet()
+    sIniFile = UserForm2.CodePath & "setting.ini"
+    If CBool(Len(Dir$(sIniFile))) Then
+        type_okrugl = INIReadKeyVal("РАСЧЁТЫ", "type_okrugl")
+        n_round_l = INIReadKeyVal("РАСЧЁТЫ", "n_round_l")
+        n_round_w = INIReadKeyVal("РАСЧЁТЫ", "n_round_w")
+        n_round_wkzh = INIReadKeyVal("РАСЧЁТЫ", "n_round_wkzh")
+        ignore_pos = INIReadKeyVal("РАСЧЁТЫ", "ignore_pos")
+        subpos_delim = INIReadKeyVal("РАСЧЁТЫ", "subpos_delim")
+        n_round_area = INIReadKeyVal("ОТДЕЛКА", "n_round_area")
+        hole_in_zone = INIReadKeyVal("ОТДЕЛКА", "hole_in_zone")
+        isErrorNoFin = INIReadKeyVal("ОТДЕЛКА", "isErrorNoFin")
+        izd_sheet_name = INIReadKeyVal("ЛИСТЫ", "izd_sheet_name")
+        inx_name = INIReadKeyVal("ЛИСТЫ", "inx_name")
+        mem_option = INIReadKeyVal("ЛИСТЫ", "mem_option")
+        inx_on_new = INIReadKeyVal("ЛИСТЫ", "inx_on_new")
+        check_on_active = INIReadKeyVal("ЛИСТЫ", "check_on_active")
+        def_decode = INIReadKeyVal("ЛИСТЫ", "def_decode")
+        Debug_mode = INIReadKeyVal("DEBUG", "Debug_mode")
+        check_version = INIReadKeyVal("DEBUG", "check_version")
+        flag = False
+    Else
+        flag = True
+    End If
+    '-----Значения по умолчанию-----------------------------
+    If IsEmpty(type_okrugl) Or flag Then type_okrugl = 1
+    If IsEmpty(n_round_l) Or flag Then n_round_l = 2
+    If IsEmpty(n_round_w) Or flag Then n_round_w = 2
+    If IsEmpty(n_round_wkzh) Or flag Then n_round_wkzh = 1
+    If IsEmpty(n_round_area) Or flag Then n_round_area = 1
+    If IsEmpty(ignore_pos) Or flag Then ignore_pos = "!!"
+    If IsEmpty(subpos_delim) Or flag Then subpos_delim = "'"
+    If IsEmpty(izd_sheet_name) Or flag Then izd_sheet_name = "Изделия"
+    If IsEmpty(inx_name) Or flag Then inx_name = "|Содержание|"
+    If IsEmpty(isErrorNoFin Or flag) Then isErrorNoFin = True
+    If IsEmpty(hole_in_zone) Or flag Then hole_in_zone = False
+    If IsEmpty(mem_option) Or flag Then mem_option = True
+    If IsEmpty(inx_on_new) Or flag Then inx_on_new = True
+    If IsEmpty(check_on_active) Or flag Then check_on_active = True
+    If IsEmpty(def_decode) Or flag Then def_decode = False
+    If IsEmpty(check_version) Or flag Then check_version = True
+    '----Запись умолчаний, если файл не найден
+    If flag Then
+        t = INIWriteKeyVal("РАСЧЁТЫ", "type_okrugl", type_okrugl)
+        t = INIWriteKeyVal("РАСЧЁТЫ", "n_round_l", n_round_l)
+        t = INIWriteKeyVal("РАСЧЁТЫ", "n_round_w", n_round_w)
+        t = INIWriteKeyVal("РАСЧЁТЫ", "n_round_wkzh", n_round_wkzh)
+        t = INIWriteKeyVal("РАСЧЁТЫ", "ignore_pos", ignore_pos)
+        t = INIWriteKeyVal("РАСЧЁТЫ", "subpos_delim", subpos_delim)
+        t = INIWriteKeyVal("ОТДЕЛКА", "n_round_area", n_round_area)
+        t = INIWriteKeyVal("ОТДЕЛКА", "hole_in_zone", hole_in_zone)
+        t = INIWriteKeyVal("ОТДЕЛКА", "isErrorNoFin", isErrorNoFin)
+        t = INIWriteKeyVal("ЛИСТЫ", "izd_sheet_name", izd_sheet_name)
+        t = INIWriteKeyVal("ЛИСТЫ", "inx_name", inx_name)
+        t = INIWriteKeyVal("ЛИСТЫ", "mem_option", mem_option)
+        t = INIWriteKeyVal("ЛИСТЫ", "inx_on_new", inx_on_new)
+        t = INIWriteKeyVal("ЛИСТЫ", "check_on_active", check_on_active)
+        t = INIWriteKeyVal("ЛИСТЫ", "def_decode", def_decode)
+        t = INIWriteKeyVal("DEBUG", "Debug_mode", False)
+        t = INIWriteKeyVal("DEBUG", "check_version", True)
+    End If
+    isINIset = True
+End Function
+
+Function INIReadKeyVal(ByVal sSection As String, ByVal sKey As String) As Variant
+    sIniFile = UserForm2.CodePath & "setting.ini"
+    sIniFileContent = ""
+    bSectionExists = False
+    bKeyExists = False
+    sIniFileContent = INIReadFile(sIniFile)    'Read the file into memory
+    aIniLines = Split(sIniFileContent, vbCrLf)
+    For i = 0 To UBound(aIniLines)
+        sLine = Trim(aIniLines(i))
+        If bSectionExists = True And Left(sLine, 1) = "[" And Right(sLine, 1) = "]" Then
+            Exit For    'Start of a new section
+        End If
+        If sLine = "[" & sSection & "]" Then
+            bSectionExists = True
+        End If
+        If bSectionExists = True Then
+            If Len(sLine) > Len(sKey) Then
+                If Left(sLine, Len(sKey) + 1) = sKey & "=" Then
+                    bKeyExists = True
+                    INIReadKeyVal = Mid(sLine, InStr(sLine, "=") + 1)
+                End If
+            End If
+        End If
+    Next i
+    If InStr(INIReadKeyVal, "#") > 0 Then INIReadKeyVal = Trim(Split(INIReadKeyVal, "#")(0))
+End Function
+
+Function INIWriteKeyVal(ByVal sSection As String, ByVal sKey As String, ByVal sValue As String) As Boolean
+    sIniFile = UserForm2.CodePath & "setting.ini"
+    sIniFileContent = ""
+    bSectionExists = False
+    bKeyExists = False
+    sIniFileContent = INIReadFile(sIniFile)    'Read the file into memory
+    aIniLines = Split(sIniFileContent, vbCrLf)    'Break the content into individual lines
+    sIniFileContent = ""    'Reset it
+    For i = 0 To UBound(aIniLines)    'Loop through each line
+        sNewLine = ""
+        sLine = Trim(aIniLines(i))
+        If sLine = "[" & sSection & "]" Then
+            bSectionExists = True
+            bInSection = True
+        End If
+        If bInSection = True Then
+            If sLine <> "[" & sSection & "]" _
+               And Left(sLine, 1) = "[" And Right(sLine, 1) = "]" Then
+                'Our section exists, but the key wasn't found, so append it
+                bInSection = False    ' we're switching section
+            End If
+            If Len(sLine) > Len(sKey) Then
+                If Left(sLine, Len(sKey) + 1) = sKey & "=" Then
+                    sNewLine = sKey & "=" & sValue
+                    bKeyExists = True
+                    bKeyAdded = True
+                End If
+            End If
+        End If
+        If Len(sIniFileContent) > 0 Then sIniFileContent = sIniFileContent & vbCrLf
+        If sNewLine = "" Then
+            sIniFileContent = sIniFileContent & sLine
+        Else
+            sIniFileContent = sIniFileContent & sNewLine
+        End If
+    Next i
+    'if not found, add it to the end
+    If bSectionExists = False Then
+        If Len(sIniFileContent) > 0 Then sIniFileContent = sIniFileContent & vbCrLf
+        sIniFileContent = sIniFileContent & "[" & sSection & "]"
+    End If
+    If bKeyAdded = False Then
+        sIniFileContent = sIniFileContent & vbCrLf & sKey & "=" & sValue
+    End If
+    'Write to the ini file the new content
+    r = ExportSaveTXTfile(sIniFile, sIniFileContent)
+    Ini_WriteKeyVal = True
+End Function
+
+Function INIReadFile(ByVal strFile As String) As String
+    Dim FileNumber  As Integer
+    Dim sFile       As String 'Variable contain file content
+    FileNumber = FreeFile
+    Open strFile For Binary Access Read As FileNumber
+    sFile = Space(LOF(FileNumber))
+    Get #FileNumber, , sFile
+    Close FileNumber
+    INIReadFile = sFile
+End Function
 
 Function ArrayCol(ByVal array_in As Variant, ByVal col As Integer) As Variant
     If IsEmpty(array_in) Then ArrayCol = Empty: Exit Function
@@ -1478,7 +1627,7 @@ End Function
 
 Function ExportSheet(nm)
     type_spec = SpecGetType(nm)
-    If type_spec <> 7 And type_spec > 0 Then
+    If type_spec <> 7 And type_spec > 0 And Len(nm) > 1 Then
         Set Sh = Application.ThisWorkbook.Sheets(nm)
         lsize = SheetGetSize(Sh)
         n_row = lsize(1)
@@ -2522,6 +2671,24 @@ Function FormatSpec_Rule(ByVal Data_out As Range) As Boolean
         .Weight = xlThin
     End With
     Selection.Rows.AutoFit
+    Selection.FormatConditions.Add Type:=xlTextString, String:="Исключить", _
+        TextOperator:=xlContains
+    Selection.FormatConditions(Selection.FormatConditions.Count).SetFirstPriority
+    With Selection.FormatConditions(1).Interior
+        .PatternColorIndex = xlAutomatic
+        .ThemeColor = xlThemeColorAccent6
+        .TintAndShade = 0.399945066682943
+    End With
+    Selection.FormatConditions(1).StopIfTrue = False
+    Selection.FormatConditions.Add Type:=xlTextString, String:="Добавить", _
+        TextOperator:=xlContains
+    Selection.FormatConditions(Selection.FormatConditions.Count).SetFirstPriority
+    With Selection.FormatConditions(1).Interior
+        .PatternColorIndex = xlAutomatic
+        .Color = 5296274
+        .TintAndShade = 0
+    End With
+    Selection.FormatConditions(1).StopIfTrue = False
     Columns("C:C").ColumnWidth = 60
     Columns("B:B").ColumnWidth = 40
     Columns("A:A").ColumnWidth = 60
@@ -4018,6 +4185,7 @@ End Function
 
 Function ManualSpec_batch(type_out)
     r = LogWrite("Автовывод", "Начало", "-")
+    If mem_option Then r = LogWrite("Автовывод", "Включена автонастройка листов", "-")
     n_out = 0
     r = OutPrepare()
     For Each objWh In ThisWorkbook.Worksheets
@@ -4026,6 +4194,7 @@ Function ManualSpec_batch(type_out)
         If type_spec = 7 Then
             For Each tspec In type_out
                 If Not IsEmpty(tspec) Then
+                    If mem_option Then r = SheetSetOption(nm)
                     sheet_out = Spec_Select(nm, tspec, True)
                     r = ExportSheet(sheet_out)
                     n_out = n_out + 1
@@ -4465,6 +4634,21 @@ Function ReadTxt(ByVal filename$, Optional ByVal FirstRow& = 1, Optional ByVal C
     On Error Resume Next
     Set fso = CreateObject("scripting.filesystemobject")
     Set ts = fso.OpenTextFile(filename$, 1, True): txt$ = ts.ReadAll: ts.Close
+    If def_decode Then UserForm2.decode_CB.Value = True
+    If UserForm2.decode_CB.Value = True Then
+        SourceCharset$ = "Windows-1251"
+        DestCharset$ = "UTF-8"
+        With CreateObject("ADODB.Stream")
+            .Type = 2: .mode = 3
+            .Charset = SourceCharset$
+            .Open
+            .WriteText txt$
+            .Position = 0
+            .Charset = DestCharset$
+            txt$ = .ReadText
+            .Close
+        End With
+    End If
     Set ts = Nothing: Set fso = Nothing
     txt = Trim(txt): Err.Clear
     If txt Like "*" & RowsSeparator$ Then txt = Left(txt, Len(txt) - Len(RowsSeparator$))
@@ -4641,26 +4825,26 @@ Function SheetImport(ByVal nm As String) As Boolean
 End Function
 
 Function SheetActivate(ByVal sheetn As String)
-    type_spec = SpecGetType(sheetn)
+    r = INISet()
     If sheetn = inx_name Then
         r = OutPrepare()
         r = SheetIndex()
         r = OutEnded()
+    Else
+        type_spec = SpecGetType(sheetn)
+        If type_spec = 7 And check_on_active Then
+            r = OutPrepare()
+            r = ManualCheck(sheetn)
+            r = OutEnded()
+        End If
+        If type_spec > 0 And mem_option Then r = SheetSetOption(sheetn)
     End If
-    If type_spec = 7 Then
-        r = OutPrepare()
-        r = ManualCheck(sheetn)
-        r = OutEnded()
-    End If
-    r = SheetSetOption(sheetn)
 End Function
 
 Function SheetSetOption(ByVal sheetn As String)
-    If IsEmpty(sheet_option) Then
-        Set sheet_option = CreateObject("Scripting.Dictionary")
-        sheet_option.comparemode = 1
-    End If
+    If IsEmpty(sheet_option) Then r = SheetReadOption()
     If IsEmpty(sheet_option.Item(sheetn & ";data")) Then r = SheetReadOption()
+    tdate = sheet_option.Item(sheetn & ";data")
     UserForm2.Kzap.Text = sheet_option.Item(sheetn & ";k_zap")
     UserForm2.arm_pm_CB.Value = sheet_option.Item(sheetn & ";arm_pm")
     UserForm2.pr_pm_CB.Value = sheet_option.Item(sheetn & ";pr_pm")
@@ -4675,13 +4859,15 @@ Function SheetSetOption(ByVal sheetn As String)
     UserForm2.separate_material_CB = sheet_option.Item(sheetn & ";separate_material")
     UserForm2.show_type_CB = sheet_option.Item(sheetn & ";show_type")
     UserForm2.show_qty_spec = sheet_option.Item(sheetn & ";show_qty_spec")
+    UserForm2.decode_CB = sheet_option.Item(sheetn & ";decode")
+    If def_decode Then UserForm2.decode_CB.Value = True
     SheetSetOption = True
 End Function
 
 Function SheetIndex()
+    r = SheetReadOption()
     If SheetExist(inx_name) Then
         ThisWorkbook.Worksheets(inx_name).Activate
-        r = SheetReadOption()
     Else
         ThisWorkbook.Worksheets.Add.Name = inx_name
         ThisWorkbook.Worksheets(inx_name).Activate
@@ -4711,6 +4897,7 @@ Function SheetIndex()
     Worksheets(inx_name).Cells(19) = "separate_material"
     Worksheets(inx_name).Cells(20) = "show_type"
     Worksheets(inx_name).Cells(21) = "show_qty_spec"
+    Worksheets(inx_name).Cells(22) = "decode"
     Dim sheetnames(): j = 0
     With ThisWorkbook
         For Each sheet In ThisWorkbook.Worksheets
@@ -4782,24 +4969,25 @@ Function SheetIndex()
                     ThisWorkbook.Worksheets(inx_name).Hyperlinks.Add anchor:=cell, Address:="", SubAddress:="'" & sheetn & "'" & "!D4"
                 End Select
                 cell.Formula = sheetn
-                If Not IsEmpty(sheet_option) Then
-                    If sheet_option.Item(sheetn & ";write") = True Then
-                        Worksheets(inx_name).Cells(j, 7) = sheet_option.Item(sheetn & ";k_zap")
-                        Worksheets(inx_name).Cells(j, 8) = sheet_option.Item(sheetn & ";data")
-                        Worksheets(inx_name).Cells(j, 9) = sheet_option.Item(sheetn & ";arm_pm")
-                        Worksheets(inx_name).Cells(j, 10) = sheet_option.Item(sheetn & ";pr_pm")
-                        Worksheets(inx_name).Cells(j, 11) = sheet_option.Item(sheetn & ";keep_pos")
-                        Worksheets(inx_name).Cells(j, 12) = sheet_option.Item(sheetn & ";qtyOneSubpos")
-                        Worksheets(inx_name).Cells(j, 13) = sheet_option.Item(sheetn & ";show_subpos")
-                        Worksheets(inx_name).Cells(j, 14) = sheet_option.Item(sheetn & ";ignore_subpos")
-                        Worksheets(inx_name).Cells(j, 15) = sheet_option.Item(sheetn & ";merge_material")
-                        Worksheets(inx_name).Cells(j, 16) = sheet_option.Item(sheetn & ";otd_by_type")
-                        Worksheets(inx_name).Cells(j, 17) = sheet_option.Item(sheetn & ";add_row")
-                        Worksheets(inx_name).Cells(j, 18) = sheet_option.Item(sheetn & ";ed_izm_km")
-                        Worksheets(inx_name).Cells(j, 19) = sheet_option.Item(sheetn & ";separate_material")
-                        Worksheets(inx_name).Cells(j, 20) = sheet_option.Item(sheetn & ";show_type")
-                        Worksheets(inx_name).Cells(j, 21) = sheet_option.Item(sheetn & ";show_qty_spec")
-                    End If
+                If IsEmpty(sheet_option.Item(sheetn & ";k_zap")) Then
+                    hh = sheet_option.Item(sheetn & ";k_zap")
+                Else
+                    ThisWorkbook.Worksheets(inx_name).Cells(j, 7) = sheet_option.Item(sheetn & ";k_zap")
+                    ThisWorkbook.Worksheets(inx_name).Cells(j, 8) = sheet_option.Item(sheetn & ";data")
+                    ThisWorkbook.Worksheets(inx_name).Cells(j, 9) = sheet_option.Item(sheetn & ";arm_pm")
+                    ThisWorkbook.Worksheets(inx_name).Cells(j, 10) = sheet_option.Item(sheetn & ";pr_pm")
+                    ThisWorkbook.Worksheets(inx_name).Cells(j, 11) = sheet_option.Item(sheetn & ";keep_pos")
+                    ThisWorkbook.Worksheets(inx_name).Cells(j, 12) = sheet_option.Item(sheetn & ";qtyOneSubpos")
+                    ThisWorkbook.Worksheets(inx_name).Cells(j, 13) = sheet_option.Item(sheetn & ";show_subpos")
+                    ThisWorkbook.Worksheets(inx_name).Cells(j, 14) = sheet_option.Item(sheetn & ";ignore_subpos")
+                    ThisWorkbook.Worksheets(inx_name).Cells(j, 15) = sheet_option.Item(sheetn & ";merge_material")
+                    ThisWorkbook.Worksheets(inx_name).Cells(j, 16) = sheet_option.Item(sheetn & ";otd_by_type")
+                    ThisWorkbook.Worksheets(inx_name).Cells(j, 17) = sheet_option.Item(sheetn & ";add_row")
+                    ThisWorkbook.Worksheets(inx_name).Cells(j, 18) = sheet_option.Item(sheetn & ";ed_izm_km")
+                    ThisWorkbook.Worksheets(inx_name).Cells(j, 19) = sheet_option.Item(sheetn & ";separate_material")
+                    ThisWorkbook.Worksheets(inx_name).Cells(j, 20) = sheet_option.Item(sheetn & ";show_type")
+                    ThisWorkbook.Worksheets(inx_name).Cells(j, 21) = sheet_option.Item(sheetn & ";show_qty_spec")
+                    ThisWorkbook.Worksheets(inx_name).Cells(j, 22) = sheet_option.Item(sheetn & ";decode")
                 End If
                 Sheets(sheetn).Visible = True
             End If
@@ -4807,6 +4995,19 @@ Function SheetIndex()
         Sheets(inx_name).Visible = True
     Next
     ThisWorkbook.Worksheets(inx_name).Activate
+    ThisWorkbook.Worksheets(inx_name).Sort.SortFields.Clear
+    ThisWorkbook.Worksheets(inx_name).Sort.SortFields.Add Key:=Range( _
+        "H2:H600"), SortOn:=xlSortOnValues, Order:=xlAscending, DataOption:= _
+        xlSortNormal
+    With ThisWorkbook.Worksheets(inx_name).Sort
+        .SetRange Range("A1:V600")
+        .Header = xlYes
+        .MatchCase = False
+        .Orientation = xlTopToBottom
+        .SortMethod = xlPinYin
+        .Apply
+    End With
+    
     Rows("1:1").Font.Bold = True
     With Rows("1:1").Font
         .Name = "Calibri"
@@ -4822,11 +5023,13 @@ Function SheetIndex()
         .ThemeFont = xlThemeFontMinor
     End With
     Rows("1:1").RowHeight = 28
+    Rows("2:600").RowHeight = 15
     Range("A2:N600").Rows.AutoFit
-    Columns("A:U").Select
+    Columns("A:V").Select
     Columns("A:E").ColumnWidth = 36
-    Columns("G:H").ColumnWidth = 15
-    Columns("I:U").ColumnWidth = 8
+    Columns("G").ColumnWidth = 8
+    Columns("H").ColumnWidth = 15
+    Columns("I:V").ColumnWidth = 10
     With Selection
         .HorizontalAlignment = xlGeneral
         .VerticalAlignment = xlCenter
@@ -4962,68 +5165,76 @@ Function SheetReadOption()
         Set sheet_option = CreateObject("Scripting.Dictionary")
         sheet_option.comparemode = 1
     End If
-    If Not SheetExist(inx_name) Then r = SheetIndex()
-    sheet_size = SheetGetSize(ThisWorkbook.Worksheets(inx_name))
-    n_row = sheet_size(1)
-    n_col = sheet_size(2)
-    If n_row > 1 Then
-        existssheet = ThisWorkbook.Worksheets(inx_name).Range(ThisWorkbook.Worksheets(inx_name).Cells(2, 1), ThisWorkbook.Worksheets(inx_name).Cells(n_row, n_col))
-        For i = 1 To UBound(existssheet, 1)
-            If IsEmpty(existssheet(i, 1)) Then
-                For j = 2 To 5
-                    If Not IsEmpty(existssheet(i, j)) Then
-                        existssheet(i, 1) = existssheet(i, j)
-                        j = 5
-                    End If
-                Next j
-            End If
-            sheetn = existssheet(i, 1)
-            kz = existssheet(i, 7)
-            If IsEmpty(existssheet(i, 7)) Then
-                UserForm2.Kzap.Text = "1.0"
-                UserForm2.arm_pm_CB.Value = False
-                UserForm2.pr_pm_CB.Value = False
-                UserForm2.keep_pos_CB = False
-                UserForm2.qtyOneSubpos_CB = False
-                UserForm2.show_subpos_CB = True
-                UserForm2.ignore_subpos_CB = False
-                UserForm2.merge_material_CB = True
-                UserForm2.otd_by_type_CB = True
-                UserForm2.add_row_CB = False
-                UserForm2.ed_izm_km_CB = False
-                UserForm2.separate_material_CB = True
-                UserForm2.show_type_CB = False
-                UserForm2.show_qty_spec = False
-                r = SheetWriteOption(sheetn, True)
-            Else
-                If Not sheet_option.Exists(sheetn & ";write") Then sheet_option.Item(sheetn & ";write") = False
-                If sheet_option.Exists(sheetn & ";write") = False Then
-                    sheet_option.Item(sheetn & ";k_zap") = existssheet(i, 7)
-                    sheet_option.Item(sheetn & ";data") = existssheet(i, 8)
-                    sheet_option.Item(sheetn & ";arm_pm") = existssheet(i, 9)
-                    sheet_option.Item(sheetn & ";pr_pm") = existssheet(i, 10)
-                    sheet_option.Item(sheetn & ";keep_pos") = existssheet(i, 11)
-                    sheet_option.Item(sheetn & ";qtyOneSubpos") = existssheet(i, 12)
-                    sheet_option.Item(sheetn & ";show_subpos") = existssheet(i, 13)
-                    sheet_option.Item(sheetn & ";ignore_subpos") = existssheet(i, 14)
-                    sheet_option.Item(sheetn & ";merge_material") = existssheet(i, 15)
-                    sheet_option.Item(sheetn & ";otd_by_type") = existssheet(i, 16)
-                    sheet_option.Item(sheetn & ";add_row") = existssheet(i, 17)
-                    sheet_option.Item(sheetn & ";ed_izm_km") = existssheet(i, 18)
-                    sheet_option.Item(sheetn & ";separate_material") = existssheet(i, 19)
-                    sheet_option.Item(sheetn & ";show_type") = existssheet(i, 20)
-                    sheet_option.Item(sheetn & ";show_qty_spec") = existssheet(i, 21)
+    If SheetExist(inx_name) Then
+        sheet_size = SheetGetSize(ThisWorkbook.Worksheets(inx_name))
+        n_row = sheet_size(1)
+        n_col = sheet_size(2)
+        If n_row > 1 Then
+            existssheet = ThisWorkbook.Worksheets(inx_name).Range(ThisWorkbook.Worksheets(inx_name).Cells(2, 1), ThisWorkbook.Worksheets(inx_name).Cells(n_row, n_col))
+            For i = 1 To UBound(existssheet, 1)
+                If IsEmpty(existssheet(i, 1)) Then
+                    For j = 2 To 5
+                        If Not IsEmpty(existssheet(i, j)) Then existssheet(i, 1) = existssheet(i, j)
+                    Next j
                 End If
-            End If
-        Next i
+                sheetn = existssheet(i, 1)
+                If SpecGetType(sheetn) > 0 Then
+                    If IsEmpty(existssheet(i, 7)) Then
+                        r = SheetDefultOption(sheetn)
+                    Else
+                        sheet_option.Item(sheetn & ";k_zap") = existssheet(i, 7)
+                        sheet_option.Item(sheetn & ";data") = existssheet(i, 8)
+                        sheet_option.Item(sheetn & ";arm_pm") = existssheet(i, 9)
+                        sheet_option.Item(sheetn & ";pr_pm") = existssheet(i, 10)
+                        sheet_option.Item(sheetn & ";keep_pos") = existssheet(i, 11)
+                        sheet_option.Item(sheetn & ";qtyOneSubpos") = existssheet(i, 12)
+                        sheet_option.Item(sheetn & ";show_subpos") = existssheet(i, 13)
+                        sheet_option.Item(sheetn & ";ignore_subpos") = existssheet(i, 14)
+                        sheet_option.Item(sheetn & ";merge_material") = existssheet(i, 15)
+                        sheet_option.Item(sheetn & ";otd_by_type") = existssheet(i, 16)
+                        sheet_option.Item(sheetn & ";add_row") = existssheet(i, 17)
+                        sheet_option.Item(sheetn & ";ed_izm_km") = existssheet(i, 18)
+                        sheet_option.Item(sheetn & ";separate_material") = existssheet(i, 19)
+                        sheet_option.Item(sheetn & ";show_type") = existssheet(i, 20)
+                        sheet_option.Item(sheetn & ";show_qty_spec") = existssheet(i, 21)
+                        sheet_option.Item(sheetn & ";decode") = existssheet(i, 22)
+                    End If
+                End If
+            Next i
+        End If
     End If
+    With ThisWorkbook
+        For Each sheet In ThisWorkbook.Worksheets
+            If Not sheet_option.Exists(sheet.Name & ";k_zap") Then
+                If SpecGetType(sheet.Name) > 0 Then r = SheetDefultOption(sheet.Name)
+            End If
+        Next
+    End With
+    
 End Function
 
-Function SheetWriteOption(ByVal sheetn As String, Optional ByVal flag As Boolean)
-    If IsEmpty(sheet_option) Then
-        Set sheet_option = CreateObject("Scripting.Dictionary")
-        sheet_option.comparemode = 1
-    End If
+Function SheetDefultOption(ByVal sheetn As String)
+    sheet_option.Item(sheetn & ";data") = "---"
+    sheet_option.Item(sheetn & ";k_zap") = "1.0"
+    sheet_option.Item(sheetn & ";arm_pm") = False
+    sheet_option.Item(sheetn & ";pr_pm") = False
+    sheet_option.Item(sheetn & ";keep_pos") = False
+    sheet_option.Item(sheetn & ";qtyOneSubpos") = False
+    sheet_option.Item(sheetn & ";show_subpos") = True
+    sheet_option.Item(sheetn & ";ignore_subpos") = False
+    sheet_option.Item(sheetn & ";merge_material") = True
+    sheet_option.Item(sheetn & ";otd_by_type") = True
+    sheet_option.Item(sheetn & ";add_row") = False
+    sheet_option.Item(sheetn & ";ed_izm_km") = False
+    sheet_option.Item(sheetn & ";separate_material") = True
+    sheet_option.Item(sheetn & ";show_type") = False
+    sheet_option.Item(sheetn & ";show_qty_spec") = False
+    sheet_option.Item(sheetn & ";decode") = False
+    SheetDefultOption = True
+End Function
+
+Function SheetWriteOption(ByVal sheetn As String)
+    If IsEmpty(sheet_option.Item(sheetn & ";data")) Then r = SheetReadOption()
     tdate = Right(Str(DatePart("yyyy", Now)), 2) & Str(DatePart("m", Now)) & Str(DatePart("d", Now))
     stamp = tdate + "/" + Str(DatePart("h", Now)) + Str(DatePart("n", Now)) + Str(DatePart("s", Now))
     sheet_option.Item(sheetn & ";k_zap") = UserForm2.Kzap.Text
@@ -5041,7 +5252,30 @@ Function SheetWriteOption(ByVal sheetn As String, Optional ByVal flag As Boolean
     sheet_option.Item(sheetn & ";separate_material") = UserForm2.separate_material_CB
     sheet_option.Item(sheetn & ";show_type") = UserForm2.show_type_CB
     sheet_option.Item(sheetn & ";show_qty_spec") = UserForm2.show_qty_spec
-    sheet_option.Item(sheetn & ";write") = flag
+    sheet_option.Item(sheetn & ";decode") = UserForm2.decode_CB
+    SheetWriteOption = True
+End Function
+
+Function SheetCopyOption(ByVal sheetn As String, ByVal sheetnto As String)
+    If IsEmpty(sheet_option.Item(sheetn & ";data")) Then r = SheetReadOption()
+    tdate = Right(Str(DatePart("yyyy", Now)), 2) & Str(DatePart("m", Now)) & Str(DatePart("d", Now))
+    stamp = tdate + "/" + Str(DatePart("h", Now)) + Str(DatePart("n", Now)) + Str(DatePart("s", Now))
+    sheet_option.Item(sheetn & ";k_zap") = UserForm2.Kzap.Text
+    sheet_option.Item(sheetn & ";data") = stamp
+    sheet_option.Item(sheetn & ";arm_pm") = UserForm2.arm_pm_CB.Value
+    sheet_option.Item(sheetn & ";pr_pm") = UserForm2.pr_pm_CB.Value
+    sheet_option.Item(sheetn & ";keep_pos") = UserForm2.keep_pos_CB
+    sheet_option.Item(sheetn & ";qtyOneSubpos") = UserForm2.qtyOneSubpos_CB
+    sheet_option.Item(sheetn & ";show_subpos") = UserForm2.show_subpos_CB
+    sheet_option.Item(sheetn & ";ignore_subpos") = UserForm2.ignore_subpos_CB
+    sheet_option.Item(sheetn & ";merge_material") = UserForm2.merge_material_CB
+    sheet_option.Item(sheetn & ";otd_by_type") = UserForm2.otd_by_type_CB
+    sheet_option.Item(sheetn & ";add_row") = UserForm2.add_row_CB
+    sheet_option.Item(sheetn & ";ed_izm_km") = UserForm2.ed_izm_km_CB
+    sheet_option.Item(sheetn & ";separate_material") = UserForm2.separate_material_CB
+    sheet_option.Item(sheetn & ";show_type") = UserForm2.show_type_CB
+    sheet_option.Item(sheetn & ";show_qty_spec") = UserForm2.show_qty_spec
+    sheet_option.Item(sheetn & ";decode") = UserForm2.decode_CB
     SheetWriteOption = True
 End Function
 
@@ -6676,38 +6910,18 @@ Function Spec_POL(ByRef out_data As Variant) As Variant
         pos_out(j, 4) = Round_w(pol_perim / 1000, n_round_area)
         If InStr(type_pol, "I") Or InStr(type_pol, "V") Or InStr(type_pol, "X") Then isrim = isrim + 1
     Next j
-'    If (isrim - n_type_pol) < 3 Then
-'
-'        For j = 1 To n_type_pol
-'
-'        Next j
-'        For j = 1 To n_type_pol
-'
-'        Next j
-'
-'    End If
+    'TODO Добавить сортировку римских цифр
     Spec_POL = pos_out
 End Function
-'Function Rim2Arab(ByVal text As String) As Integer
-'    font_ar = Array(1, 4, 5, 9, 10, 40, 50, 90, 100, 400)
-'    font_rom = Array("I", "IV", "V", "IX", "X", "XL", "L", "XC", "C", "CD")
-'    rezult = ""
-'    L = UBound(font_ar)
-'    While Len(text) > 0
-'    End While
-'    Rim2Roman =
-'End Function
-'Function Arab2Rim(ByVal va As String) As Integer
-'    font_ar = Array(1, 4, 5, 9, 10, 40, 50, 90, 100, 400)
-'    font_rom = Array("I", "IV", "V", "IX", "X", "XL", "L", "XC", "C", "CD")
-'    rezult = ""
-'    L = UBound(font_ar)
-'    While Len(text) > 0
-'    End While
-'    Rim2Roman =
-'End Function
+
 Function Spec_Select(ByVal lastfilespec As String, ByVal suffix As String, Optional quiet As Boolean = False) As String
-    r = SheetWriteOption(lastfilespec, True)
+    r = INISet()
+    If SpecGetType(lastfilespec) = 7 Then
+        nm = Split(lastfilespec, "_")(0) & suffix
+    Else
+        nm = lastfilespec & suffix
+    End If
+    r = SheetWriteOption(nm)
     tt = ConvTxt2Num(UserForm2.Kzap.Text)
     If IsNumeric(tt) Then
         If tt > 1 And tt < 2 Then
@@ -6715,11 +6929,6 @@ Function Spec_Select(ByVal lastfilespec As String, ByVal suffix As String, Optio
         Else
             k_zap_total = 1
         End If
-    End If
-    If SpecGetType(lastfilespec) = 7 Then
-        nm = Split(lastfilespec, "_")(0) & suffix
-    Else
-        nm = lastfilespec & suffix
     End If
     If Not SheetCheckName(nm) Then
         r = LogWrite(lastfilespec, suffix, "Ошибка имени листа или файла")
@@ -6758,13 +6967,15 @@ Function Spec_Select(ByVal lastfilespec As String, ByVal suffix As String, Optio
             If UserForm2.otd_by_type_CB.Value Then
                 zone_el = ArraySelectParam(all_data(1), "ЗОНА", col_s_type)
                 flag = Empty
-                For jj = LBound(zone_el, 1) To UBound(zone_el, 1)
-                    is_type_otd = zone_el(1, col_s_type_otd)
-                    If is_type_otd = 0 Or is_type_otd = "" Then
-                        flag = zone_el(1, col_s_numb_zone)
-                        jj = UBound(zone_el, 1)
-                    End If
-                Next jj
+                If Not IsEmpty(zone_el) Then
+                    For jj = LBound(zone_el, 1) To UBound(zone_el, 1)
+                        is_type_otd = zone_el(1, col_s_type_otd)
+                        If is_type_otd = 0 Or is_type_otd = "" Then
+                            flag = zone_el(1, col_s_numb_zone)
+                            jj = UBound(zone_el, 1)
+                        End If
+                    Next jj
+                End If
                 If IsEmpty(flag) Then
                     pos_out = Spec_VED_GR(all_data)
                 Else
@@ -6794,8 +7005,10 @@ Function Spec_Select(ByVal lastfilespec As String, ByVal suffix As String, Optio
         r = FormatTable(nm, pos_out)
         r = FormatTable(nm)
         r = LogWrite(lastfilespec, suffix, "ОК")
-        r = SheetIndex()
-        Worksheets(nm).Activate
+        If inx_on_new Then
+            r = SheetIndex()
+            Worksheets(nm).Activate
+        End If
         Spec_Select = nm
     Else
         r = LogWrite(lastfilespec, suffix, "Данные отсутвуют")
@@ -6803,7 +7016,7 @@ Function Spec_Select(ByVal lastfilespec As String, ByVal suffix As String, Optio
     End If
 End Function
 
-Function VedAddArea(ByRef zone As Variant, ByRef materials As Variant, ByVal mat_draft As String, ByVal mat_fin As String, ByVal num As String, ByVal area_mat As Double, Optional ByVal perim As Double = 0, Optional ByVal h_pan As Double = 0) As Integer
+Function VedAddArea(ByRef zone As Variant, ByRef materials As Variant, ByVal mat_draft As String, ByVal mat_fin As String, ByVal num As String, ByVal area_mat As Double, ByVal fin_str As String, ByVal rules_mod As Variant, Optional ByVal perim As Double = 0, Optional ByVal h_pan As Double = 0) As Integer
     If UserForm2.separate_material_CB.Value Then
         razd = ";"
         mat_fin = Trim(mat_fin)
@@ -6813,6 +7026,7 @@ Function VedAddArea(ByRef zone As Variant, ByRef materials As Variant, ByVal mat
     End If
     mat_fin = Replace(mat_fin, "@", ";a@")
     If Trim(mat_fin) = "0" Then mat_fin = "---"
+    mat_draft = VedModMat(Replace(mat_fin, fin_str, ""), mat_draft, rules_mod)
     mat_draft = Trim(mat_draft)
     mat_draft = "b@" & Replace(mat_draft, razd, ";b@")
     mat_draft = Replace(mat_draft, "@ ", "@")
@@ -6955,6 +7169,7 @@ Function Spec_VED_GR(ByRef all_data As Variant) As Variant
     fin_str = "!1A"
     out_data = all_data(1)
     rules = all_data(2)
+    rules_mod = all_data(3)
     Erase all_data
     If IsEmpty(out_data) Or IsEmpty(rules) Then
         Spec_VED_GR = Empty
@@ -7027,15 +7242,17 @@ Function Spec_VED_GR(ByRef all_data As Variant) As Variant
                 If h_pan > 0.001 Then is_pan = True
                 tot_area_column = tot_area_column + column_area + column_pan_area
                 colm = VedNameMat("Колонны", "ЖБ", rules)
+                colm_с = VedModMat(Replace(fin_column, fin_str, ""), colm, rules_mod)
+                colm_p = VedModMat(Replace(fin_pan, fin_str, ""), colm, rules_mod)
                 If column_area > 0.001 Then
-                    all_name_mat = Split(Replace(colm + ";" + fin_column, "@", ";"), ";")
+                    all_name_mat = Split(Replace(colm_с + ";" + fin_column, "@", ";"), ";")
                     For ni = 0 To UBound(all_name_mat)
                         mat = Trim(all_name_mat(ni))
                         materials_by_type.Item(type_name + ";column;" + mat) = materials_by_type.Item(type_name + ";column;" + mat) + column_area
                     Next ni
                 End If
                 If column_pan_area > 0.001 Then
-                    all_name_mat = Split(Replace(colm + ";" + fin_pan, "@", ";"), ";")
+                    all_name_mat = Split(Replace(colm_p + ";" + fin_pan, "@", ";"), ";")
                     For ni = 0 To UBound(all_name_mat)
                         mat = Trim(all_name_mat(ni))
                         materials_by_type.Item(type_name + ";pan;" + mat) = materials_by_type.Item(type_name + ";pan;" + mat) + column_pan_area
@@ -7072,39 +7289,67 @@ Function Spec_VED_GR(ByRef all_data As Variant) As Variant
                         pan_c_area = (wall_c_len - door_c_len) * h_pan
                         wall_c_area = wall_c_area - pan_c_area
                         tot_area_column = tot_area_column + pan_c_area + wall_c_area
-                        all_name_mat = Split(Replace(w, "@", ";"), ";")
-                        For ni = 0 To UBound(all_name_mat)
-                            mat = Trim(all_name_mat(ni))
-                            If wall_c_area > 0.001 Then materials_by_type.Item(type_name + ";column;" + mat) = materials_by_type.Item(type_name + ";column;" + mat) + wall_c_area
-                            If pan_c_area > 0.001 Then materials_by_type.Item(type_name + ";pan;" + mat) = materials_by_type.Item(type_name + ";pan;" + mat) + pan_c_area
-                            If wall_area > 0.001 Then materials_by_type.Item(type_name + ";wall;" + mat) = materials_by_type.Item(type_name + ";wall;" + mat) + wall_area
-                            If pan_area > 0.001 Then materials_by_type.Item(type_name + ";pan;" + mat) = materials_by_type.Item(type_name + ";pan;" + mat) + pan_area
-                        Next ni
+                        
+                        'Стены
                         If wall_area > 0.001 Then
-                            all_name_mat = Split(Replace(fin_wall, "@", ";"), ";")
-                            For ni = 0 To UBound(all_name_mat)
-                                mat = Trim(all_name_mat(ni))
+                            'Черновая отделка с учётом исключений
+                            all_name_mat_w = Split(Replace(VedModMat(Replace(fin_wall, fin_str, ""), w, rules_mod), "@", ";"), ";")
+                            For ni = 0 To UBound(all_name_mat_w)
+                                mat = Trim(all_name_mat_w(ni))
+                                materials_by_type.Item(type_name + ";wall;" + mat) = materials_by_type.Item(type_name + ";wall;" + mat) + wall_area
+                            Next ni
+                            'Чистовая отделка
+                            all_name_mat_w = Split(Replace(fin_wall, "@", ";"), ";")
+                            For ni = 0 To UBound(all_name_mat_w)
+                                mat = Trim(all_name_mat_w(ni))
                                 materials_by_type.Item(type_name + ";wall;" + mat) = materials_by_type.Item(type_name + ";wall;" + mat) + wall_area
                             Next ni
                         End If
+                        
+                        'Панели
                         If pan_area > 0.001 Then
-                            all_name_mat = Split(Replace(fin_pan, "@", ";"), ";")
-                            For ni = 0 To UBound(all_name_mat)
-                                mat = Trim(all_name_mat(ni))
+                            'Черновая отделка с учётом исключений
+                            all_name_mat_p = Split(Replace(VedModMat(Replace(fin_pan, fin_str, ""), w, rules_mod), "@", ";"), ";")
+                            For ni = 0 To UBound(all_name_mat_p)
+                                mat = Trim(all_name_mat_p(ni))
+                                materials_by_type.Item(type_name + ";pan;" + mat) = materials_by_type.Item(type_name + ";pan;" + mat) + pan_area
+                            Next ni
+                            'Чистовая отделка
+                            all_name_mat_p = Split(Replace(fin_pan, "@", ";"), ";")
+                            For ni = 0 To UBound(all_name_mat_p)
+                                mat = Trim(all_name_mat_p(ni))
                                 materials_by_type.Item(type_name + ";pan;" + mat) = materials_by_type.Item(type_name + ";pan;" + mat) + pan_area
                             Next ni
                         End If
+                        
+                        'Колонны, смоделированные стенами
                         If wall_c_area > 0.001 Then
-                            all_name_mat = Split(Replace(fin_column, "@", ";"), ";")
-                            For ni = 0 To UBound(all_name_mat)
-                                mat = Trim(all_name_mat(ni))
+                            'Черновая отделка с учётом исключений
+                            all_name_mat_c = Split(Replace(VedModMat(Replace(fin_column, fin_str, ""), w, rules_mod), "@", ";"), ";")
+                            For ni = 0 To UBound(all_name_mat_c)
+                                mat = Trim(all_name_mat_c(ni))
+                                materials_by_type.Item(type_name + ";column;" + mat) = materials_by_type.Item(type_name + ";column;" + mat) + wall_c_area
+                            Next ni
+                            'Чистовая отделка
+                            all_name_mat_c = Split(Replace(fin_column, "@", ";"), ";")
+                            For ni = 0 To UBound(all_name_mat_c)
+                                mat = Trim(all_name_mat_c(ni))
                                 materials_by_type.Item(type_name + ";column;" + mat) = materials_by_type.Item(type_name + ";column;" + mat) + wall_c_area
                             Next ni
                         End If
+                        
+                        'Панели на колоннах, смоделированных стенами
                         If pan_c_area > 0.001 Then
-                            all_name_mat = Split(Replace(fin_pan, "@", ";"), ";")
-                            For ni = 0 To UBound(all_name_mat)
-                                mat = Trim(all_name_mat(ni))
+                            'Черновая отделка с учётом исключений
+                            all_name_mat_p = Split(Replace(VedModMat(Replace(fin_pan, fin_str, ""), w, rules_mod), "@", ";"), ";")
+                            For ni = 0 To UBound(all_name_mat_p)
+                                mat = Trim(all_name_mat_p(ni))
+                                materials_by_type.Item(type_name + ";pan;" + mat) = materials_by_type.Item(type_name + ";pan;" + mat) + pan_area
+                            Next ni
+                            'Чистовая отделка
+                            all_name_mat_p = Split(Replace(fin_pan, "@", ";"), ";")
+                            For ni = 0 To UBound(all_name_mat_p)
+                                mat = Trim(all_name_mat_p(ni))
                                 materials_by_type.Item(type_name + ";pan;" + mat) = materials_by_type.Item(type_name + ";pan;" + mat) + pan_c_area
                             Next ni
                         End If
@@ -7130,6 +7375,7 @@ Function Spec_VED_GR(ByRef all_data As Variant) As Variant
                                 area_total_pot = area_total_pot + pot_area
                             Next
                         Next
+                        'VedModMat(Replace(fin_pot, fin_str, ""), w, rules_mod)
                         all_name_mat = Split(Replace(fin_pot, "@", ";"), ";")
                         For ni = 0 To UBound(all_name_mat)
                             mat = Trim(all_name_mat(ni))
@@ -7383,6 +7629,7 @@ Function Spec_VED(ByRef all_data As Variant) As Variant
     fin_str = "!!AA_"
     out_data = all_data(1)
     rules = all_data(2)
+    rules_mod = all_data(3)
     Erase all_data
     If IsEmpty(out_data) Or IsEmpty(rules) Then
         Spec_VED = Empty
@@ -7456,10 +7703,10 @@ Function Spec_VED(ByRef all_data As Variant) As Variant
             name_mat_column = "ЖБ"
             colmn = VedNameMat("Колонны", name_mat_column, rules)
             If column_area > 0.001 Then
-                n_row_c = n_row_c + VedAddArea(zone, materials, colmn, fin_column, num + ";c", column_area)
+                n_row_c = n_row_c + VedAddArea(zone, materials, colmn, fin_column, num + ";c", column_area, fin_str, rules_mod)
                 is_column = True
             End If
-            If column_pan_area > 0.001 Then n_row_pn = n_row_pn + VedAddArea(zone, materials, colmn, fin_pan, num + ";pn", column_pan_area, 0, h_pan)
+            If column_pan_area > 0.001 Then n_row_pn = n_row_pn + VedAddArea(zone, materials, colmn, fin_pan, num + ";pn", column_pan_area, fin_str, rules_mod, 0, h_pan)
             '----------------------
             '        СТЕНЫ
             '----------------------
@@ -7489,15 +7736,15 @@ Function Spec_VED(ByRef all_data As Variant) As Variant
                     wall_c_area = wall_c_area - pan_c_area
                     pan_area = (wall_len - door_len) * h_pan
                     wall_area = wall_area - pan_area
-                    result = VedAddArea(zone, materials, w, fin_column, num + ";c", wall_c_area)
+                    result = VedAddArea(zone, materials, w, fin_column, num + ";c", wall_c_area, fin_str, rules_mod)
                     n_row_c = n_row_c + result
-                    result = VedAddArea(zone, materials, w, fin_wall, num + ";w", wall_area)
+                    result = VedAddArea(zone, materials, w, fin_wall, num + ";w", wall_area, fin_str, rules_mod)
                     n_row_w = n_row_w + result
-                    result = VedAddArea(zone, materials, w, fin_pan, num + ";pn", pan_area + pan_c_area, 0, h_pan)
+                    result = VedAddArea(zone, materials, w, fin_pan, num + ";pn", pan_area + pan_c_area, fin_str, rules_mod, 0, h_pan)
                     n_row_pn = n_row_pn + result
                 Next
             Else
-                result = VedAddArea(zone, materials, "", fin_wall, num + ";w", wall_area)
+                result = VedAddArea(zone, materials, "", fin_wall, num + ";w", wall_area, fin_str, rules_mod)
                 n_row_w = n_row_w + result
             End If
             If wall_c_area > 0.001 Then is_column = True
@@ -7521,17 +7768,17 @@ Function Spec_VED(ByRef all_data As Variant) As Variant
                             pot_perim = pot_perim + pot_by_type(i, col_s_perim_pol) / 1000
                             area_total_pot = area_total_pot + pot_area
                         Next
-                        n_row_pot = n_row_pot + VedAddArea(zone, materials, p, fin_pot, num + ";pot", pot_area, pot_perim)
+                        n_row_pot = n_row_pot + VedAddArea(zone, materials, p, fin_pot, num + ";pot", pot_area, fin_str, rules_mod, pot_perim)
                     Next
                     diff_area_pot = area_total - area_total_pot
                     If Abs(diff_area_pot) > 0.1 Then
                         r = LogWrite("Разница площади помещения " & area_total & " и потолка " & area_total_pot & " в помещении " & num, "Ошибка", diff_area_pot)
                     End If
                 Else
-                    n_row_pot = n_row_pot + VedAddArea(zone, materials, "", fin_pot, num + ";pot", area_total, perim_total)
+                    n_row_pot = n_row_pot + VedAddArea(zone, materials, "", fin_pot, num + ";pot", area_total, fin_str, rules_mod, perim_total)
                 End If
             Else
-                n_row_pot = n_row_pot + VedAddArea(zone, materials, "", fin_pot, num + ";pot", area_total, perim_total)
+                n_row_pot = n_row_pot + VedAddArea(zone, materials, "", fin_pot, num + ";pot", area_total, fin_str, rules_mod, perim_total)
             End If
             '----------------------
             '        ПОЛЫ
@@ -7560,7 +7807,7 @@ Function Spec_VED(ByRef all_data As Variant) As Variant
     If is_column Then n_col_out = n_col_out + 2
     n_un_mat = (materials.Count / 2)
     If (n_un_mat - Int(n_un_mat)) <> 0 Then MsgBox ("Ошибка записи в словарь")
-    Dim pos_out: ReDim pos_out(3 + n_row_tot + n_un_mat, n_col_out)
+    Dim pos_out: ReDim pos_out(3 + n_row_tot + n_un_mat + 60, n_col_out)
     pos_out(1, 1) = "Номер помещения"
     pos_out(1, 2) = "Наименование помещения"
     For i = 3 To n_col_out - 1
@@ -7700,6 +7947,7 @@ Function Spec_VED(ByRef all_data As Variant) As Variant
             pos_out(n_row, 4) = Round_w(materials.Item(mat + ";a") * k_zap_total, n_round_area)
         End If
     Next
+    pos_out = ArrayRedim(pos_out, n_row)
     r = LogWrite("Ведомость отделки", "Итог", CStr(summ_area_pot))
     Spec_VED = pos_out
 End Function
@@ -7764,12 +8012,29 @@ Function VedGetRules(ByVal nm As String) As Variant
         r = FormatClear()
         r = FormatSpec_Rule(Data_out)
         Dim rules: ReDim rules(n_row - 1, 3)
+        Dim rules_mod: ReDim rules_mod(n_row - 1, 3)
+        n_rules = 0
+        n_rules_mod = 0
         For i = 2 To n_row
-            rules(i - 1, 1) = Data_out(i, 1)
-            rules(i - 1, 2) = Data_out(i, 2)
-            rules(i - 1, 3) = Data_out(i, 3)
+            If Not IsEmpty(Data_out(i, 1)) And Len(Data_out(i, 1)) > 1 And Left(Data_out(i, 1), 2) <> "!!" Then
+                If InStr(Data_out(i, 1), "Исключить") = 0 And InStr(Data_out(i, 1), "Добавить") = 0 Then
+                    n_rules = n_rules + 1
+                    rules(n_rules, 1) = Data_out(i, 1)
+                    rules(n_rules, 2) = Data_out(i, 2)
+                    rules(n_rules, 3) = Data_out(i, 3)
+                Else
+                    n_rules_mod = n_rules_mod + 1
+                    rules_mod(n_rules_mod, 1) = Data_out(i, 1)
+                    rules_mod(n_rules_mod, 1) = Replace(rules_mod(n_rules_mod, 1), "Исключить", "-")
+                    rules_mod(n_rules_mod, 1) = Replace(rules_mod(n_rules_mod, 1), "Добавить", "+")
+                    rules_mod(n_rules_mod, 2) = Data_out(i, 2)
+                    rules_mod(n_rules_mod, 3) = Data_out(i, 3)
+                End If
+            End If
         Next i
-        VedGetRules = rules
+        rules = ArrayRedim(rules, n_rules)
+        rules_mod = ArrayRedim(rules_mod, n_rules_mod)
+        VedGetRules = Array(rules, rules_mod)
         Erase rules
     Else
         VedGetRules = Empty
@@ -7778,24 +8043,40 @@ Function VedGetRules(ByVal nm As String) As Variant
     End If
 End Function
 
+Function VedModMat(ByVal fin_material As String, ByVal all_material As String, ByRef rules_mod As Variant) As String
+    If Not IsEmpty(rules_mod) Then
+        For i = 1 To UBound(rules_mod, 1)
+            If fin_material = rules_mod(i, 2) Then
+                If rules_mod(i, 1) = "-" Then all_material = Replace(all_material, rules_mod(i, 3), "")
+                If rules_mod(i, 1) = "+" Then all_material = all_material + ";" + rules_mod(i, 3)
+            End If
+        Next i
+        all_material = Replace(all_material, "; ;", ";")
+    End If
+    VedModMat = all_material
+End Function
+
 Function VedNameMat(ByVal layer As String, ByVal material As String, ByRef rules As Variant) As String
     name_m = ""
     flag = 0
     For i = 1 To UBound(rules, 1)
         m = rules(i, 1)
         L = rules(i, 2)
-        If layer = L Or layer = "" Then
-            If m = material Then
-                name_m = rules(i, 3)
-                flag = flag + 1
-            Else
-                If InStr(material, m) > 0 Then
-                    name_m = rules(i, 3)
-                    flag = flag + 1
-                End If
-            End If
+        If (layer = L Or layer = "") And m = material Then
+            name_m = rules(i, 3)
+            flag = flag + 1
         End If
     Next i
+    If flag < 1 Then
+        For i = 1 To UBound(rules, 1)
+            m = rules(i, 1)
+            L = rules(i, 2)
+            If (layer = L Or layer = "") And InStr(material, m) > 0 Then
+                name_m = rules(i, 3)
+                flag = flag + 1
+            End If
+        Next i
+    End If
     If flag = 1 Then
         If InStr(name_m, "ез отделк") > 0 Then
             If InStr(name_m, ";") > 0 Then name_m = Split(name_m, ";")(0)
@@ -7814,17 +8095,28 @@ Function VedNewListRules(ByVal nm As String) As Boolean
     ThisWorkbook.Worksheets.Add.Name = nm & "_правила"
     Worksheets(nm & "_правила").Move After:=ThisWorkbook.Sheets(ThisWorkbook.Sheets.Count)
     Worksheets(nm & "_правила").Activate
-    Cells(1, 1).Value = "Имя многослойной конструкции (целиком или часть имени)"
+    Cells(1, 1).Value = "Имя многослойной конструкции (целиком или часть имени, строки с !! не учитываются)"
     Cells(1, 2).Value = "Слой"
     Cells(1, 3).Value = "Черновая отделка (разделитель ';')"
     
-    Cells(2, 1).Value = "ЖБ"
-    Cells(2, 2).Value = "Колонны"
-    Cells(2, 3).Value = "Затирка; Шпатлёвка"
+    Cells(2, 1).Value = "!!Исключить"
+    Cells(2, 2).Value = "Облицовка керам. плиткой"
+    Cells(2, 3).Value = "Шпатлёвка"
     
-    Cells(3, 1).Value = "П1"
-    Cells(3, 2).Value = "Потолок"
-    Cells(3, 3).Value = "Армстронг; Без отделки"
+    Cells(3, 1).Value = "!!Добавить"
+    Cells(3, 2).Value = "Облицовка керам. плиткой"
+    Cells(3, 3).Value = "Обработка бетоноконтактом"
+    
+    Cells(5, 1).Value = "ЖБ"
+    Cells(5, 2).Value = "Колонны"
+    Cells(5, 3).Value = "Затирка; Шпатлёвка"
+    
+    Cells(6, 1).Value = "!!П1"
+    Cells(6, 2).Value = "Потолок"
+    Cells(6, 3).Value = "Армстронг; Без отделки"
+    
+
+    
     
     Columns("A:A").ColumnWidth = 50
     Columns("B:B").ColumnWidth = 30
@@ -7840,7 +8132,8 @@ Function VedRead(ByVal lastfilespec As String) As Variant
         VedRead = Empty
         Exit Function
     End If
-    rules = VedGetRules(lastfilespec)
+    rules = VedGetRules(lastfilespec)(1)
+    rules_mod = VedGetRules(lastfilespec)(2)
     Set add_rule = CreateObject("Scripting.Dictionary")
     add_rule.comparemode = 1
     If IsEmpty(rules) Or IsEmpty(out_data) Then
@@ -7902,14 +8195,16 @@ Function VedRead(ByVal lastfilespec As String) As Variant
             End If
         Next j
     Next i
-    Dim pos_out: ReDim pos_out(2)
+    Dim pos_out: ReDim pos_out(3)
     If add_rule.Count = 0 Then
         pos_out(1) = out_data
         pos_out(2) = rules
+        pos_out(3) = rules_mod
     Else
         r = VedAddRules(lastfilespec, add_rule.keys)
         pos_out(1) = Empty
         pos_out(2) = Empty
+        pos_out(3) = Empty
     End If
     VedRead = pos_out
 End Function
