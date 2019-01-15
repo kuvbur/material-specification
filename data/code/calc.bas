@@ -2149,6 +2149,7 @@ Function FormatManual(ByVal nm As String) As Boolean
     
     With Range(r_prim).Validation
         .Delete
+        On Error Resume Next
         .Add Type:=xlValidateList, AlertStyle:=xlValidAlertWarning, Operator:=xlBetween, Formula1:="=" & pr_adress.Item("Примечания")
         .IgnoreBlank = True
         .InCellDropdown = True
