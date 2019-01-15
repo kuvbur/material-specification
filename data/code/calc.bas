@@ -1,7 +1,7 @@
 Attribute VB_Name = "calc"
 Option Compare Text
 Option Base 1
-Public Const macro_version As String = "3.28"
+Public Const macro_version As String = "3.29"
 '-------------------------------------------------------
 'Типы элементов (столбец col_type_el)
 Public Const t_arm As Integer = 10
@@ -3968,9 +3968,29 @@ Function ManualSpec(ByVal nm As String, Optional ByVal add_array As Variant) As 
         spec_izd_size = SheetGetSize(spec_izd_sheet)
         n_izd_row = spec_izd_size(1)
         spec_izd = spec_izd_sheet.Range(spec_izd_sheet.Cells(3, 1), spec_izd_sheet.Cells(n_izd_row, max_col_man))
-        spec = ArrayCombine(spec, spec_izd)
-        n_row = n_row + UBound(spec_izd, 1)
-        Erase spec_izd
+        unic_pos_mun = ArrayUniqValColumn(spec, col_man_pos)
+        unic_subpos_izd = ArrayUniqValColumn(spec_izd, col_man_subpos)
+        For i = 1 To UBound(unic_subpos_izd)
+            flag_use = False
+            For j = 1 To UBound(unic_pos_mun)
+                If unic_subpos_izd(i) = unic_pos_mun(j) Then
+                    flag_use = True
+                    Exit For
+                End If
+            Next j
+            If flag_use = False Then
+                unic_subpos_izd(i) = Empty
+                t = 1
+            End If
+        Next i
+        For Each subpos_izd In unic_subpos_izd
+            If Not IsEmpty(subpos_izd) Then
+                subpos_spec_izd = ArraySelectParam(spec_izd, subpos_izd, col_man_subpos)
+                spec = ArrayCombine(spec, subpos_spec_izd)
+                n_row = n_row + UBound(subpos_spec_izd, 1)
+            End If
+        Next
+        Erase spec_izd, subpos_spec_izd, unic_pos_mun, unic_subpos_izd
     End If
     Dim pos_out: ReDim pos_out(n_row - istart, max_col): n_row_out = 0
     Dim param

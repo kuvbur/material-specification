@@ -2,7 +2,7 @@ Attribute VB_Name = "update"
 Option Compare Text
 Option Base 1
 
-Public Const update_version As String = "3.1"
+Public Const update_version As String = "3.2"
 Function CheckVersion()
     If Ping() And check_version Then
         msg_upd = ""
