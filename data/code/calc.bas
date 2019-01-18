@@ -1,7 +1,7 @@
 Attribute VB_Name = "calc"
 Option Compare Text
 Option Base 1
-Public Const macro_version As String = "3.29"
+Public Const macro_version As String = "3.30"
 '-------------------------------------------------------
 'Типы элементов (столбец col_type_el)
 Public Const t_arm As Integer = 10
@@ -16,6 +16,7 @@ Public Const t_perem_m As Integer = 70
 Public Const t_perem As Integer = 71
 Public Const t_error As Integer = -1 'Ошибка распознавания типов
 Public Const t_sys As Integer = -10 'Вспомогательный тип
+Public Const t_syserror As Integer = -20 'Строки с ошибками
 'Столбцы общие
 Public Const col_marka As Integer = 1
 Public Const col_sub_pos As Integer = 2
@@ -1987,7 +1988,9 @@ Function FormatManual(ByVal nm As String) As Boolean
     'Наведение красоты на листе с ручной спецификацией
     If IsEmpty(pr_adress) Then r = ReadPrSortament()
     Set Data_out = Application.ThisWorkbook.Sheets(nm)
-    nrow = SheetGetSize(Data_out)(1)
+    size_sh = SheetGetSize(Data_out)
+    nrow = size_sh(1)
+    nsols = size_sh(2)
     'Имена диапазонов для каждого столбца
     r_all = FormatManuallitera(1) & ":" & FormatManuallitera(max_col_man)
     r_subpos = FormatManualrange(col_man_subpos, nrow)
@@ -2085,6 +2088,21 @@ Function FormatManual(ByVal nm As String) As Boolean
     Data_out.Cells(2, col_man_ank).ColumnWidth = 8
     Data_out.Cells(2, col_man_nahl).ColumnWidth = 8
     Data_out.Cells(2, col_man_dgib).ColumnWidth = 8
+    
+    
+    Range(r_all).FormatConditions.Add Type:=xlExpression, Formula1:="=ЕОШИБКА(A1)"
+    Range(r_all).FormatConditions(Range(r_all).FormatConditions.Count).SetFirstPriority
+    With Range(r_all).FormatConditions(1).Font
+        .Color = -6684826
+        .TintAndShade = 0
+    End With
+    With Range(r_all).FormatConditions(1).Interior
+        .PatternColorIndex = xlAutomatic
+        .Color = 10040319
+        .TintAndShade = 0
+    End With
+    Range(r_all).FormatConditions(1).StopIfTrue = False
+
     
     'Создаём столбец с марками элементов и добавим раскрывающийся список
     sheet_subpos_name = Left(nm, Len(nm) - 5) & "_поз"
@@ -3663,169 +3681,180 @@ Function ManualCheck(nm) As Boolean
     For i = 3 To n_row
         row = ArrayRow(spec, i)
         type_el = ManualType(row)
-        subpos = row(col_man_subpos)  ' Марка элемента
-        pos = row(col_man_pos)  ' Поз.
-        obozn = row(col_man_obozn) ' Обозначение
-        naen = row(col_man_naen) ' Наименование
-        qty = row(col_man_qty) ' Кол-во на один элемент
-        Weight = row(col_man_weight) ' Масса, кг
-        prim = row(col_man_prim) ' Примечание (на лист)
-        
-        If Not IsNumeric(qty) And Not IsEmpty(qty) Then
-            qty = ConvTxt2Num(qty)
-            If Not IsNumeric(qty) Then
-                r = ManualCeilAlert(Data_out.Cells(i, col_man_qty), "Проверьте разделитель")
-                n_err = n_err + 1
-            Else
-                r = ManualCeilSetValue(Data_out.Cells(i, col_man_qty), qty, "check")
+        If type_el <> t_syserror Then
+            subpos = row(col_man_subpos)  ' Марка элемента
+            pos = row(col_man_pos)  ' Поз.
+            obozn = row(col_man_obozn) ' Обозначение
+            naen = row(col_man_naen) ' Наименование
+            qty = row(col_man_qty) ' Кол-во на один элемент
+            Weight = row(col_man_weight) ' Масса, кг
+            prim = row(col_man_prim) ' Примечание (на лист)
+            
+            If Not IsNumeric(qty) And Not IsEmpty(qty) Then
+                qty = ConvTxt2Num(qty)
+                If Not IsNumeric(qty) Then
+                    r = ManualCeilAlert(Data_out.Cells(i, col_man_qty), "Проверьте разделитель")
+                    n_err = n_err + 1
+                Else
+                    r = ManualCeilSetValue(Data_out.Cells(i, col_man_qty), qty, "check")
+                End If
             End If
-        End If
-
-        Select Case type_el
-            Case t_sys 'Отмечаем вспомогательные строки
-                If InStr(obozn, "сновной") > 0 And InStr(naen, "етон") > 0 And InStr(subpos, "!!") > 0 Then
-                    r = ManualCeilAlert(Data_out.Cells(i, col_man_subpos), "Впишите марку элемента")
-                    n_err = n_err + 1
-                End If
-                If InStr(obozn, "ейсмика") > 0 Or InStr(naen, "ейсмика") > 0 And InStr(subpos, "!!") > 0 Then
-                    r = ManualCeilAlert(Data_out.Cells(i, col_man_subpos), "Впишите марку элемента")
-                    n_err = n_err + 1
-                End If
-                If InStr(obozn, "сновной") > 0 And InStr(naen, "етон") > 0 And InStr(subpos, "!!") = 0 Then ank_subpos.Item(subpos & "_бет") = Trim(Replace(Replace(naen, "Бетон", ""), "бетон", ""))
-                If InStr(obozn, "ейсмика") > 0 Or InStr(naen, "ейсмика") > 0 And InStr(subpos, "!!") = 0 Then ank_subpos.Item(subpos & "_kseism") = 1.3
-                With Data_out.Range(Data_out.Cells(i, 1), Data_out.Cells(i, max_col_man)).Interior
-                    .Pattern = xlSolid
-                    .PatternColorIndex = xlAutomatic
-                    .Color = XlRgbColor.rgbLightGrey
-                    .TintAndShade = 0
-                    .PatternTintAndShade = 0
-                End With
-            Case t_arm 'Правила для арамтуры
-                Length = row(col_man_length) ' Арматура
-                diametr = row(col_man_diametr) ' Диаметр
-                klass = row(col_man_klass) ' Класс
-                'Массу п.м. посчитаем автоматом
-                Data_out.Cells(i, col_man_weight).Value = GetWeightForDiametr(diametr, klass)
-                Data_out.Cells(i, col_man_weight).Interior.Color = XlRgbColor.rgbLightGrey
-                If qty = Empty And prim <> "п.м." Then
-                    r = ManualCeilAlert(Data_out.Cells(i, col_man_qty), "Необходимо указать количество")
-                    n_err = n_err + 1
-                End If
-                If Length > 11700 And prim <> "п.м." Then
-                    r = ManualCeilAlert(Data_out.Cells(i, col_man_length), "Стержни длиной выше 11,7 должны идти в п.м.")
-                    n_err = n_err + 1
-                End If
-                If Length < 100 Then
-                    r = ManualCeilAlert(Data_out.Cells(i, col_man_length), "Подозрительно малая длина.")
-                    n_err = n_err + 1
-                End If
-                If InStr(naen, "жатая") > 0 Then ank_subpos.Item(subpos & pos & "тип") = "сжатая"
-                If InStr(naen, "астянутая") > 0 Then ank_subpos.Item(subpos & pos & "тип") = "растянутая"
-                If InStr(naen, "войная") > 0 Then ank_subpos.Item(subpos & pos & "тип") = "двойная"
-            Case t_mat
-                If (prim <> "кв.м." And prim <> "куб.м.") Then
-                    r = ManualCeilAlert(Data_out.Cells(i, col_man_prim), "Проверьте единицы измерения.")
-                    n_err = n_err + 1
-                End If
-                If InStr(naen, "Бетон") <> 0 Then
-                    With Data_out.Range(Data_out.Cells(i, 3), Data_out.Cells(i, col_man_prim)).Interior
-                        .Pattern = xlSolid
-                        .PatternColorIndex = xlAutomatic
-                        .Color = XlRgbColor.rgbLightBlue
-                        .TintAndShade = 0
-                        .PatternTintAndShade = 0
-                    End With
-                    If IsEmpty(obozn) Then
-                        r = ManualCeilAlert(Data_out.Cells(i, col_man_obozn), "Отсутствует ГОСТ на бетон")
+    
+            Select Case type_el
+                Case t_sys 'Отмечаем вспомогательные строки
+                    If InStr(obozn, "сновной") > 0 And InStr(naen, "етон") > 0 And InStr(subpos, "!!") > 0 Then
+                        r = ManualCeilAlert(Data_out.Cells(i, col_man_subpos), "Впишите марку элемента")
                         n_err = n_err + 1
                     End If
-                    If prim <> "куб.м." Then
-                        r = ManualCeilAlert(Data_out.Cells(i, col_man_obozn), "Бетон должен быть в куб.м.")
+                    If InStr(obozn, "ейсмика") > 0 Or InStr(naen, "ейсмика") > 0 And InStr(subpos, "!!") > 0 Then
+                        r = ManualCeilAlert(Data_out.Cells(i, col_man_subpos), "Впишите марку элемента")
                         n_err = n_err + 1
                     End If
-                    Data_out.Cells(i, col_man_weight).Value = "-"
-                End If
-            Case t_prokat
-                pr_length = row(col_man_pr_length) ' Прокат
-                pr_gost_pr = row(col_man_pr_gost_pr) ' ГОСТ профиля
-                pr_prof = row(col_man_pr_prof) ' Профиль
-                pr_type = row(col_man_pr_type) ' Тип конструкции
-                pr_st = row(col_man_pr_st) ' Сталь
-                If IsEmpty(pr_st) Then
-                    r = ManualCeilAlert(Data_out.Cells(i, col_man_pr_st), "Не указана марка стали.")
-                    n_err = n_err + 1
-                End If
-                Data_out.Cells(i, col_man_weight).Interior.Color = XlRgbColor.rgbLightGrey
-                If IsEmpty(qty) Then
-                    r = ManualCeilAlert(Data_out.Cells(i, col_man_qty), "Необходимо указать количество")
-                    n_err = n_err + 1
-                End If
-                
-                If InStr(Data_out.Cells(i, col_man_pr_gost_pr).Value, "Лист_") Then
-                    If GetAreaList(Cells(i, col_man_naen).Value) <> Cells(i, col_man_pr_length).Value Then
-                        Data_out.Cells(i, col_man_pr_length).Value = GetAreaList(Data_out.Cells(i, col_man_naen).Value)
-                    End If
-                    Data_out.Cells(i, col_man_pr_length).Interior.Color = XlRgbColor.rgbLightGrey
-                End If
-            Case t_subpos 'Правила для маркировки сборок
-                If qty = Empty Then
+                    If InStr(obozn, "сновной") > 0 And InStr(naen, "етон") > 0 And InStr(subpos, "!!") = 0 Then ank_subpos.Item(subpos & "_бет") = Trim(Replace(Replace(naen, "Бетон", ""), "бетон", ""))
+                    If InStr(obozn, "ейсмика") > 0 Or InStr(naen, "ейсмика") > 0 And InStr(subpos, "!!") = 0 Then ank_subpos.Item(subpos & "_kseism") = 1.3
                     With Data_out.Range(Data_out.Cells(i, 1), Data_out.Cells(i, max_col_man)).Interior
                         .Pattern = xlSolid
                         .PatternColorIndex = xlAutomatic
-                        .Color = XlRgbColor.rgbLightGreen
+                        .Color = XlRgbColor.rgbLightGrey
                         .TintAndShade = 0
                         .PatternTintAndShade = 0
                     End With
-                    suff = ""
-                    If IsEmpty(obozn) Then
-                        r = ManualCeilAlert(Data_out.Cells(i, col_man_obozn), "Нужна ссылка на лист")
+                Case t_arm 'Правила для арамтуры
+                    Length = row(col_man_length) ' Арматура
+                    diametr = row(col_man_diametr) ' Диаметр
+                    klass = row(col_man_klass) ' Класс
+                    'Массу п.м. посчитаем автоматом
+                    Data_out.Cells(i, col_man_weight).Value = GetWeightForDiametr(diametr, klass)
+                    Data_out.Cells(i, col_man_weight).Interior.Color = XlRgbColor.rgbLightGrey
+                    If qty = Empty And prim <> "п.м." Then
+                        r = ManualCeilAlert(Data_out.Cells(i, col_man_qty), "Необходимо указать количество")
                         n_err = n_err + 1
                     End If
-                Else
+                    If Length > 11700 And prim <> "п.м." Then
+                        r = ManualCeilAlert(Data_out.Cells(i, col_man_length), "Стержни длиной выше 11,7 должны идти в п.м.")
+                        n_err = n_err + 1
+                    End If
+                    If Length < 100 Then
+                        r = ManualCeilAlert(Data_out.Cells(i, col_man_length), "Подозрительно малая длина.")
+                        n_err = n_err + 1
+                    End If
+                    If InStr(naen, "жатая") > 0 Then ank_subpos.Item(subpos & pos & "тип") = "сжатая"
+                    If InStr(naen, "астянутая") > 0 Then ank_subpos.Item(subpos & pos & "тип") = "растянутая"
+                    If InStr(naen, "войная") > 0 Then ank_subpos.Item(subpos & pos & "тип") = "двойная"
+                Case t_mat
+                    If (prim <> "кв.м." And prim <> "куб.м.") Then
+                        r = ManualCeilAlert(Data_out.Cells(i, col_man_prim), "Проверьте единицы измерения.")
+                        n_err = n_err + 1
+                    End If
+                    If InStr(naen, "Бетон") <> 0 Then
+                        With Data_out.Range(Data_out.Cells(i, 3), Data_out.Cells(i, col_man_prim)).Interior
+                            .Pattern = xlSolid
+                            .PatternColorIndex = xlAutomatic
+                            .Color = XlRgbColor.rgbLightBlue
+                            .TintAndShade = 0
+                            .PatternTintAndShade = 0
+                        End With
+                        If IsEmpty(obozn) Then
+                            r = ManualCeilAlert(Data_out.Cells(i, col_man_obozn), "Отсутствует ГОСТ на бетон")
+                            n_err = n_err + 1
+                        End If
+                        If prim <> "куб.м." Then
+                            r = ManualCeilAlert(Data_out.Cells(i, col_man_obozn), "Бетон должен быть в куб.м.")
+                            n_err = n_err + 1
+                        End If
+                        Data_out.Cells(i, col_man_weight).Value = "-"
+                    End If
+                Case t_prokat
+                    pr_length = row(col_man_pr_length) ' Прокат
+                    pr_gost_pr = row(col_man_pr_gost_pr) ' ГОСТ профиля
+                    pr_prof = row(col_man_pr_prof) ' Профиль
+                    pr_type = row(col_man_pr_type) ' Тип конструкции
+                    pr_st = row(col_man_pr_st) ' Сталь
+                    If IsEmpty(pr_st) Then
+                        r = ManualCeilAlert(Data_out.Cells(i, col_man_pr_st), "Не указана марка стали.")
+                        n_err = n_err + 1
+                    End If
+                    Data_out.Cells(i, col_man_weight).Interior.Color = XlRgbColor.rgbLightGrey
+                    If IsEmpty(qty) Then
+                        r = ManualCeilAlert(Data_out.Cells(i, col_man_qty), "Необходимо указать количество")
+                        n_err = n_err + 1
+                    End If
+                    
+                    If InStr(Data_out.Cells(i, col_man_pr_gost_pr).Value, "Лист_") Then
+                        If GetAreaList(Cells(i, col_man_naen).Value) <> Cells(i, col_man_pr_length).Value Then
+                            Data_out.Cells(i, col_man_pr_length).Value = GetAreaList(Data_out.Cells(i, col_man_naen).Value)
+                        End If
+                        Data_out.Cells(i, col_man_pr_length).Interior.Color = XlRgbColor.rgbLightGrey
+                    End If
+                Case t_subpos 'Правила для маркировки сборок
+                    If qty = Empty Then
+                        With Data_out.Range(Data_out.Cells(i, 1), Data_out.Cells(i, max_col_man)).Interior
+                            .Pattern = xlSolid
+                            .PatternColorIndex = xlAutomatic
+                            .Color = XlRgbColor.rgbLightGreen
+                            .TintAndShade = 0
+                            .PatternTintAndShade = 0
+                        End With
+                        suff = ""
+                        If IsEmpty(obozn) Then
+                            r = ManualCeilAlert(Data_out.Cells(i, col_man_obozn), "Нужна ссылка на лист")
+                            n_err = n_err + 1
+                        End If
+                    Else
+                        With Data_out.Range(Data_out.Cells(i, 1), Data_out.Cells(i, max_col_man)).Interior
+                            .Pattern = xlSolid
+                            .PatternColorIndex = xlAutomatic
+                            .Color = XlRgbColor.rgbLightCoral
+                            .TintAndShade = 0
+                            .PatternTintAndShade = 0
+                        End With
+                        suff = "_par"
+                    End If
+                    ky = pos & " " & obozn & " " & naen & suff
+                    If dsubpos.Exists(ky) Then
+                        dsubpos.Item(ky) = dsubpos.Item(ky) + 1
+                        dsubpos.Item(ky + "_adr") = dsubpos.Item(ky + "_adr") + "+" + Data_out.Cells(i, 1).Address
+                    Else
+                        dsubpos.Item(ky) = 1
+                        dsubpos.Item(ky + "_adr") = Data_out.Cells(i, 1).Address
+                    End If
+                Case t_error
+                    r = ManualCeilAlert(Data_out.Cells(i, col_man_length), "Проверьте правильность заполнения.")
+                    r = ManualCeilAlert(Data_out.Cells(i, col_man_pr_length), "Проверьте правильность заполнения.")
+                    n_err = n_err + 1
+                Case -2
+                    r = ManualCeilAlert(Data_out.Cells(i, col_man_subpos), "Пустая строка")
+                    n_err = n_err + 1
+                Case 0
                     With Data_out.Range(Data_out.Cells(i, 1), Data_out.Cells(i, max_col_man)).Interior
                         .Pattern = xlSolid
                         .PatternColorIndex = xlAutomatic
-                        .Color = XlRgbColor.rgbLightCoral
-                        .TintAndShade = 0
+                        .ThemeColor = xlThemeColorDark1
+                        .TintAndShade = -0.08
                         .PatternTintAndShade = 0
                     End With
-                    suff = "_par"
-                End If
-                ky = pos & " " & obozn & " " & naen & suff
-                If dsubpos.Exists(ky) Then
-                    dsubpos.Item(ky) = dsubpos.Item(ky) + 1
-                    dsubpos.Item(ky + "_adr") = dsubpos.Item(ky + "_adr") + "+" + Data_out.Cells(i, 1).Address
-                Else
-                    dsubpos.Item(ky) = 1
-                    dsubpos.Item(ky + "_adr") = Data_out.Cells(i, 1).Address
-                End If
-            Case t_error
-                r = ManualCeilAlert(Data_out.Cells(i, col_man_length), "Проверьте правильность заполнения.")
-                r = ManualCeilAlert(Data_out.Cells(i, col_man_pr_length), "Проверьте правильность заполнения.")
-                n_err = n_err + 1
-            Case -2
-                r = ManualCeilAlert(Data_out.Cells(i, col_man_subpos), "Пустая строка")
-                n_err = n_err + 1
-            Case 0
-                With Data_out.Range(Data_out.Cells(i, 1), Data_out.Cells(i, max_col_man)).Interior
-                    .Pattern = xlSolid
-                    .PatternColorIndex = xlAutomatic
-                    .ThemeColor = xlThemeColorDark1
-                    .TintAndShade = -0.08
-                    .PatternTintAndShade = 0
-                End With
-                With Data_out.Range(Data_out.Cells(i, 1), Data_out.Cells(i, max_col_man))
-                    .Borders(xlDiagonalDown).LineStyle = xlNone
-                    .Borders(xlDiagonalUp).LineStyle = xlNone
-                    .Borders(xlEdgeLeft).LineStyle = xlNone
-                    .Borders(xlEdgeRight).LineStyle = xlNone
-                    .Borders(xlInsideVertical).LineStyle = xlNone
-                    .Borders(xlInsideHorizontal).LineStyle = xlNone
-                End With
-        End Select
-
-        If type_el <> t_prokat Then
-            Data_out.Range(Data_out.Cells(i, col_man_pr_length), Data_out.Cells(i, col_man_pr_ogn)).ClearContents
+                    With Data_out.Range(Data_out.Cells(i, 1), Data_out.Cells(i, max_col_man))
+                        .Borders(xlDiagonalDown).LineStyle = xlNone
+                        .Borders(xlDiagonalUp).LineStyle = xlNone
+                        .Borders(xlEdgeLeft).LineStyle = xlNone
+                        .Borders(xlEdgeRight).LineStyle = xlNone
+                        .Borders(xlInsideVertical).LineStyle = xlNone
+                        .Borders(xlInsideHorizontal).LineStyle = xlNone
+                    End With
+            End Select
+    
+            If type_el <> t_prokat Then
+                Data_out.Range(Data_out.Cells(i, col_man_pr_length), Data_out.Cells(i, col_man_pr_ogn)).ClearContents
+            End If
+        Else
+            With Data_out.Range(Data_out.Cells(i, 1), Data_out.Cells(i, max_col_man)).Interior
+                .Pattern = xlSolid
+                .PatternColorIndex = xlAutomatic
+                .Color = XlRgbColor.rgbLightGrey
+                .TintAndShade = 0
+                .PatternTintAndShade = 0
+            End With
+            n_err = n_err + 1
         End If
     Next
     
@@ -3870,26 +3899,30 @@ Function ManualCheck(nm) As Boolean
                 Next
             End If
             For i = 3 To n_row
-                subpos = spec(i, col_man_subpos) ' Марка элемента
-                pos = spec(i, col_man_pos) ' Поз.
-                obozn = spec(i, col_man_obozn) ' Обозначение
-                naen = spec(i, col_man_naen) ' Наименование
-                qty = spec(i, col_man_qty) ' Кол-во на один элемент
-                prim = spec(i, col_man_prim) ' Примечание (на лист)
-                Weight = spec(i, col_man_weight) ' Масса, кг
-                kyt = pos & " " & obozn & " " & naen
-                If subpos <> pos And kyt = ky Then
-                    If Not IsEmpty(prim) Then
-                        r = ManualCeilAlert(Data_out.Cells(i, col_man_prim), "Вхождения сборок - только в штуках. Удали " + prim)
-                        n_err = n_err + 1
-                    End If
-                    If Int(qty) - qty <> 0 Then
-                        r = ManualCeilAlert(Data_out.Cells(i, col_man_qty), "Дробное количество сборок")
-                        n_err = n_err + 1
-                    End If
-                    If Not IsEmpty(Weight) Then
-                        r = ManualCeilAlert(Data_out.Cells(i, col_man_weight), "Масса для сборки считается автоматически. Удали " + Str(Weight))
-                        n_err = n_err + 1
+                row = ArrayRow(spec, i)
+                type_el = ManualType(row)
+                If type_el <> t_syserror Then
+                    subpos = spec(i, col_man_subpos) ' Марка элемента
+                    pos = spec(i, col_man_pos) ' Поз.
+                    obozn = spec(i, col_man_obozn) ' Обозначение
+                    naen = spec(i, col_man_naen) ' Наименование
+                    qty = spec(i, col_man_qty) ' Кол-во на один элемент
+                    prim = spec(i, col_man_prim) ' Примечание (на лист)
+                    Weight = spec(i, col_man_weight) ' Масса, кг
+                    kyt = pos & " " & obozn & " " & naen
+                    If subpos <> pos And kyt = ky Then
+                        If Not IsEmpty(prim) Then
+                            r = ManualCeilAlert(Data_out.Cells(i, col_man_prim), "Вхождения сборок - только в штуках. Удали " + prim)
+                            n_err = n_err + 1
+                        End If
+                        If Int(qty) - qty <> 0 Then
+                            r = ManualCeilAlert(Data_out.Cells(i, col_man_qty), "Дробное количество сборок")
+                            n_err = n_err + 1
+                        End If
+                        If Not IsEmpty(Weight) Then
+                            r = ManualCeilAlert(Data_out.Cells(i, col_man_weight), "Масса для сборки считается автоматически. Удали " + Str(Weight))
+                            n_err = n_err + 1
+                        End If
                     End If
                 End If
             Next i
@@ -4390,7 +4423,7 @@ Function ManualType(ByVal row As Variant) As Integer
     tempt = 0
     For i = 1 To max_col_man
         If IsError(row(i)) Then
-            ManualType = t_sys
+            ManualType = t_syserror
             Exit Function
         End If
         If IsEmpty(row(i)) Then tempt = tempt + 1
@@ -8420,3 +8453,5 @@ Function VedReadPol(ByVal lastfilespec As String) As Variant
 '    out_data = ArrayCombine(out_data, zone)
     VedReadPol = out_data
 End Function
+
+
