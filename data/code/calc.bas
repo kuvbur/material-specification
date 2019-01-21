@@ -1,7 +1,7 @@
 Attribute VB_Name = "calc"
 Option Compare Text
 Option Base 1
-Public Const macro_version As String = "3.30"
+Public Const macro_version As String = "3.31"
 '-------------------------------------------------------
 'Типы элементов (столбец col_type_el)
 Public Const t_arm As Integer = 10
@@ -4023,7 +4023,6 @@ Function ManualSpec(ByVal nm As String, Optional ByVal add_array As Variant) As 
                 n_row = n_row + UBound(subpos_spec_izd, 1)
             End If
         Next
-        Erase spec_izd, subpos_spec_izd, unic_pos_mun, unic_subpos_izd
     End If
     Dim pos_out: ReDim pos_out(n_row - istart, max_col): n_row_out = 0
     Dim param
