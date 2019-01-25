@@ -104,8 +104,8 @@ Public Function Арм_Анкеровка(ByVal diam As Integer, ByVal class As String, ByVa
         Case "D"
             Арм_Анкеровка = Round((lout / diam), 2) & "d"
     End Select
-    If Not ank_data.Exists(class) Then Арм_Анкеровка = "ОШИБКА КЛАССА"
-    If Not ank_data.Exists(beton) Then Арм_Анкеровка = "ОШИБКА БЕТОНА"
+    If Not ank_data.exists(class) Then Арм_Анкеровка = "ОШИБКА КЛАССА"
+    If Not ank_data.exists(beton) Then Арм_Анкеровка = "ОШИБКА БЕТОНА"
 End Function
 
 Public Function Арм_Округление(ByVal L As Long, Optional ByVal krat As String = "10мм") As Long
