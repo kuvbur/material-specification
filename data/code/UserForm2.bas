@@ -18,7 +18,7 @@ Attribute VB_Exposed = False
 Option Compare Text
 Option Base 1
 
-Const form_version As String = "3.9"
+Const form_version As String = "3.10"
 Public CodePath, MaterialPath, SortamentPath As String
 Public lastsheet, lastconstrtype, lastconstr, lastfile, lastfilespec, lastfileadd, materialbook_index As Variant
 
@@ -309,8 +309,9 @@ Sub remat()
         End If
     Next
     For i = 1 To UBound(listFile, 1)
+            type_spec = SpecGetType(listFile(i, 1))
         If ((listFile(i, 1) <> "Полы") * (listFile(i, 1) <> _
-            "Отметки_перемычек") * (listFile(i, 1) <> "Типы_полов") * (InStr(listFile(i, 1), "_сист") = 0)) Then
+            "Отметки_перемычек") * (listFile(i, 1) <> "Типы_полов") * (InStr(listFile(i, 1), "_сист") = 0) And type_spec <> 21) Then
             n_man = n_man + 1
             ReDim Preserve listspec(n_man)
             listspec(n_man) = listFile(i, 1)
