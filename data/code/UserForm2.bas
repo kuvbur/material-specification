@@ -15,31 +15,92 @@ Attribute VB_Creatable = False
 Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
 
+
 Option Compare Text
 Option Base 1
 
-Const form_version As String = "3.10"
+Const form_version As String = "3.12"
 Public CodePath, MaterialPath, SortamentPath As String
 Public lastsheet, lastconstrtype, lastconstr, lastfile, lastfilespec, lastfileadd, materialbook_index As Variant
 
+Private Sub AllPosButton_Click()
+    ans = MsgBox("Отменить будет не просто. Нажмите Да, если сделали резервную копию", vbYesNo)
+    If ans = 6 Then
+        r = OutPrepare()
+        nm = ThisWorkbook.ActiveSheet.Name
+        type_spec = SpecGetType(nm)
+        If type_spec = 7 Then
+            r = ManualPos(nm, 1)
+            r = LogWrite(nm, "ОК", "Перенумеровано сквнозной нумерацией")
+        Else
+            If Not (quiet) Then MsgBox ("Перейдите на лист _спец и повторите")
+        End If
+        r = OutEnded()
+    End If
+End Sub
+
+Private Sub PosSubposButton_Click()
+    ans = MsgBox("Отменить будет не просто. Нажмите Да, если сделали резервную копию", vbYesNo)
+    If ans = 6 Then
+        r = OutPrepare()
+        nm = ThisWorkbook.ActiveSheet.Name
+        type_spec = SpecGetType(nm)
+        If type_spec = 7 Then
+            r = ManualPos(nm, 2)
+            r = LogWrite(nm, "ОК", "Перенумеровано по сборкам")
+        Else
+            If Not (quiet) Then MsgBox ("Перейдите на лист _спец и повторите")
+        End If
+        r = OutEnded()
+    End If
+End Sub
+
+Private Sub UndoPosButton_Click()
+    r = OutPrepare()
+    nm = ThisWorkbook.ActiveSheet.Name
+    type_spec = SpecGetType(nm)
+    If type_spec = 7 Then
+        r = ManualUndoPos(nm)
+        r = LogWrite(nm, "ОК", "Отмена перенумерации")
+    Else
+        If Not (quiet) Then MsgBox ("Перейдите на лист _спец и повторите")
+    End If
+    r = OutEnded()
+End Sub
+
 Private Sub ClearSheetButton_Click()
     r = OutPrepare()
-    Dim type_out: ReDim type_out(5)
+    Dim type_out: ReDim type_out(7)
     If UserForm2.ob_CB.Value Then type_out(1) = 2
     If UserForm2.obsh_CB.Value Then type_out(2) = 3
     If UserForm2.groub_CB.Value Then type_out(3) = 1
     If UserForm2.vedkzh_CB.Value Then type_out(4) = 5
     If UserForm2.bysybpos_CB.Value Then type_out(5) = 13
+    If UserForm2.byved_CB.Value Then type_out(6) = 11
+    If UserForm2.bypol_CB.Value Then type_out(7) = 13
     tdel = ""
     If UserForm2.ob_CB.Value Then tdel = tdel + "_об, "
     If UserForm2.obsh_CB.Value Then tdel = tdel + "общестрой, "
     If UserForm2.groub_CB.Value Then tdel = tdel + "_гр, "
     If UserForm2.vedkzh_CB.Value Then tdel = tdel + "_кж, "
     If UserForm2.bysybpos_CB.Value Then tdel = tdel + "_грс, "
+    If UserForm2.byved_CB.Value Then tdel = tdel + "_вед, "
+    If UserForm2.bypol_CB.Value Then tdel = tdel + "_экспл, "
     r = LogWrite("Очистка листов", "", 1)
     r = SheetClear(type_out)
-    r = SheetIndex()
     r = LogWrite("Удалено " & r & " листов", "", 1)
+    r = SheetIndex()
+    r = OutEnded()
+End Sub
+
+Private Sub ClearAllButton_Click()
+    r = OutPrepare()
+    Dim type_out: ReDim type_out(1)
+    type_out(1) = -1
+    r = LogWrite("Очистка ВСЕХ листов", "", 1)
+    r = SheetClear(type_out)
+    r = LogWrite("Удалено " & r & " листов", "", 1)
+    r = SheetIndex()
     r = OutEnded()
 End Sub
 
@@ -132,6 +193,17 @@ End Sub
 
 Private Sub MergeManualButton_Click()
     r = ManualSpec_Merge()
+End Sub
+
+Private Sub ReSortamentButton_Click()
+    r = OutPrepare()
+    nm = "!System"
+    r = LogWrite(nm, SheetExist(nm), "Сортаменты обновлёны")
+    If SheetExist(nm) Then ThisWorkbook.Sheets(nm).Delete
+    r = ReadPrSortament()
+    Sheets(nm).Visible = False
+    r = OutEnded()
+    MsgBox ("Сортаменты обновлёны")
 End Sub
 
 Private Sub use_tmp_CB_Click()

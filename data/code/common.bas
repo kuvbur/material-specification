@@ -2,7 +2,7 @@ Attribute VB_Name = "common"
 Option Compare Text
 Option Base 1
 
-Public Const common_version As String = "3.8"
+Public Const common_version As String = "3.9"
 Public Const Pi As Double = 3.141592653589
 Public ank_data As Variant
 Public Function GetLeghtByID(id As String, table As Range, n_col_id As Integer, n_col_l As Integer) As Variant
@@ -15,11 +15,7 @@ Attribute Сумма_ПоИД.VB_Description = "Суммирует элементов с одинаковым ID из та
     For i = 1 To table.Rows.Count
         If Trim(table(i, n_col_id)) = id Then
             ll = table(i, n_col_l)
-            If IsNumeric(ll) Then
-                Sum_l = Sum_l + ll
-            Else
-                MsgBox (ll)
-            End If
+            If IsNumeric(ll) Then Sum_l = Sum_l + ll
         End If
     Next i
     Сумма_ПоИД = Sum_l
