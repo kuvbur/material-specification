@@ -1,7 +1,7 @@
 Attribute VB_Name = "calc"
 Option Compare Text
 Option Base 1
-Public Const macro_version As String = "3.34"
+Public Const macro_version As String = "3.35"
 '-------------------------------------------------------
 'Типы элементов (столбец col_type_el)
 Public Const t_arm As Integer = 10
@@ -2694,6 +2694,8 @@ Function FormatSpec_KZH(ByVal Data_out As Range, ByVal n_row As Integer, ByVal n
             n_col = n_col - 1
             Range(Cells(1, n_col + 1), Cells(1, n_col + n_col_bet - 1)).Merge
             Range(Cells(1, n_col + n_col_bet), Cells(5, n_col + n_col_bet)).Merge
+        Else
+            If InStr(Data_out(2, n_col + n_col_bet), "етон") > 0 Then Range(Cells(2, n_col + n_col_bet), Cells(5, n_col + n_col_bet)).Merge
         End If
         For i = n_col + 1 To n_col + n_col_bet - 1
             If InStr(Data_out(2, i), "етон") > 0 Then Range(Cells(2, i), Cells(5, i)).Merge
@@ -3822,7 +3824,6 @@ Function LogWrite(ByVal sheet_name As String, ByVal suffix As String, ByVal rezu
     i = i + 1: log_sheet.Cells(j, i) = UserForm2.qtyOneSubpos_CB
     i = i + 1: log_sheet.Cells(j, i) = UserForm2.show_subpos_CB
     i = i + 1: log_sheet.Cells(j, i) = UserForm2.ignore_subpos_CB
-    If Sheets(log_sheet_name).Visible = True Then Sheets(log_sheet_name).Visible = False
 End Function
 
 Function ManualAdd(ByVal lastfileadd As String) As Boolean
@@ -4058,7 +4059,7 @@ Function ManualCheck(nm) As Boolean
                         r = ManualCeilAlert(Data_out.Cells(i, col_man_subpos), "Впишите марку элемента")
                         n_err = n_err + 1
                     End If
-                    If InStr(obozn, "ейсмика") > 0 Or InStr(naen, "ейсмика") > 0 And InStr(subpos, "!!") > 0 Then
+                    If (InStr(obozn, "ейсмика") > 0 Or InStr(naen, "ейсмика") > 0) And InStr(subpos, "!!") > 0 Then
                         r = ManualCeilAlert(Data_out.Cells(i, col_man_subpos), "Впишите марку элемента")
                         n_err = n_err + 1
                     End If
@@ -4212,7 +4213,11 @@ Function ManualCheck(nm) As Boolean
                         .Borders(xlInsideHorizontal).LineStyle = xlNone
                     End With
             End Select
-    
+            If type_el <> t_arm Then
+                Data_out.Cells(i, col_man_ank).ClearContents
+                Data_out.Cells(i, col_man_nahl).ClearContents
+                Data_out.Cells(i, col_man_dgib).ClearContents
+            End If
             If type_el <> t_prokat Then
                 Data_out.Range(Data_out.Cells(i, col_man_pr_length), Data_out.Cells(i, col_man_pr_ogn)).ClearContents
             End If
@@ -5005,7 +5010,7 @@ Function ManualType(ByVal row As Variant) As Integer
         Exit Function
     End If
     tempt = 0
-    For i = 1 To max_col_man
+    For i = 1 To col_man_komment - 1
         If IsError(row(i)) Then
             ManualType = t_syserror
             Exit Function
@@ -5013,7 +5018,7 @@ Function ManualType(ByVal row As Variant) As Integer
         If IsEmpty(row(i)) Then tempt = tempt + 1
     Next i
     
-    If tempt = max_col_man Then
+    If tempt = col_man_komment - 1 Then
         type_el = 0
         ManualType = type_el
         Erase row
@@ -7998,11 +8003,13 @@ Function VedAddArea(ByRef zone As Variant, ByRef materials As Variant, ByVal mat
 End Function
 
 Function Spec_CONC(ByRef all_data As Variant) As Boolean
-    all_bet = ArraySelectParam_2(all_data, t_mat, col_type_el, "?етон В?", col_m_naen)
+    all_bet = ArraySelectParam_2(all_data, t_mat, col_type_el, "?етон?", col_m_naen)
     If IsEmpty(concrsubpos) Then Set concrsubpos = CreateObject("Scripting.Dictionary")
     flag = False
+    concrsubpos.Item("bet_qty") = 0
     For Each subpos In pos_data.Item("parent").keys()
-        all_bet_subpos = ArraySelectParam_2(all_bet, subpos, col_sub_pos, "?етон В?", col_m_naen)
+        all_bet_subpos = ArraySelectParam_2(all_bet, subpos, col_sub_pos, "?етон?", col_m_naen)
+        concrsubpos.Item(subpos & "_bet_qty") = 0
         If Not IsEmpty(all_bet_subpos) Then
             nSubPos = GetNSubpos(subpos, 1)
             n_mat = UBound(all_bet_subpos, 1)
@@ -8010,7 +8017,7 @@ Function Spec_CONC(ByRef all_data As Variant) As Boolean
             For j = 1 To UBound(spec_subpos, 1)
                 bet = Trim(Replace(spec_subpos(j, 3), "B", "В"))
                 qty = spec_subpos(j, 4)
-                concrsubpos.Item(subpos & "_" & bet & "_qty") = concrsubpos.Item(subpos & "_" & bet & "_qty") + qty
+                concrsubpos.Item(subpos & "_" & bet & "_qty") = qty
                 concrsubpos.Item(subpos & "_bet_qty") = concrsubpos.Item(subpos & "_bet_qty") + qty
                 concrsubpos.Item("bet_qty") = concrsubpos.Item("bet_qty") + qty
             Next j
@@ -8024,6 +8031,11 @@ End Function
 Function Spec_NRM(ByRef all_data As Variant) As Variant
     UserForm2.qtyOneSubpos_CB.Value = False
     pos_out_arm = Spec_KZH(all_data)
+    n_col_arm = UBound(pos_out_arm, 2)
+    For i = 1 To UBound(pos_out_arm, 2)
+        If InStr(pos_out_arm(2, i), "етон") > 0 Then n_col_arm = n_col_arm - 1
+    Next
+    If UBound(pos_out_arm, 2) - n_col_arm > 1 Then n_col_arm = n_col_arm - 1
     r = Spec_CONC(all_data)
     If r = False Then
         MsgBox ("В спецификациях не найден бетон")
@@ -8031,7 +8043,7 @@ Function Spec_NRM(ByRef all_data As Variant) As Variant
         Exit Function
     End If
     subpos = pos_data.Item("parent").keys()
-    Dim pos_out_norm: ReDim pos_out_norm(UBound(subpos, 1) + 2, 5)
+    Dim pos_out_norm: ReDim pos_out_norm(UBound(subpos, 1) + 3, 5)
     n_out = 1
     pos_out_norm(n_out, 1) = "Поз."
     pos_out_norm(n_out, 2) = "Марка бетона"
@@ -8062,18 +8074,20 @@ Function Spec_NRM(ByRef all_data As Variant) As Variant
                 Next
             End If
         End If
+        v_bet = Round(v_bet, 0)
         If v_bet > 0 Then
             For k = 1 To UBound(pos_out_arm, 1)
-                If Left(pos_out_arm(k, 1), Len(subpos)) = subpos Then v_arm = pos_out_arm(k, UBound(pos_out_arm, 2))
+                If Left(pos_out_arm(k, 1), Len(subpos)) = subpos Then v_arm = pos_out_arm(k, n_col_arm)
             Next k
         End If
+        v_arm = Round(v_arm, 0)
         If v_bet > 0 And v_arm > 0 Then
             n_out = n_out + 1
             pos_out_norm(n_out, 1) = subpos
             pos_out_norm(n_out, 2) = naen_bet
             pos_out_norm(n_out, 3) = v_bet
             pos_out_norm(n_out, 4) = v_arm
-            pos_out_norm(n_out, 5) = Round(pos_out_norm(n_out, 4) / pos_out_norm(n_out, 3), 0)
+            pos_out_norm(n_out, 5) = Round(v_arm / v_bet, 0)
             sum_bet = sum_bet + v_bet
             sum_arm = sum_arm + v_arm
         End If
