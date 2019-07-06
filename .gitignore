@@ -1,10 +1,14 @@
-*.pdf
+﻿*.pdf
 *.zip
 
 ~$*.*
-/data/code/old/*
+data/code/old/*
 
-/data/code/git/*
+data/code/git/*
 
-/data/code/from_git/*
+data/code/from_git/*
+
+import/*
+
+list/*
 

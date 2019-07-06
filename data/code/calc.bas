@@ -1,7 +1,7 @@
 Attribute VB_Name = "calc"
 Option Compare Text
 Option Base 1
-Public Const macro_version As String = "3.40"
+Public Const macro_version As String = "3.41"
 '-------------------------------------------------------
 'Типы элементов (столбец col_type_el)
 Public Const t_arm As Integer = 10
@@ -1052,6 +1052,7 @@ Function ControlSumEl(ByVal array_in As Variant) As String
             st = array_in(col_pr_st)
             gost_prof = array_in(col_pr_gost_prof)
             prof = array_in(col_pr_prof)
+            naen = array_in(col_pr_naen)
             Length = array_in(col_pr_length)
             'Weight = array_in(col_pr_weight)
             
@@ -1066,7 +1067,7 @@ Function ControlSumEl(ByVal array_in As Variant) As String
             param(8) = pos
             param(9) = "_"
             param(10) = type_konstr
-            param(11) = "l" + ConvNum2Txt(Int(Length))
+            param(11) = "l" + ConvNum2Txt(Int(Length)) + naen
             
         Case t_mat
             isel = 1
@@ -8332,12 +8333,6 @@ Function Spec_VED_GR(ByRef all_data As Variant) As Variant
             zone_bytype_el = ArraySelectParam(zones_el_all, type_name, col_s_type_otd) 'Список зон с этим типом отделки
             un_n_zone_type = ArrayUniqValColumn(zone_bytype_el, col_s_numb_zone) 'Список номеров зон
             materials_by_type.Item(type_name + ";zone") = un_n_zone_type
-            ' --- Финишная отделка для данного типа ----
-            fin_pot = fin_str + Replace(zone_bytype_el(1, col_s_mpot_zone), "@", "; ")
-            fin_pan = fin_str + Replace(zone_bytype_el(1, col_s_mpan_zone), "@", "; ")
-            fin_wall = fin_str + Replace(zone_bytype_el(1, col_s_mwall_zone), "@", "; ")
-            fin_column = fin_str + Replace(zone_bytype_el(1, col_s_mcolumn_zone), "@", "; ")
-            ' ------------------------------------------
             '------- Предварительная выборка элементов --------------------
             zones_el = ArraySelectParam_2(zones_el_all, un_n_zone_type, col_s_numb_zone)
             walls_el = ArraySelectParam_2(walls_el_all, un_n_zone_type, col_s_numb_zone)
@@ -8350,6 +8345,23 @@ Function Spec_VED_GR(ByRef all_data As Variant) As Variant
                 If IsNumeric(num) Then num = CStr(num)
                 zone_el = ArraySelectParam(zone_bytype_el, num, col_s_numb_zone)
                 If Not IsEmpty(zone_el) Then
+                    ' --- Финишная отделка для данного типа ----
+                    fin_pot = fin_str + Replace(zone_el(1, col_s_mpot_zone), "@", "; ")
+                    fin_pan = fin_str + Replace(zone_el(1, col_s_mpan_zone), "@", "; ")
+                    fin_wall = fin_str + Replace(zone_el(1, col_s_mwall_zone), "@", "; ")
+                    fin_column = fin_str + Replace(zone_el(1, col_s_mcolumn_zone), "@", "; ")
+                    ' ---
+                    ' Если в имени финишного материала стоят знаки <>
+                    ' То все колонны переходят в стены
+                    ' Отделка панелей для них не выполняется
+                    ' ---
+                    If InStr(fin_column, "<>") > 0 Then
+                        column_is_wall = True
+                        fin_column = Replace(fin_column, "<>", "")
+                    Else
+                        column_is_wall = False
+                    End If
+                    ' ------------------------------------------
                     area_total = zone_el(1, col_s_area_zone)
                     perim_total = zone_el(1, col_s_perim_zone) / 1000
                     perim_hole = zone_el(1, col_s_perimhole_zone) / 1000
@@ -8361,6 +8373,7 @@ Function Spec_VED_GR(ByRef all_data As Variant) As Variant
                         is_error = is_error + 1
                         h_pan = h_pan * 1000
                     End If
+                    If h_pan > 0.01 Then is_pan = True
                     If UBound(zone_el, 1) > 1 Then
                         r = LogWrite("Одинаковых зон - " + CStr(UBound(zone_el, 1)), "Ошибка", num)
                         is_error = is_error + 1
@@ -8395,16 +8408,21 @@ Function Spec_VED_GR(ByRef all_data As Variant) As Variant
                     column_perim_total = column_perim + column_perim_in_wall
                     column_pan_area = column_perim_total * h_pan
                     column_area = column_perim_total * (h_zone - h_pan)
-                    If column_area > 0.01 Then is_column = True
-                    If column_pan_area > 0.01 Then is_pan = True
-                    If h_pan > 0.01 Then is_pan = True
                     tot_area_column = tot_area_column + column_area
                     tot_area_pan = tot_area_pan + column_pan_area
                     colm = VedNameMat("Колонны", "ЖБ", rules)
-                    'Колонны
-                    r = VedAddAreaGR(column_area, fin_column, ";column;", type_name, colm, rules_mod, materials_by_type, num)
-                    'Панели на колоннах
-                    r = VedAddAreaGR(column_pan_area, fin_pan, ";pan;", type_name, colm, rules_mod, materials_by_type, num)
+                    If column_is_wall Then
+                        'Стены
+                        r = VedAddAreaGR(column_area + column_pan_area, fin_column, ";wall;", type_name, "", rules_mod, materials_by_type, num)
+                    Else
+                        If column_area > 0.01 Then is_column = True
+                        If column_pan_area > 0.01 Then is_pan = True
+                        colm = VedNameMat("Колонны", "ЖБ", rules)
+                        'Колонны
+                        r = VedAddAreaGR(column_area, fin_column, ";column;", type_name, colm, rules_mod, materials_by_type, num)
+                        'Панели на колоннах
+                        r = VedAddAreaGR(column_pan_area, fin_pan, ";pan;", type_name, colm, rules_mod, materials_by_type, num)
+                    End If
                     '----------------------
                     '        СТЕНЫ
                     '----------------------
@@ -8738,11 +8756,11 @@ Function Spec_VED_GR(ByRef all_data As Variant) As Variant
                             n_row_c = n_row_c + 1
                         End If
                     Next
-                End If
-            Else
-                pos_out(n_row_c, 7) = "-"
-                pos_out(n_row_c, 8) = "-"
-                n_row_c = n_row_c + 1
+                                Else
+                                        pos_out(n_row_c, 7) = "-"
+                                        pos_out(n_row_c, 8) = "-"
+                                        n_row_c = n_row_c + 1
+                                End If
             End If
     'ПАНЕЛИ
             If is_pan Then
