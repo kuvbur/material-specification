@@ -1,7 +1,7 @@
 Attribute VB_Name = "calc"
 Option Compare Text
 Option Base 1
-Public Const macro_version As String = "3.41"
+Public Const macro_version As String = "3.5"
 '-------------------------------------------------------
 'Типы элементов (столбец col_type_el)
 Public Const t_arm As Integer = 10
@@ -1728,7 +1728,15 @@ Function DataWeightSubpos(ByVal array_in As Variant) As Variant
                     If (qty = 0) Or IsEmpty(qty) Then qty = 1
                     weight_pm = array_in(i, col_pr_weight)
                     length_pos = Round_w(array_in(i, col_pr_length) / 1000, n_round_l)
-                    tweight = Round_w(weight_pm * length_pos * k_zap_total, n_round_w) * qty
+                    name_pr = GetShortNameForGOST(array_in(i, col_pr_gost_prof))
+                    If InStr(1, name_pr, "Лист") Then
+                        naen_plate = SpecMetallPlate(array_in(i, col_pr_prof), array_in(i, col_pr_naen), length_pos, weight_pm)
+                        tweight = Round_w(naen_plate(4) * k_zap_total, n_round_w) * qty
+                        ll = 1
+                    Else
+                        tweight = Round_w(weight_pm * length_pos * k_zap_total, n_round_w) * qty
+                    End If
+                    ll = 1
                 Case t_izd
                     qty = array_in(i, col_qty)
                     If (qty = 0) Or IsEmpty(qty) Then qty = 1
@@ -5443,7 +5451,7 @@ Function RelFName(ByVal fname As String) As String
     RelFName = wt_path
 End Function
 
-Function Round_w(ByVal arg As Variant, ByVal nokrg As Integer, Optional ByVal hard_round As Boolean = False) As Variant
+Function Round_w(ByVal arg As Variant, ByVal nokrg As Variant, Optional ByVal hard_round As Boolean = False) As Variant
     If IsNumeric(arg) Then
         If arg < (1 / (10 ^ nokrg)) And hard_round = False Then
             nokrg_n = 0
@@ -6122,9 +6130,10 @@ Function SpecArm(ByVal arm As Variant, ByVal n_arm As Integer, ByVal type_spec A
                         pos_out(i, 2) = " "
                     End If
                     If fon Then
+                        l_pos = Round_w(length_pos * k_zap_total, n_round_l) * n_el
                         If prim = "п.м." Then prim = ""
                         pos_out(i, 3) = symb_diam & diametr & " " & klass & " L= п.м." & prim
-                        pos_out(i, 4) = pos_out(i, 4) + Round_w(length_pos * k_zap_total, n_round_l) * n_el
+                        pos_out(i, 4) = pos_out(i, 4) + l_pos
                         pos_out(i, 5) = Round_w(weight_pm, n_round_w)
                     Else
                         pos_out(i, 3) = symb_diam & diametr & " " & klass & " L=" & length_pos * 1000 & "мм." & prim
@@ -6139,10 +6148,11 @@ Function SpecArm(ByVal arm As Variant, ByVal n_arm As Integer, ByVal type_spec A
                     End If
                     pos_out(i, 2) = GetGOSTForKlass(klass)
                     If fon Then
+                        l_pos = Round_w(length_pos * k_zap_total, n_round_l) * n_el
                         pos_out(i, 3) = symb_diam & diametr & " " & klass & " L= п.м." & prim
-                        pos_out(i, 4) = pos_out(i, 4) + Round_w(length_pos * k_zap_total, n_round_l) * n_el
+                        pos_out(i, 4) = pos_out(i, 4) + l_pos
                         pos_out(i, 5) = weight_pm
-                        If show_sum_prim Then pos_out(i, 6) = pos_out(i, 6) + Round_w(Round_w(length_pos * weight_pm * k_zap_total, n_round_w) * n_el, 2)
+                        If show_sum_prim Then pos_out(i, 6) = pos_out(i, 6) + Round_w((l_pos * weight_pm), 2)
                     Else
                         pos_out(i, 3) = symb_diam & diametr & " " & klass & " L=" & length_pos * 1000 & "мм." & prim
                         pos_out(i, 4) = pos_out(i, 4) + n_el
@@ -6752,7 +6762,7 @@ Function SpecProkat(ByVal prokat As Variant, ByVal n_prokat As Integer, ByVal ty
 End Function
 
 Function SpecMetallPlate(ByVal prokat_prof As String, ByVal prokat_naen As String, ByVal L As Double, ByVal we As Double) As Variant
-    Dim array_out: ReDim array_out(3)
+    Dim array_out: ReDim array_out(4)
     prokat_naen_t = prokat_naen
     prokat_prof = Replace(prokat_prof, " ", "")
     prokat_prof = Replace(prokat_prof, "-", "")
@@ -6771,6 +6781,7 @@ Function SpecMetallPlate(ByVal prokat_prof As String, ByVal prokat_naen As Strin
         array_out(1) = "ОШИБКА ТИПА ПРОФИЛЯ ЛИСТА"
         array_out(2) = 0.001
         array_out(3) = 0.001
+        array_out(4) = 0.001
         SpecMetallPlate = array_out
         Exit Function
     End If
@@ -6795,20 +6806,26 @@ Function SpecMetallPlate(ByVal prokat_prof As String, ByVal prokat_naen As Strin
         t = Round(t, 3)
         prokat_prof = "--" + ConvNum2Txt(t * 1000)
         prokat_naen = "--" + ConvNum2Txt(t * 1000) + "x" + ConvNum2Txt(b * 1000) + "x" + ConvNum2Txt(A * 1000)
+        we_plate_one = A * b * t * 7850
     End If
     If b < 0.000001 Or t < 0.000001 Or A < 0.000001 Then
         MsgBox ("Ошибка в имени типа профиля листа " + prokat_naen_t)
         array_out(1) = "ОШИБКА ТИПА ПРОФИЛЯ ЛИСТА"
         array_out(2) = 0.001
         array_out(3) = 0.001
+        array_out(4) = 0.001
         SpecMetallPlate = array_out
         Exit Function
     End If
-    If L < 0.000001 Or we < 0.000001 Then
-        L = b * A
-        we = t * 7850
-        If Not UserForm2.pr_pm_CB.Value Then we = we * L
-    End If
+'    If L < 0.000001 Or we < 0.000001 Then
+'        L = b * A
+'        we = t * 7850
+'        If Not UserForm2.pr_pm_CB.Value Then we = we * L
+'    End If
+
+    L = b * A
+    we = t * 7850
+    If Not UserForm2.pr_pm_CB.Value Then we = we * L
     If (UserForm2.keep_pos_CB.Value And UserForm2.pr_pm_CB.Value) Or Not UserForm2.pr_pm_CB.Value Then
         If Not UserForm2.pr_pm_CB.Value Then we = we / L
         If flag_read Then
@@ -6835,6 +6852,7 @@ Function SpecMetallPlate(ByVal prokat_prof As String, ByVal prokat_naen As Strin
     array_out(1) = naen_plate
     array_out(2) = l_plate
     array_out(3) = we_plate
+    array_out(4) = we_plate_one
     SpecMetallPlate = array_out
 End Function
 
@@ -7728,6 +7746,7 @@ Function Spec_KZH(ByRef all_data As Variant) As Variant
                         k = weight_index.Item("row" & tparent)
                     End If
                 End If
+                If Not UserForm2.qtyOneSubpos_CB.Value Then nSubPos = 1
                 If arm_arr(i)(j, col_type_el) = t_arm Then
                     diametr = arm_arr(i)(j, col_diametr)
                     klass = arm_arr(i)(j, col_klass)
@@ -7735,6 +7754,7 @@ Function Spec_KZH(ByRef all_data As Variant) As Variant
                     gost = GetGOSTForKlass(klass)
                     length_pos = arm_arr(i)(j, col_length) / 1000
                     weight_pm = GetWeightForDiametr(diametr, klass)
+                    w_pos = Round_w(weight_pm * length_pos * k_zap_total, n_round_w) * qty / nSubPos
                     tkeyd = "Арматура" & n_type & klass & gost & symb_diam & diametr
                     tkesum_1 = "Арматура" & n_type & klass & gost & "Всего"
                 Else
@@ -7745,12 +7765,16 @@ Function Spec_KZH(ByRef all_data As Variant) As Variant
                     qty = arm_arr(i)(j, col_qty)
                     length_pos = arm_arr(i)(j, col_pr_length) / 1000
                     weight_pm = arm_arr(i)(j, col_pr_weight)
+                    name_pr = GetShortNameForGOST(arm_arr(i)(j, col_pr_gost_prof))
+                    w_pos = Round_w(weight_pm * length_pos * k_zap_total, n_round_w) * qty / nSubPos
+                    If InStr(1, name_pr, "Лист") Then
+                        naen_plate = SpecMetallPlate(arm_arr(i)(j, col_pr_prof), arm_arr(i)(j, col_pr_naen), length_pos, weight_pm)
+                        weight_pm = naen_plate(4)
+                        w_pos = Round_w(naen_plate(4) * k_zap_total, n_round_w) * qty / nSubPos
+                    End If
                     tkeyd = "Прокат" & n_type & stal & vbLf & gost_stal & gost_prof & prof
                     tkesum_1 = "Прокат" & n_type & stal & vbLf & gost_stal & gost_prof & "Всего"
                 End If
-                If Not UserForm2.qtyOneSubpos_CB.Value Then nSubPos = 1
-                l_spec = (length_pos * qty) / nSubPos
-                w_pos = weight_pm * l_spec * k_zap_total
                 i_col_d = weight_index.Item("col" & tkeyd)
                 i_col_s1 = weight_index.Item("col" & tkesum_1)
                 i_col_s2 = weight_index.Item("col" & n_type & "Всего")
@@ -7765,13 +7789,13 @@ Function Spec_KZH(ByRef all_data As Variant) As Variant
         pos_out(n_row + sum_row, 1) = "Итого"
         For i = 2 To UBound(pos_out, 2)
             For j = 6 To n_row
-                pos_out(n_row + sum_row, i) = pos_out(n_row + sum_row, i) + Round_w(pos_out(j, i), n_round_wkzh)
+                pos_out(n_row + sum_row, i) = pos_out(n_row + sum_row, i) + pos_out(j, i)
             Next
         Next
         If is_bet = True Then
             For i = 1 To UBound(pos_out_bet, 2)
                 For j = 6 To n_row
-                    pos_out_bet(n_row + sum_row, i) = pos_out_bet(n_row + sum_row, i) + Round_w(pos_out_bet(j, i), n_round_wkzh)
+                    pos_out_bet(n_row + sum_row, i) = pos_out_bet(n_row + sum_row, i) + pos_out_bet(j, i)
                 Next
             Next
         End If
