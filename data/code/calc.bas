@@ -1,7 +1,7 @@
 Attribute VB_Name = "calc"
 Option Compare Text
 Option Base 1
-Public Const macro_version As String = "3.56"
+Public Const macro_version As String = "3.57"
 '-------------------------------------------------------
 'Типы элементов (столбец col_type_el)
 Public Const t_arm As Integer = 10
@@ -1700,7 +1700,12 @@ Function DataRead(ByVal nm As String) As Variant
         MsgBox ("Лист или файл отсутствуют")
     Else
         spec_version = DataGetVersion(out_data)
-        If spec_version > 1 Then out_data = DataConvertVersion(out_data)
+        If spec_version > 1 Then
+            out_data = DataConvertVersion(out_data)
+        Else
+            'Отключаем неиспользуемое
+            UserForm2.qtyOneFloor_CB.Value = False
+        End If
         If DataIsShort(out_data) Then out_data = DataShort(out_data)
         Dim out: ReDim out(UBound(out_data, 1), max_col)
         For i = 1 To UBound(out_data, 1)
@@ -2882,6 +2887,7 @@ Function FormatSpec_ASGR(ByVal Data_out As Range, ByVal n_row As Integer, ByVal 
         Next i
         n_col = n_col - n_emp
         r = FormatFont(Data_out, n_row, n_col)
+                
         For i = 3 To n_row
             flag = 1
             For j = 2 To n_col
@@ -2899,6 +2905,30 @@ Function FormatSpec_ASGR(ByVal Data_out As Range, ByVal n_row As Integer, ByVal 
         For i = n_col - 2 To n_col
             Range(Data_out.Cells(1, i), Cells(2, i)).Merge
         Next i
+                
+        If UserForm2.merge_material_CB.Value Then
+            n_c = 2
+            start_row = 3
+            n_start = start_row
+            n_end = start_row
+            temp_1 = Data_out.Cells(n_start, n_c).MergeArea.Cells(1, 1).Value
+            For i = start_row To n_row
+                temp_2 = Data_out.Cells(i, n_c).MergeArea.Cells(1, 1).Value
+                If temp_1 <> temp_2 And temp_2 <> Empty Then
+                    temp_1 = temp_2
+                    If n_end > n_start Then Range(Data_out.Cells(n_start, n_c), Data_out.Cells(n_end, n_c)).Merge
+                    n_start = i
+                Else
+                    n_end = i
+                End If
+                If i = n_row And temp_1 = temp_2 And temp_2 <> Empty Then
+                    n_end = i
+                    Range(Data_out.Cells(n_start, n_c), Data_out.Cells(n_end, n_c)).Merge
+                End If
+            Next i
+        End If
+        
+                
         Range(Data_out.Cells(1, 1), Data_out.Cells(n_row, n_col)).Rows.AutoFit
         Range(Data_out.Cells(1, 1), Data_out.Cells(1, 1)).ColumnWidth = (s1 / sall) * koeff
         Range(Data_out.Cells(1, 2), Data_out.Cells(1, 2)).ColumnWidth = (s2 / sall) * koeff
@@ -4871,6 +4901,7 @@ Function posarmsort(ByRef chksum_pos As Variant, ByVal arm As Variant, ByVal cur
 End Function
 
 Function ManualPos(ByVal nm As String, ByVal type_pos As Integer) As Boolean
+    floor_txt = "all_floor"
     istart = 2
     Set spec_sheet = Application.ThisWorkbook.Sheets(nm)
     sheet_size = SheetGetSize(spec_sheet)
@@ -6396,6 +6427,7 @@ Function SpecArm(ByVal arm As Variant, ByVal n_arm As Integer, ByVal type_spec A
         pos_chsum_arm = UBound(un_chsum_arm, 1)
     End If
     n_col_spec = 6
+    If type_spec = 13 Then n_col_spec = n_col_spec + 1
     If type_spec = 13 And UserForm2.qtyOneFloor_CB.Value Then n_col_spec = n_col_spec + 1
     If type_spec <> 13 And UserForm2.qtyOneFloor_CB.Value Then n_col_spec = n_col_spec + 2
     ReDim pos_out(pos_chsum_arm, n_col_spec)
@@ -6465,7 +6497,7 @@ Function SpecArm(ByVal arm As Variant, ByVal n_arm As Integer, ByVal type_spec A
     Next i
     
     For i = 1 To UBound(pos_out, 1)
-        If type_spec = 13 Or UserForm2.qtyOneFloor_CB.Value Then pos_out(i, n_col_spec - 1) = t_arm
+        If type_spec = 13 Or UserForm2.qtyOneFloor_CB.Value Then pos_out(i, 7) = t_arm
     Next
     If type_spec = 1 Then
         n_col_pos = 2
@@ -6552,6 +6584,7 @@ Function SpecIzd(ByVal izd As Variant, ByVal n_izd As Integer, ByVal type_spec A
     End If
     
     n_col_spec = 6
+    If type_spec = 13 Then n_col_spec = n_col_spec + 1
     If type_spec = 13 And UserForm2.qtyOneFloor_CB.Value Then n_col_spec = n_col_spec + 1
     If type_spec <> 13 And UserForm2.qtyOneFloor_CB.Value Then n_col_spec = n_col_spec + 2
     Dim pos_out: ReDim pos_out(pos_chsum_izd, n_col_spec)
@@ -6613,7 +6646,7 @@ Function SpecIzd(ByVal izd As Variant, ByVal n_izd As Integer, ByVal type_spec A
         Next j
     Next i
     For i = 1 To UBound(pos_out, 1)
-        If type_spec = 13 Or UserForm2.qtyOneFloor_CB.Value Then pos_out(i, n_col_spec - 1) = t_izd
+        If type_spec = 13 Or UserForm2.qtyOneFloor_CB.Value Then pos_out(i, 7) = t_izd
         If type_spec <> 1 Then
             If InStr(pos_out(i, 1), "#дерев") > 0 Then
                 pos_out(i, 1) = Replace(pos_out(i, 1), "#дерев", "")
@@ -6651,6 +6684,7 @@ Function SpecMaterial(ByVal mat As Variant, ByVal n_mat As Integer, ByVal type_s
         pos_mat = UBound(un_pos_mat, 1)
     End If
     n_col_spec = 6
+    If type_spec = 13 Then n_col_spec = n_col_spec + 1
     If type_spec = 13 And UserForm2.qtyOneFloor_CB.Value Then n_col_spec = n_col_spec + 1
     If type_spec <> 13 And UserForm2.qtyOneFloor_CB.Value Then n_col_spec = n_col_spec + 2
     Dim pos_out: ReDim pos_out(pos_mat, n_col_spec)
@@ -6681,7 +6715,7 @@ Function SpecMaterial(ByVal mat As Variant, ByVal n_mat As Integer, ByVal type_s
         Next j
     Next i
     For i = 1 To UBound(pos_out, 1)
-        If type_spec = 13 Or UserForm2.qtyOneFloor_CB.Value Then pos_out(i, n_col_spec) = t_mat
+        If type_spec = 13 Or UserForm2.qtyOneFloor_CB.Value Then pos_out(i, 7) = t_mat
     Next
     If type_spec = 1 Then
         n_col_pos = 2
@@ -6710,6 +6744,7 @@ Function SpecOneSubpos(ByVal all_data As Variant, ByVal subpos As String, ByVal 
     End If
     sb_naen = "@"
     n_col_spec = 6
+    If type_spec = 13 Then n_col_spec = n_col_spec + 1
     If type_spec = 13 And UserForm2.qtyOneFloor_CB.Value Then n_col_spec = n_col_spec + 1
     If type_spec <> 13 And UserForm2.qtyOneFloor_CB.Value Then n_col_spec = n_col_spec + 2
     If type_spec = 2 Then
@@ -6825,10 +6860,10 @@ Function SpecOneSubpos(ByVal all_data As Variant, ByVal subpos As String, ByVal 
     If n_subpos > 0 Then
         'subp = ArrayRedim(subp, n_subpos)
         pos_naen(n_n, 3) = " Сборочные единицы "
-        pos_naen(n_n, 1) = fin_str
+        If UserForm2.qtyOneFloor_CB.Value And type_spec <> 13 Then pos_naen(n_n, 1) = fin_str
         If type_spec = 13 Or UserForm2.qtyOneFloor_CB.Value Then
-            pos_naen(n_n, n_col_spec - 1) = t_subpos
-            pos_naen(1, n_col_spec - 1) = pos_naen(n_n, n_col_spec - 1)
+            pos_naen(n_n, 7) = t_subpos
+            pos_naen(1, 7) = pos_naen(n_n, 7)
         End If
         If type_spec <> 1 And UserForm2.show_type_CB.Value Then pos_out = ArrayCombine(pos_out, pos_naen)
         pos_out = ArrayCombine(pos_out, SpecSubpos(subp, n_subpos, type_spec, nSubPos, floor_txt))
@@ -6837,10 +6872,10 @@ Function SpecOneSubpos(ByVal all_data As Variant, ByVal subpos As String, ByVal 
     If n_izd > 0 Then
         'izd = ArrayRedim(izd, n_izd)
         pos_naen(n_n, 3) = " Изделия "
-        pos_naen(n_n, 1) = fin_str
+        If UserForm2.qtyOneFloor_CB.Value And type_spec <> 13 Then pos_naen(n_n, 1) = fin_str
         If type_spec = 13 Or UserForm2.qtyOneFloor_CB.Value Then
-            pos_naen(n_n, n_col_spec - 1) = t_izd
-            pos_naen(1, n_col_spec - 1) = pos_naen(n_n, n_col_spec - 1)
+            pos_naen(n_n, 7) = t_izd
+            pos_naen(1, 7) = pos_naen(n_n, 7)
         End If
         If type_spec <> 1 And UserForm2.show_type_CB.Value Then pos_out = ArrayCombine(pos_out, pos_naen)
         pos_out = ArrayCombine(pos_out, SpecIzd(izd, n_izd, type_spec, nSubPos))
@@ -6849,10 +6884,10 @@ Function SpecOneSubpos(ByVal all_data As Variant, ByVal subpos As String, ByVal 
     If n_prokat > 0 Then
         'prokat = ArrayRedim(prokat, n_prokat)
         pos_naen(n_n, 3) = " Прокат "
-        pos_naen(n_n, 1) = fin_str
+        If UserForm2.qtyOneFloor_CB.Value And type_spec <> 13 Then pos_naen(n_n, 1) = fin_str
         If type_spec = 13 Or UserForm2.qtyOneFloor_CB.Value Then
-            pos_naen(n_n, n_col_spec - 1) = t_prokat
-            pos_naen(1, n_col_spec - 1) = pos_naen(n_n, n_col_spec - 1)
+            pos_naen(n_n, 7) = t_prokat
+            pos_naen(1, 7) = pos_naen(n_n, 7)
         End If
         If type_spec <> 1 And UserForm2.show_type_CB.Value Then pos_out = ArrayCombine(pos_out, pos_naen)
         pos_out = ArrayCombine(pos_out, SpecProkat(prokat, n_prokat, type_spec, nSubPos))
@@ -6861,10 +6896,10 @@ Function SpecOneSubpos(ByVal all_data As Variant, ByVal subpos As String, ByVal 
     If n_arm > 0 Then
         'arm = ArrayRedim(arm, n_arm)
         pos_naen(n_n, 3) = " Изделия арматурные "
-        pos_naen(n_n, 1) = fin_str
+        If UserForm2.qtyOneFloor_CB.Value And type_spec <> 13 Then pos_naen(n_n, 1) = fin_str
         If type_spec = 13 Or UserForm2.qtyOneFloor_CB.Value Then
-            pos_naen(n_n, n_col_spec - 1) = t_arm
-            pos_naen(1, n_col_spec - 1) = pos_naen(n_n, n_col_spec - 1)
+            pos_naen(n_n, 7) = t_arm
+            pos_naen(1, 7) = pos_naen(n_n, 7)
         End If
         If type_spec <> 1 And UserForm2.show_type_CB.Value Then pos_out = ArrayCombine(pos_out, pos_naen)
         pos_out = ArrayCombine(pos_out, SpecArm(arm, n_arm, type_spec, nSubPos))
@@ -6873,10 +6908,10 @@ Function SpecOneSubpos(ByVal all_data As Variant, ByVal subpos As String, ByVal 
     If n_mat > 0 Then
         'mat = ArrayRedim(mat, n_mat)
         pos_naen(n_n, 3) = " Материалы "
-        pos_naen(n_n, 1) = fin_str
+        If UserForm2.qtyOneFloor_CB.Value And type_spec <> 13 Then pos_naen(n_n, 1) = fin_str
         If type_spec = 13 Or UserForm2.qtyOneFloor_CB.Value Then
-            pos_naen(n_n, n_col_spec - 1) = t_mat
-            pos_naen(1, n_col_spec - 1) = pos_naen(n_n, n_col_spec - 1)
+            pos_naen(n_n, 7) = t_mat
+            pos_naen(1, 7) = pos_naen(n_n, 7)
         End If
         If type_spec <> 1 And UserForm2.show_type_CB.Value Then pos_out = ArrayCombine(pos_out, pos_naen)
         pos_out = ArrayCombine(pos_out, SpecMaterial(mat, n_mat, type_spec, nSubPos))
@@ -6943,7 +6978,7 @@ Function SpecOneSubpos(ByVal all_data As Variant, ByVal subpos As String, ByVal 
         End Select
         If type_spec <> 13 And UserForm2.qtyOneFloor_CB.Value Then
             For i = 1 To UBound(pos_out, 1)
-                pos_out(i, n_col_spec) = nSubPos
+                pos_out(i, 8) = nSubPos
             Next i
         End If
         SpecOneSubpos = pos_out
@@ -6977,6 +7012,7 @@ Function SpecProkat(ByVal prokat As Variant, ByVal n_prokat As Integer, ByVal ty
     End If
     
     n_col_spec = 6
+    If type_spec = 13 Then n_col_spec = n_col_spec + 1
     If type_spec = 13 And UserForm2.qtyOneFloor_CB.Value Then n_col_spec = n_col_spec + 1
     If type_spec <> 13 And UserForm2.qtyOneFloor_CB.Value Then n_col_spec = n_col_spec + 2
     ReDim pos_out(pos_chsum_prokat, n_col_spec)
@@ -7202,6 +7238,7 @@ Function SpecSubpos(ByVal subp As Variant, ByVal n_subp As Integer, ByVal type_s
     End If
     
     n_col_spec = 6
+    If type_spec = 13 Then n_col_spec = n_col_spec + 1
     If type_spec = 13 And UserForm2.qtyOneFloor_CB.Value Then n_col_spec = n_col_spec + 1
     If type_spec <> 13 And UserForm2.qtyOneFloor_CB.Value Then n_col_spec = n_col_spec + 2
     Dim pos_out: ReDim pos_out(pos_chsum_subp, n_col_spec)
@@ -7260,6 +7297,7 @@ End Function
 Function Spec_AS(ByRef all_data As Variant, ByVal type_spec As Integer) As Variant
     n_col_spec = 6
     n_col_end = 4
+    If type_spec = 13 Then n_col_spec = n_col_spec + 1
     If type_spec = 13 And UserForm2.qtyOneFloor_CB.Value Then n_col_spec = n_col_spec + 1
     If type_spec <> 13 And UserForm2.qtyOneFloor_CB.Value Then
         n_col_spec = n_col_spec + 2
@@ -7567,7 +7605,7 @@ Function Spec_AS(ByRef all_data As Variant, ByVal type_spec As Integer) As Varia
                 End If
                 If IsNumeric(pos_out_floor(i, end_col)) Then
                     If Round_w(pos_out_floor(i, end_col), 0) > 0 Then
-                        pos_out_floor(i, end_col) = Trim(ConvNum2Txt(pos_out_floor(i, end_col)) & " кг.")
+                        pos_out_floor(i, end_col) = Trim(ConvNum2Txt(Round_w(pos_out_floor(i, end_col), n_round_w)) & " кг.")
                         If Left(pos_out_floor(i, end_col), 1) = "." Then pos_out_floor(i, end_col) = "0" + pos_out_floor(i, end_col)
                     Else
                         pos_out_floor(i, end_col) = "-"
@@ -7586,13 +7624,15 @@ Function Spec_AS(ByRef all_data As Variant, ByVal type_spec As Integer) As Varia
                     End If
                 Next i
             End If
-            If UserForm2.qtyOneFloor_CB.Value Then pos_out = ArrayCombine(pos_out, pos_out_floor)
-            ReDim pos_out_subpos(1, 1)
-            ReDim pos_out_arm(1, 1)
-            ReDim pos_out_prokat(1, 1)
-            ReDim pos_out_izd(1, 1)
-            ReDim pos_out_mat(1, 1)
-            pos_out_floor = Empty
+            pos_out = ArrayCombine(pos_out, pos_out_floor)
+            If UserForm2.qtyOneFloor_CB.Value Then
+                ReDim pos_out_subpos(1, 1)
+                ReDim pos_out_arm(1, 1)
+                ReDim pos_out_prokat(1, 1)
+                ReDim pos_out_izd(1, 1)
+                ReDim pos_out_mat(1, 1)
+                pos_out_floor = Empty
+            End If
         End If
     Next inxfloor
     
@@ -7693,7 +7733,7 @@ Function Spec_AS(ByRef all_data As Variant, ByVal type_spec As Integer) As Varia
             If pos_out(i, 3) <> "" Then
                 If IsNumeric(ConvTxt2Num(pos_out(i, end_col))) Then
                     If Round_w(pos_out(i, end_col), 0) > 0 Then
-                        pos_out(i, end_col) = Trim(ConvNum2Txt(pos_out(i, end_col)) & " кг.")
+                        pos_out(i, end_col) = Trim(ConvNum2Txt(Round_w(pos_out(i, end_col), n_round_w)) & " кг.")
                         If Left(pos_out(i, end_col), 1) = "." Then pos_out(i, end_col) = "0" + pos_out(i, end_col)
                     Else
                         pos_out(i, end_col) = "-"
@@ -8032,6 +8072,7 @@ Function Spec_KM(ByRef all_data As Variant) As Variant
 End Function
 
 Function Spec_KZH(ByRef all_data As Variant) As Variant
+    floor_txt = "all_floor"
     is_bet = False
     If show_bet_wkzh Then is_bet = Spec_CONC(all_data)
     Set name_subpos = pos_data.Item(floor_txt).Item("name") 'Словарь с именами сборок
@@ -8787,6 +8828,7 @@ Function VedCleanName(ByVal mat As String) As String
 End Function
 
 Function Spec_CONC(ByRef all_data As Variant) As Boolean
+    floor_txt = "all_floor"
     all_bet = ArraySelectParam_2(all_data, t_mat, col_type_el, "?етон?", col_m_naen)
     If IsEmpty(concrsubpos) Then Set concrsubpos = CreateObject("Scripting.Dictionary")
     flag = False
@@ -8795,7 +8837,7 @@ Function Spec_CONC(ByRef all_data As Variant) As Boolean
         all_bet_subpos = ArraySelectParam_2(all_bet, subpos, col_sub_pos, "?етон?", col_m_naen)
         concrsubpos.Item(subpos & "_bet_qty") = 0
         If Not IsEmpty(all_bet_subpos) Then
-            nSubPos = GetNSubpos(subpos, 1)
+            nSubPos = GetNSubpos(subpos, 1, floor_txt)
             n_mat = UBound(all_bet_subpos, 1)
             spec_subpos = SpecMaterial(all_bet_subpos, n_mat, 2, nSubPos)
             For j = 1 To UBound(spec_subpos, 1)
@@ -8813,6 +8855,7 @@ Function Spec_CONC(ByRef all_data As Variant) As Boolean
 End Function
 
 Function Spec_NRM(ByRef all_data As Variant) As Variant
+    floor_txt = "all_floor"
     UserForm2.qtyOneSubpos_CB.Value = False
     pos_out_arm = Spec_KZH(all_data)
     n_col_arm = UBound(pos_out_arm, 2)
