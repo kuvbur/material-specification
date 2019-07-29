@@ -2,7 +2,7 @@ Attribute VB_Name = "common"
 Option Compare Text
 Option Base 1
 
-Public Const common_version As String = "3.9"
+Public Const common_version As String = "3.91"
 Public Const Pi As Double = 3.141592653589
 Public ank_data As Variant
 Public Function GetLeghtByID(id As String, table As Range, n_col_id As Integer, n_col_l As Integer) As Variant
@@ -100,8 +100,8 @@ Public Function Арм_Анкеровка(ByVal diam As Integer, ByVal class As String, ByVa
         Case "D"
             Арм_Анкеровка = Round((lout / diam), 2) & "d"
     End Select
-    If Not ank_data.Exists(class) Then Арм_Анкеровка = "ОШИБКА КЛАССА"
-    If Not ank_data.Exists(beton) Then Арм_Анкеровка = "ОШИБКА БЕТОНА"
+    If Not ank_data.exists(class) Then Арм_Анкеровка = "ОШИБКА КЛАССА"
+    If Not ank_data.exists(beton) Then Арм_Анкеровка = "ОШИБКА БЕТОНА"
 End Function
 
 Public Function Арм_Округление(ByVal L As Long, Optional ByVal krat As String = "10мм") As Long
@@ -202,6 +202,10 @@ Public Function Арм_ПоПлощади(S As Variant, shag As Variant, ByVal lnahl As Inte
     L = Sqr(S) + (S / shag)
     lout = Арм_Длина_ПМ(L, lnahl, led)
     Арм_ПоПлощади = lout
+End Function
+
+Public Function Арм_ОдинСлойПоПлощади(S As Variant, shag As Variant, ByVal lnahl As Integer, Optional ByVal led As Integer = 11700) As Long
+    Арм_ОдинСлойПоПлощади = Арм_ПоПлощади(S, shag, lnahl, led)
 End Function
 
 Public Function SetPlast_Razm(diam As Integer) As String
