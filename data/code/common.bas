@@ -2,7 +2,7 @@ Attribute VB_Name = "common"
 Option Compare Text
 Option Base 1
 
-Public Const common_version As String = "3.91"
+Public Const common_version As String = "3.93"
 Public Const Pi As Double = 3.141592653589
 Public ank_data As Variant
 Public Function GetLeghtByID(id As String, table As Range, n_col_id As Integer, n_col_l As Integer) As Variant
@@ -10,6 +10,7 @@ Public Function GetLeghtByID(id As String, table As Range, n_col_id As Integer, 
 End Function
 Public Function Сумма_ПоИД(id As String, table As Range, n_col_id As Integer, n_col_l As Integer) As Variant
 Attribute Сумма_ПоИД.VB_Description = "Суммирует элементов с одинаковым ID из таблицы. Ввод в формате ID, Таблица, Номер столбца ID, Номер столбца суммируемой величины"
+    'Сумма значений заданного столбца для заданного ID
     Sum_l = 0
     id = Trim(id)
     For i = 1 To table.Rows.Count
@@ -19,6 +20,36 @@ Attribute Сумма_ПоИД.VB_Description = "Суммирует элементов с одинаковым ID из та
         End If
     Next i
     Сумма_ПоИД = Sum_l
+End Function
+
+Public Function Макс_ПоИД(id As String, table As Range, n_col_id As Integer, n_col_l As Integer) As Variant
+    'Выбор максимального значения из таблицы по заданному ID (макс. высота стен, макс. площадь и т.д.)
+    max_l = 0
+    id = Trim(id)
+    For i = 1 To table.Rows.Count
+        If Trim(table(i, n_col_id)) = id Then
+            ll = table(i, n_col_l)
+            If IsNumeric(ll) Then
+                If ll > max_l Then max_l = ll
+            End If
+        End If
+    Next i
+    Макс_ПоИД = max_l
+End Function
+
+Public Function Мин_ПоИД(id As String, table As Range, n_col_id As Integer, n_col_l As Integer) As Variant
+    'Выбор минимального значения из таблицы по заданному ID (мин. высота стен, мин. площадь и т.д.)
+    min_l = Макс_ПоИД(id, table, n_col_id, n_col_l)
+    id = Trim(id)
+    For i = 1 To table.Rows.Count
+        If Trim(table(i, n_col_id)) = id Then
+            ll = table(i, n_col_l)
+            If IsNumeric(ll) Then
+                If ll < min_l Then min_l = ll
+            End If
+        End If
+    Next i
+    Мин_ПоИД = min_l
 End Function
 
 Public Function SetPlast_T(diam As Integer) As String
@@ -64,7 +95,7 @@ End Function
 
 Private Function get_lo_arm(ByVal diam As Integer, ByVal class As String, beton As String) As Double
     set_ank_data
-    beton = Trim(Replace(Replace(beton, "B", ""), "В", ""))
+    beton = GetClassBeton(beton)
     Rs = ank_data.Item(class)
     Rbt = ank_data.Item(beton)
     Rbond = 2.5 * 1 * Rbt
@@ -169,10 +200,17 @@ Public Function Арм_МинРадиус(ByVal diam As Integer, ByVal class As String) As D
     Арм_МинРадиус = r_opr + r_arm
 End Function
 
-Public Function Арм_Элемент_П(ByVal L As Variant, ByVal H As Variant, ByVal diam As Integer, ByVal class As String, Optional ByVal Lniz As Integer = 0) As Double
+Public Function Арм_Элемент_П(ByVal L As Variant, ByVal H As Variant, ByVal diam As Integer, ByVal class As String, Optional ByVal Lniz As Integer = 0, Optional ByVal diam_osn As Integer = 0) As Double
     If Lniz = 0 Then Lniz = L
     agib = 90
-    r = Арм_МинРадиус(diam, class)
+    r_min = Арм_МинРадиус(diam, class)
+    r_osn = diam_osn / 2 + diam / 2
+    'Диаметр гиба - не менее минимального
+    If r_osn > r_min Then
+        r = r_osn
+    Else
+        r = r_min
+    End If
     lr = (Pi * r * agib) / 180
     lout = L + Lniz + H - 4 * r + 2 * lr
     krat = "10мм"
@@ -180,14 +218,48 @@ Public Function Арм_Элемент_П(ByVal L As Variant, ByVal H As Variant, ByVal diam
     Арм_Элемент_П = lout
 End Function
 
-Public Function Арм_Элемент_Г(ByVal L As Variant, ByVal H As Variant, ByVal diam As Integer, ByVal class As String) As Double
+Public Function Арм_Элемент_Г(ByVal L As Variant, ByVal H As Variant, ByVal diam As Integer, ByVal class As String, Optional ByVal diam_osn As Integer = 0) As Double
     agib = 90
-    r = Арм_МинРадиус(diam, class)
+    r_min = Арм_МинРадиус(diam, class)
+    r_osn = diam_osn / 2 + diam / 2
+    'Диаметр гиба - не менее минимального
+    If r_osn > r_min Then
+        r = r_osn
+    Else
+        r = r_min
+    End If
     lr = (Pi * r * agib) / 180
     lout = L + H - 2 * r + lr
     krat = "10мм"
     lout = Арм_Округление(lout, krat)
     Арм_Элемент_Г = lout
+End Function
+
+Public Function Арм_Элемент_Хомут(ByVal L As Integer, ByVal H As Integer, ByVal diam_osn As Integer, ByVal diam As Integer, ByVal class As String) As Double
+    r_min = Арм_МинРадиус(diam, class)
+    r_osn = diam_osn / 2 + diam / 2
+    'Диаметр гиба - не менее минимального
+    If r_osn > r_min Then
+        r = r_osn
+    Else
+        r = r_min
+    End If
+    'Длина загиба на 90
+    agib = 90
+    lr_90 = (Pi * r * agib) / 180
+    'Длина загиба на 135 (сейсмика)
+    agib = 135
+    lr_135 = (Pi * r * agib) / 180
+    'Заведение стержня в тело - 75 или 6d
+    If 6 * diam > 75 Then
+        ank = 6 * diam
+    Else
+        ank = 75
+    End If
+    lout = (L + H + ank) * 2 + lr_90 * 3 + lr_135 * 2
+    krat = "10мм"
+    lout = Арм_Округление(lout, krat)
+    Арм_Элемент_Хомут = lout
 End Function
 
 Public Function Арм_Длина_ПМ(ByVal L As Variant, ByVal lnahl As Variant, Optional ByVal led As Variant = 11700) As Long

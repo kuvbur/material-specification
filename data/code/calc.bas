@@ -1,7 +1,7 @@
 Attribute VB_Name = "calc"
 Option Compare Text
 Option Base 1
-Public Const macro_version As String = "3.57"
+Public Const macro_version As String = "3.58"
 '-------------------------------------------------------
 'Типы элементов (столбец col_type_el)
 Public Const t_arm As Integer = 10
@@ -1466,6 +1466,9 @@ Function DataIsOtd(ByVal array_in As Variant) As Boolean
     otd_version = 0
     If array_in(1, col_s_type) = "ЗОНА" And (n_col = max_col_type_1_1 Or n_col = max_col_type_2_1 Or n_col = max_col_type_3_1) Then otd_version = 1
     If array_in(1, col_s_type) = "ЗОНА" And (n_col = max_col_type_1_2 Or n_col = max_col_type_2_2 Or n_col = max_col_type_3_2) Then otd_version = 2
+    If otd_version = 2 Then
+        If array_in(1, col_s_type_pol_zone) = "Не задан" And array_in(1, col_s_type_pot_zone) = 0 And n_col = max_col_type_2_1 Then otd_version = 1
+    End If
     If otd_version = 1 Then
         col_s_type_el = col_s_type_el_1
         col_s_type_pol = col_s_type_pol_1
@@ -1573,7 +1576,7 @@ Function DataConvertVersion(ByVal array_in As Variant) As Variant
             For j = 1 To col_pos + add_row
                 pos_out(i, j) = array_in(i, j)
             Next j
-            For j = col_pos + add_row + 1 To max_col_v1 + add_row
+            For j = col_pos + add_row + 1 To UBound(array_in, 2) - 3
                 pos_out(i, j) = array_in(i, j + 3)
             Next j
             pos_out(i, col_nfloor + add_row) = array_in(i, col_pos + 1 + add_row)
@@ -1631,6 +1634,21 @@ Function DataNameSubpos(ByVal sub_pos_arr As Variant) As Object
             name_subpos.Item(subpos) = Array(naen, obozn)
         Next i
     End If
+    sheet = "Имена сборок_поз"
+    If SheetExist(sheet) Then
+        array_in = ReadPos(sheet)
+        all_subpos_in_sheet = ArraySelectParam(array_in, t_subpos, col_type_el)
+        For i = 1 To UBound(all_subpos_in_sheet, 1)
+            subpos = all_subpos_in_sheet(i, col_sub_pos)
+            naen = all_subpos_in_sheet(i, col_m_naen)
+            obozn = all_subpos_in_sheet(i, col_m_obozn)
+            If InStr(naen, "!!!") = 0 And InStr(obozn, "!!!") = 0 Then
+                If name_subpos.exists(subpos) Then name_subpos.Remove subpos
+                name_subpos.Item(subpos) = Array(naen, obozn)
+            End If
+        Next i
+    End If
+    
     nm = ThisWorkbook.ActiveSheet.Name
     type_sheet = SpecGetType(nm)
     If Not IsEmpty(type_sheet) And type_sheet <> 3 Then
@@ -1651,6 +1669,7 @@ Function DataNameSubpos(ByVal sub_pos_arr As Variant) As Object
             End If
         Next i
     End If
+    
     Set DataNameSubpos = name_subpos
 End Function
 
@@ -4031,6 +4050,22 @@ Function GetWidthSheet(ByRef Sh As Variant) As Double
     GetWidthSheet = w_sheet
 End Function
 
+Function GetClassBeton(ByVal txt As String) As String
+    class = Empty
+    If InStr(txt, "етон") > 0 Then
+        txt = Trim(Replace(txt, "  ", " "))
+        wrd = Split(txt, " ")
+        For Each w In wrd
+            w = Trim(Replace(Replace(w, "B", ""), "В", ""))
+            If IsNumeric(ConvTxt2Num(w)) Then
+                class = w
+            End If
+        Next
+        txt = Trim(Replace(Replace(txt, "B", ""), "В", ""))
+    End If
+    GetClassBeton = class
+End Function
+
 Function GetListFile(ByRef mask As String) As Variant
     path = ThisWorkbook.path & "\import"
     Set coll = FilenamesCollection(path, mask)
@@ -4453,6 +4488,7 @@ Function ManualCheck(nm) As Boolean
     spec = Data_out.Range(Data_out.Cells(1, 1), Data_out.Cells(n_row, max_col_man))
     r = FormatFont(Data_out.Range(Data_out.Cells(1, 1), Data_out.Cells(n_row, max_col_man)), n_row, max_col_man)
     n_err = 0
+    Set name_subpos = DataNameSubpos(Empty)
     Set concrsubpos = CreateObject("Scripting.Dictionary")
     Set dsubpos = CreateObject("Scripting.Dictionary")
     Set ank_subpos = CreateObject("Scripting.Dictionary")
@@ -4486,7 +4522,7 @@ Function ManualCheck(nm) As Boolean
                         r = ManualCeilAlert(Data_out.Cells(i, col_man_subpos), "Впишите марку элемента")
                         n_err = n_err + 1
                     End If
-                    If InStr(obozn, "сновной") > 0 And InStr(naen, "етон") > 0 And InStr(subpos, "!!") = 0 Then ank_subpos.Item(subpos & "_бет") = Trim(Replace(Replace(Replace(naen, "Бетон", ""), "бетон", ""), "B", "В"))
+                    If InStr(obozn, "сновной") > 0 And InStr(naen, "етон") > 0 And InStr(subpos, "!!") = 0 Then ank_subpos.Item(subpos & "_бет") = naen
                     If InStr(obozn, "ейсмика") > 0 Or InStr(naen, "ейсмика") > 0 And InStr(subpos, "!!") = 0 Then ank_subpos.Item(subpos & "_kseism") = 1.3
                     With Data_out.Range(Data_out.Cells(i, 1), Data_out.Cells(i, max_col_man)).Interior
                         .Pattern = xlSolid
@@ -4587,6 +4623,12 @@ Function ManualCheck(nm) As Boolean
                         End With
                     End If
                 Case t_subpos 'Правила для маркировки сборок
+                    If name_subpos.exists(subpos) Then
+                        tnaen = name_subpos.Item(subpos)(1)
+                        tobozn = name_subpos.Item(subpos)(2)
+                        Data_out.Cells(i, col_man_obozn) = tobozn
+                        Data_out.Cells(i, col_man_naen) = tnaen
+                    End If
                     If qty = Empty Then
                         With Data_out.Range(Data_out.Cells(i, 1), Data_out.Cells(i, max_col_man)).Interior
                             .Pattern = xlSolid
@@ -4694,11 +4736,11 @@ Function ManualCheck(nm) As Boolean
             flag_eq = 0
             i = 0
             bet_ank = ank_subpos.Item(subpos & "_бет")
-            bet_ank = Replace(bet_ank, "B", "В")
+            bet_ank = GetClassBeton(bet_ank)
             For Each bet In concrsubpos.Keys()
                 If InStr(bet, "_") > 0 And InStr(bet, subpos) > 0 Then
                     i = concrsubpos.Item(bet)
-                    bet = Replace(bet, "B", "В")
+                    bet = GetClassBeton(bet)
                     If InStr(bet, bet_ank) > 0 Then flag_eq = 1
                 End If
             Next
@@ -5116,10 +5158,10 @@ Function ManualSpec(ByVal nm As String, Optional ByVal add_array As Variant) As 
                 Else
                     perim_okr = pr_adress.Item(pr_gost_pr & pr_prof)(2)
                     pos_out(n_row_out, col_pr_naen) = pr_prof & " L=" & pr_length * 1000 & "мм."
+                    If Len(prim) > 1 Then pos_out(n_row_out, col_pr_naen) = pos_out(n_row_out, col_pr_naen) + "@@" + prim
                 End If
                 pos_out(n_row_out, col_pr_length) = pr_length / koef_l
                 pos_out(n_row_out, col_pr_weight) = Weight
-                
                 If Not IsEmpty(pr_okr) And pr_okr <> "-" Then
                     n_add_okr = n_add_okr + 1
                     area_okr = perim_okr * pr_length / 1000
@@ -7027,6 +7069,11 @@ Function SpecProkat(ByVal prokat As Variant, ByVal n_prokat As Integer, ByVal ty
             End If
             If current_chksum = un_chsum_prokat(i) Then
                 name_pr = GetShortNameForGOST(prokat(j, col_pr_gost_prof))
+                If InStr(prokat(j, col_pr_naen), "@@") > 0 Then
+                    prim = Split(prokat(j, col_pr_naen), "@@")(1)
+                    prokat(j, col_pr_naen) = Split(prokat(j, col_pr_naen), "@@")(0)
+                    pm = False: If InStr(prim, "п.м.") > 0 Then pm = True
+                End If
                 n_el = prokat(j, col_qty) / nSubPos
                 If (n_el = 0) Or IsEmpty(prokat(j, col_qty)) Then n_el = 1
                 If InStr(1, name_pr, "Лист") Then
@@ -7034,19 +7081,19 @@ Function SpecProkat(ByVal prokat As Variant, ByVal n_prokat As Integer, ByVal ty
                     we = naen_plate(4)
                     L = naen_plate(5) * naen_plate(6)
                 Else
-                    L = Round_w(prokat(j, col_pr_length) / 1000, 3)
+                    L = Round_w(prokat(j, col_pr_length) / 1000, n_round_l)
                     we = prokat(j, col_pr_weight) * L
                 End If
-                If UserForm2.pr_pm_CB.Value Then
-                    we = Round_w(we * k_zap_total, n_round_w) / L
+                If UserForm2.pr_pm_CB.Value Or pm Then
+                    we = Round(Round_w(we * k_zap_total, n_round_w) / L, n_round_w)
                 Else
                     we = Round_w(we * k_zap_total, n_round_w)
                 End If
                 Select Case type_spec
                     Case 1
-                        If UserForm2.pr_pm_CB.Value Then
+                        If UserForm2.pr_pm_CB.Value Or pm Then
                             pos_out(i, 1) = prokat(j, col_sub_pos) & n_txt
-                            If UserForm2.keep_pos_CB.Value Then
+                            If UserForm2.keep_pos_CB.Value Or pm Then
                                 pos_out(i, 2) = prokat(j, col_pos)
                             Else
                                 pos_out(i, 2) = " "
@@ -7070,8 +7117,8 @@ Function SpecProkat(ByVal prokat As Variant, ByVal n_prokat As Integer, ByVal ty
                             pos_out(i, 5) = we
                         End If
                     Case Else
-                        If UserForm2.pr_pm_CB.Value Then
-                            If UserForm2.keep_pos_CB.Value Then
+                        If UserForm2.pr_pm_CB.Value Or pm Then
+                            If UserForm2.keep_pos_CB.Value Or pm Then
                                 pos_out(i, 1) = prokat(j, col_pos)
                             Else
                                 pos_out(i, 1) = " "
@@ -7148,7 +7195,7 @@ Function SpecMetallPlate(ByVal prokat_prof As String, ByVal prokat_naen As Strin
     abc = Split(prokat_naen, "*")
     If UBound(abc) > 0 Then
         flag_read = True
-        A = 0: b = 0: t = 100000: S = 0
+        A = 0: B = 0: t = 100000: S = 0
         For nn = 0 To UBound(abc)
             k = ConvTxt2Num(abc(nn))
             If IsNumeric(k) Then
@@ -7158,15 +7205,15 @@ Function SpecMetallPlate(ByVal prokat_prof As String, ByVal prokat_naen As Strin
                 S = S + k
             End If
         Next nn
-        b = S - A - t
-        b = Round(b, 3)
+        B = S - A - t
+        B = Round(B, 3)
         A = Round(A, 3)
         t = Round(t, 3)
         prokat_prof = "--" + ConvNum2Txt(t * 1000)
-        prokat_naen = "--" + ConvNum2Txt(t * 1000) + "x" + ConvNum2Txt(b * 1000) + "x" + ConvNum2Txt(A * 1000)
-        we_plate_one = A * b * t * 7850
+        prokat_naen = "--" + ConvNum2Txt(t * 1000) + "x" + ConvNum2Txt(B * 1000) + "x" + ConvNum2Txt(A * 1000)
+        we_plate_one = A * B * t * 7850
     End If
-    If b < 0.000001 Or t < 0.000001 Or A < 0.000001 Then
+    If B < 0.000001 Or t < 0.000001 Or A < 0.000001 Then
         MsgBox ("Ошибка в имени типа профиля листа " + prokat_naen_t)
         array_out(1) = "ОШИБКА ТИПА ПРОФИЛЯ ЛИСТА"
         array_out(2) = 0.001
@@ -7184,13 +7231,13 @@ Function SpecMetallPlate(ByVal prokat_prof As String, ByVal prokat_naen As Strin
 '        If Not UserForm2.pr_pm_CB.Value Then we = we * L
 '    End If
 
-    L = b * A
+    L = B * A
     we = t * 7850
     If Not UserForm2.pr_pm_CB.Value Then we = we * L
     If (UserForm2.keep_pos_CB.Value And UserForm2.pr_pm_CB.Value) Or Not UserForm2.pr_pm_CB.Value Then
         If Not UserForm2.pr_pm_CB.Value Then we = we / L
         If flag_read Then
-            If Round(b * 1000, 1) = 0 Then
+            If Round(B * 1000, 1) = 0 Then
                 l_plate = L / A
                 we_plate = we / A
             Else
@@ -7198,8 +7245,8 @@ Function SpecMetallPlate(ByVal prokat_prof As String, ByVal prokat_naen As Strin
                 we_plate = L * we
             End If
             naen_plate = prokat_naen
-            If UserForm2.pr_pm_CB.Value And Round(b * 1000, 1) = 0 Then naen_plate = prokat_naen & " L=п.м."
-            If Not UserForm2.pr_pm_CB.Value And Round(b * 1000, 1) = 0 Then naen_plate = prokat_naen & " L=" & l_plate * 1000 & "мм."
+            If UserForm2.pr_pm_CB.Value And Round(B * 1000, 1) = 0 Then naen_plate = prokat_naen & " L=п.м."
+            If Not UserForm2.pr_pm_CB.Value And Round(B * 1000, 1) = 0 Then naen_plate = prokat_naen & " L=" & l_plate * 1000 & "мм."
         Else
             naen_plate = prokat_naen & " S=" & L & "кв.м."
             we_plate = we
@@ -7215,7 +7262,7 @@ Function SpecMetallPlate(ByVal prokat_prof As String, ByVal prokat_naen As Strin
     array_out(3) = we_plate
     array_out(4) = we_plate_one
     array_out(5) = A
-    array_out(6) = b
+    array_out(6) = B
     array_out(7) = t
     SpecMetallPlate = array_out
 End Function
