@@ -1,7 +1,7 @@
 Attribute VB_Name = "calc"
 Option Compare Text
 Option Base 1
-Public Const macro_version As String = "3.58"
+Public Const macro_version As String = "3.61"
 '-------------------------------------------------------
 'Типы элементов (столбец col_type_el)
 Public Const t_arm As Integer = 10
@@ -149,7 +149,7 @@ Public max_col_type_3 As Integer
 Public max_s_col As Integer
 
 Public fin_str As String
-Public fin_str_second As String
+Public fin_str_sec As String
 Public zone_error As Variant
 '-------------------------------------------------------
 'Описание файла сортамента
@@ -340,8 +340,8 @@ Function INISet()
     '----Принудительное включение
     delim_by_sheet = True
     isINIset = True
-    fin_str = " !!AA_"
-    fin_str_second = " !!BB_"
+    fin_str = "!!AA_"
+    fin_str_sec = "!!BB_"
 End Function
 
 Function INIReadKeyVal(ByVal sSection As String, ByVal sKey As String) As Variant
@@ -2578,7 +2578,6 @@ Function FormatManual(ByVal nm As String) As Boolean
     Data_out.Cells(2, col_man_nahl).ColumnWidth = 8
     Data_out.Cells(2, col_man_dgib).ColumnWidth = 8
     
-    
     Range(r_all).FormatConditions.Add Type:=xlExpression, Formula1:="=ЕОШИБКА(A1)"
     Range(r_all).FormatConditions(Range(r_all).FormatConditions.Count).SetFirstPriority
     With Range(r_all).FormatConditions(1).Interior
@@ -2588,7 +2587,6 @@ Function FormatManual(ByVal nm As String) As Boolean
     End With
     Range(r_all).FormatConditions(1).StopIfTrue = False
 
-    
     'Создаём столбец с марками элементов и добавим раскрывающийся список
     sheet_subpos_name = Left(nm, Len(nm) - 5) & "_поз"
     If SheetExist(sheet_subpos_name) Then
@@ -2716,7 +2714,7 @@ Function FormatManual(ByVal nm As String) As Boolean
         .ShowInput = True
         .ShowError = True
     End With
-
+    has_prof = False
     For i = 1 To nrow + 100
         gost = Cells(i, col_man_pr_gost_pr).Value
         addr = pr_adress.Item(gost)
@@ -2751,10 +2749,13 @@ Function FormatManual(ByVal nm As String) As Boolean
                             .ShowError = True
             End With
         End If
+        If Not IsEmpty(Cells(i, col_man_pr_gost_pr).Value) And i > 2 Then has_prof = True
     Next i
     Range(r_all).Rows.AutoFit
-    Columns("K:Q").Group
-    Columns("K:Q").EntireColumn.Hidden = True
+    If has_prof = False Then
+        Columns("K:Q").Group
+        Columns("K:Q").EntireColumn.Hidden = True
+    End If
     FormatManual = True
 End Function
 
@@ -4600,6 +4601,10 @@ Function ManualCheck(nm) As Boolean
                         r = ManualCeilAlert(Data_out.Cells(i, col_man_qty), "Необходимо указать количество")
                         n_err = n_err + 1
                     End If
+                    If IsEmpty(pr_length) Then
+                        r = ManualCeilAlert(Data_out.Cells(i, col_man_pr_length), "Необходимо указать длину")
+                        n_err = n_err + 1
+                    End If
                     If InStr(Data_out.Cells(i, col_man_pr_gost_pr).Value, "Лист_") Then
                         If InStr(pr_prof, "--") = 0 Then
                             r = ManualCeilAlert(Data_out.Cells(i, col_man_pr_prof), "Проверьте толщину, должно начинаться с --")
@@ -5646,10 +5651,14 @@ Function ReadPrSortament()
     For n_col = 2 To n_sort
         file = f_list_file(n_col)
         Sh.Cells(1, n_col - 1) = file
+        If Dir(SortamentPath & file & ".txt") = "" Then
+            MsgBox ("Файл не найден " + file)
+            Exit Function
+        End If
         f_prof = ReadTxt(SortamentPath & file & ".txt", 1, vbTab, vbNewLine)
         f_list_prof = ArrayCol(f_prof, 2)
         f_list_weight = ArrayCol(f_prof, 3)
-        If IsEmpty(f_list_prof) Then
+        If IsEmpty(f_list_prof) Or Not IsArray(f_prof) Then
             MsgBox ("Ошибка чтения файла " + file)
             Exit Function
         End If
@@ -5660,7 +5669,7 @@ Function ReadPrSortament()
         tpr_adress.Item(file) = tmp_arr
         type_prof = f_list_sort(n_col, 5)
         For j = 2 To n_prof - 1
-            If Not IsEmpty(f_list_weight(j)) Then
+            If Not IsEmpty(f_list_weight(j)) And IsNumeric(f_prof(j, 4)) And IsNumeric(f_list_weight(j)) Then
                 'Определяем периметр
                 perim = 0
                 Select Case type_prof
@@ -8720,8 +8729,11 @@ Function VedAddAreaGR(ByVal area As Double, ByVal mat_fin As String, ByVal type_
         flag_draft = 0
     End If
     num = Replace(num, ",", ".")
+    mat_fin = Replace(mat_fin, "<>", "")
+    mat_draft = Replace(mat_draft, "<>", "")
     'Если в названии чистовой отделки стоит --- или УНИВЕРСАЛЬНЫЙ - чистовая отделка не нужна
-    If InStr(mat_fin, "--") > 0 Or InStr(mat_fin, "УНИВЕРСАЛЬНОЕ") > 0 Then flag_fin = 0
+    If InStr(mat_fin, "--") > 0 Or InStr(mat_fin, "УНИВЕРСАЛЬНОЕ") > 0 Or mat_fin = "0" Or InStr(mat_fin, "е задан") > 0 Then flag_fin = 0
+    If mat_draft = "0" Or InStr(mat_draft, "е задан") > 0 Then flag_draft = 0
     If flag_draft Then
         'Черновая отделка с учётом исключений
         all_name_mat = Split(Replace(VedModMat(Replace(mat_fin, fin_str, ""), mat_draft, rules_mod), "@", ";"), ";")
@@ -8791,6 +8803,8 @@ Function VedAddArea(ByRef zone As Variant, ByRef materials As Variant, ByVal mat
     mat_draft = Trim(mat_draft)
     mat_draft = "b@" & Replace(mat_draft, razd, ";b@")
     mat_draft = Replace(mat_draft, "@ ", "@")
+    mat_draft = Replace(mat_draft, "<>", "")
+    mat_fin = Replace(mat_fin, "<>", "")
     If InStr(mat_draft, "=") > 0 Then
         name_mat = Array(Trim(Left(mat_draft, Len(mat_draft) - 1)))
     Else
@@ -8818,7 +8832,7 @@ Function VedAddArea(ByRef zone As Variant, ByRef materials As Variant, ByVal mat
             naen_mat = Trim(Replace(Replace(mat, "b@", ""), "a@", ""))
             If Left(naen_mat, 1) <> "" Then naen_mat = StrConv(Left(naen_mat, 1), vbUpperCase) + Right(naen_mat, Len(naen_mat) - 1)
             If Left(naen_mat, 1) = ";" Then naen_mat = Trim(Right(naen_mat, Len(naen_mat) - 1))
-            If naen_mat <> "" And Not IsEmpty(naen_mat) And InStr(naen_mat, "--") = 0 And InStr(naen_mat, "УНИВЕРСАЛЬНОЕ") = 0 Then
+            If naen_mat <> "" And Not IsEmpty(naen_mat) And InStr(naen_mat, "--") = 0 And InStr(naen_mat, "УНИВЕРСАЛЬНОЕ") = 0 And InStr(naen_mat, "е задан") = 0 Then
                 If Not zone.exists(num) Then
                     Set mat_collect = CreateObject("Scripting.Dictionary")
                     mat_collect.Item(mat) = 1
@@ -8865,7 +8879,7 @@ Function VedCleanName(ByVal mat As String) As String
     If InStr(mat, "%%") > 0 Then
         end_p = InStr(mat, "%%") + 1
         start_p = InStr(mat, fin_str + "До ") - 1
-        If start_p = -1 Then start_p = InStr(mat, fin_str_second + "Выше ") - 1
+        If start_p = -1 Then start_p = InStr(mat, fin_str_sec + "Выше ") - 1
         txt = Left(mat, end_p)
         end_txt = Right(txt, Len(txt) - start_p)
         mat = Replace(mat, end_txt, fin_str)
@@ -9032,7 +9046,7 @@ Function Spec_VED_GR(ByRef all_data As Variant) As Variant
                 Else
                     n_zone_h = UBound(un_zone_h, 1)
                 End If
-                If n_zone_h > 0 Then
+                If n_zone_h > 1 Or un_zone_h(1) > 0 Then
                     is_delta_h = True
                 Else
                     is_delta_h = False
@@ -9063,6 +9077,7 @@ Function Spec_VED_GR(ByRef all_data As Variant) As Variant
                     Else
                         column_is_wall = False
                     End If
+                    manual_column = False
                     ' ------------------------------------------
                     area_total = zone_el(1, col_s_area_zone)
                     perim_total = zone_el(1, col_s_perim_zone) / 1000
@@ -9076,14 +9091,26 @@ Function Spec_VED_GR(ByRef all_data As Variant) As Variant
                         h_pot = zone_el(1, col_s_h_pot_zone) / 1000
                         type_pot_zone = zone_el(1, col_s_type_pot_zone)
                         type_pol_zone = zone_el(1, col_s_type_pol_zone)
-                        If zone_el(1, col_s_mwall_up_zone) = fin_wall Or zone_el(1, col_s_mwall_up_zone) = fin_column Then
+                        If zone_el(1, col_s_mwall_up_zone) = fin_wall Or zone_el(1, col_s_mwall_up_zone) = fin_column Or h_pot <= 0.0001 Then
                             h_pot = h_zone
                             tfin_up_zone = zone_el(1, col_s_mwall_up_zone)
                         Else
                             tfin_up_zone = "Выше " + CStr(h_pot) + "м.:%%" + zone_el(1, col_s_mwall_up_zone)
                         End If
-                        fin_up_zone = fin_str_second + Replace(tfin_up_zone, "@", "; ")
+                        fin_up_zone = fin_str_sec + Replace(tfin_up_zone, "@", "; ")
                         param_zone = zone_el(1, col_s_param_zone)
+                        If InStr(param_zone, "@") > 0 Then
+                            For Each el In Split(param_zone, "@")
+                                If InStr(el, "=") > 0 Then
+                                    name_param = Split(el, "=")(0)
+                                    value_param = ConvTxt2Num(Split(el, "=")(1)) / 1000
+                                    If name_param = "Cp" Then
+                                        manual_column = True
+                                        column_perim_total = value_param
+                                    End If
+                                End If
+                            Next
+                        End If
                         wall_razd = ArraySelectParam(walls_el, "Разделитель", col_s_mat_wall)
                         If Not IsEmpty(wall_razd) Then
                             For wi = 1 To UBound(wall_razd, 1)
@@ -9142,10 +9169,8 @@ Function Spec_VED_GR(ByRef all_data As Variant) As Variant
                     '----------------------
                     '        КОЛОННЫ
                     '----------------------
-                    'Добавить возможность выбора наличия отверстий
-                    column_perim_in_wall = perim_total - wall_len - free_len + perim_hole * (hole_in_zone = True)
-                    column_perim = perim_hole
-                    column_perim_total = column_perim + column_perim_in_wall
+                    If manual_column = False Then column_perim_total = perim_total - wall_len - free_len + perim_hole * (hole_in_zone = True)
+                    If column_perim_total < 0 Then column_perim_total = 0
                     column_pan_area = column_perim_total * h_pan
                     column_pan_area_delta_h = column_perim_total * delta_h_zone
                     column_area = column_perim_total * (h_zone - h_pan - delta_h_zone)
@@ -9296,8 +9321,11 @@ Function Spec_VED_GR(ByRef all_data As Variant) As Variant
                         noPot = True
                     End If
                     If noPot Then
-                        r = VedAddAreaGR(pot_area, fin_pot, ";pot;", type_name, type_pot_zone, rules_mod, materials_by_type, num)
-                        materials_by_type.Item(type_name + ";pot_perim;") = materials_by_type.Item(type_name + ";pot_perim;") + perim_total
+                        pot_perim = perim_total
+                        If del_freelen_perim Then pot_perim = pot_perim - free_len
+                        If add_holes_perim Then pot_perim = pot_perim + perim_hole
+                        r = VedAddAreaGR(area_total, fin_pot, ";pot;", type_name, type_pot_zone, rules_mod, materials_by_type, num)
+                        materials_by_type.Item(type_name + ";pot_perim;") = materials_by_type.Item(type_name + ";pot_perim;") + pot_perim
                     End If
                     '----------------------
                     '        ПОЛЫ
@@ -9458,7 +9486,7 @@ Function Spec_VED_GR(ByRef all_data As Variant) As Variant
                     mat_clear = VedCleanName(mat)
                     area = Round_w(materials_by_type.Item(type_name + ";pot;" + mat) * k_zap_total, n_round_area)
                     If area > 0.001 Then
-                        If InStr(mat, fin_str) > 0 Or InStr(mat, fin_str_second) > 0 Then
+                        If InStr(mat, fin_str) > 0 Or InStr(mat, fin_str_sec) > 0 Then
                             sum_pot = sum_pot + area
                             materials.Item("@Потолок: " + mat_clear) = materials.Item("@Потолок: " + mat_clear) + area
                         Else
@@ -9469,7 +9497,7 @@ Function Spec_VED_GR(ByRef all_data As Variant) As Variant
                             num_zone = materials_by_type.Item(type_name + ";pot_num" + mat)
                             pos_out(n_row_p, 2) = num_zone
                         End If
-                        pos_out(n_row_p, 3) = Replace(Replace(Replace(mat, "%%", ""), fin_str, ""), fin_str_second, "")
+                        pos_out(n_row_p, 3) = Replace(Replace(Replace(mat, "%%", ""), fin_str, ""), fin_str_sec, "")
                         pos_out(n_row_p, 4) = area
                         n_row_p = n_row_p + 1
                     End If
@@ -9499,9 +9527,10 @@ Function Spec_VED_GR(ByRef all_data As Variant) As Variant
                     mat_clear = VedCleanName(mat)
                     area = materials_by_type.Item(type_name + ";wall;" + mat)
                     If area > 0.001 Then
-                        If InStr(mat, fin_str) > 0 Or InStr(mat, fin_str_second) > 0 Then sum_wall = sum_wall + Round_w(area * k_zap_total, n_round_area)
+                        If InStr(mat, fin_str) > 0 Or InStr(mat, fin_str_sec) > 0 Then sum_wall = sum_wall + Round_w(area * k_zap_total, n_round_area)
                         materials.Item(mat_clear) = materials.Item(mat_clear) + Round_w(area * k_zap_total, n_round_area)
-                        pos_out(n_row_w, 5) = Replace(Replace(Replace(mat, "%%", ""), fin_str, ""), fin_str_second, "")
+                        pos_out(n_row_w, 5) = Replace(Replace(mat, "%%", ""), fin_str, "")
+                        pos_out(n_row_w, 5) = Replace(pos_out(n_row_w, 5), fin_str_sec, "")
                         pos_out(n_row_w, 6) = Round_w(area * k_zap_total, n_round_area)
                         n_row_w = n_row_w + 1
                     End If
@@ -9519,9 +9548,9 @@ Function Spec_VED_GR(ByRef all_data As Variant) As Variant
                         mat_clear = VedCleanName(mat)
                         area = materials_by_type.Item(type_name + ";column;" + mat)
                         If area > 0.001 Then
-                            If InStr(mat, fin_str) > 0 Or InStr(mat, fin_str_second) > 0 Then sum_column = sum_column + Round_w(area * k_zap_total, n_round_area)
+                            If InStr(mat, fin_str) > 0 Or InStr(mat, fin_str_sec) > 0 Then sum_column = sum_column + Round_w(area * k_zap_total, n_round_area)
                             materials.Item(mat_clear) = materials.Item(mat_clear) + Round_w(area * k_zap_total, n_round_area)
-                            pos_out(n_row_c, 7) = Replace(Replace(Replace(mat, "%%", ""), fin_str, ""), fin_str_second, "")
+                            pos_out(n_row_c, 7) = Replace(Replace(Replace(mat, "%%", ""), fin_str, ""), fin_str_sec, "")
                             pos_out(n_row_c, 8) = Round_w(area * k_zap_total, n_round_area)
                             n_row_c = n_row_c + 1
                         End If
@@ -9540,9 +9569,9 @@ Function Spec_VED_GR(ByRef all_data As Variant) As Variant
                         mat_clear = VedCleanName(mat)
                         area = materials_by_type.Item(type_name + ";pan;" + mat)
                         If area > 0.001 Then
-                            If InStr(mat, fin_str) > 0 Or InStr(mat, fin_str_second) > 0 Then sum_pan = sum_pan + Round_w(area * k_zap_total, n_round_area)
+                            If InStr(mat, fin_str) > 0 Or InStr(mat, fin_str_sec) > 0 Then sum_pan = sum_pan + Round_w(area * k_zap_total, n_round_area)
                             materials.Item(mat_clear) = materials.Item(mat_clear) + Round_w(area * k_zap_total, n_round_area)
-                            pos_out(n_row_pan, col_end + 1) = Replace(Replace(Replace(mat, "%%", ""), fin_str, ""), fin_str_second, "")
+                            pos_out(n_row_pan, col_end + 1) = Replace(Replace(Replace(mat, "%%", ""), fin_str, ""), fin_str_sec, "")
                             pos_out(n_row_pan, col_end + 2) = Round_w(area * k_zap_total, n_round_area)
                             pos_out(n_row_pan, col_end + 3) = materials_by_type.Item(type_name + ";panh")
                             n_row_pan = n_row_pan + 1
@@ -9584,7 +9613,7 @@ Function Spec_VED_GR(ByRef all_data As Variant) As Variant
             For Each mat In materials.Keys()
                 If Len(mat) > 2 And (Left(mat, len_type_mat) = type_mat Or (type_mat = "@@@" And InStr(mat, "@") = 0 And InStr(mat, "Потолок: ") = 0 And InStr(mat, fin_str) = 0)) Then
                     n_row = n_row + 1
-                    pos_out(n_row, 1) = Replace(Replace(Replace(Replace(mat, "@", ""), "%%", ""), fin_str, ""), fin_str_second, "")
+                    pos_out(n_row, 1) = Replace(Replace(Replace(Replace(mat, "@", ""), "%%", ""), fin_str, ""), fin_str_sec, "")
                     pos_out(n_row, 4) = materials.Item(mat)
                 End If
             Next
@@ -9661,6 +9690,7 @@ Function Spec_VED(ByRef all_data As Variant) As Variant
             End If
             wall = ArraySelectParam(out_data, num, col_s_numb_zone, "СТЕНА", col_s_type)
             free_len_wall = 0
+            manual_column = False
             If otd_version = 2 Then
                 h_pot = zone_el(1, col_s_h_pot_zone) / 1000
                 type_pot_zone = zone_el(1, col_s_type_pot_zone)
@@ -9671,8 +9701,20 @@ Function Spec_VED(ByRef all_data As Variant) As Variant
                 Else
                     tfin_up_zone = "Выше " + CStr(h_pot) + "м.:%%" + zone_el(1, col_s_mwall_up_zone)
                 End If
-                fin_up_zone = fin_str_second + Replace(tfin_up_zone, "@", "; ")
+                fin_up_zone = fin_str_sec + Replace(tfin_up_zone, "@", "; ")
                 param_zone = zone_el(1, col_s_param_zone)
+                If InStr(param_zone, "@") > 0 Then
+                    For Each el In Split(param_zone, "@")
+                        If InStr(el, "=") > 0 Then
+                            name_param = Split(el, "=")(0)
+                            value_param = ConvTxt2Num(Split(el, "=")(1)) / 1000
+                            If name_param = "Cp" Then
+                                manual_column = True
+                                column_perim_total = value_param
+                            End If
+                        End If
+                    Next
+                End If
                 wall_razd = ArraySelectParam(wall, "Разделитель", col_s_mat_wall)
                 If Not IsEmpty(wall_razd) Then
                     For wi = 1 To UBound(wall_razd, 1)
@@ -9719,9 +9761,7 @@ Function Spec_VED(ByRef all_data As Variant) As Variant
             '        КОЛОННЫ
             '----------------------
             'Добавить возможность выбора наличия отверстий
-            column_perim_in_wall = perim_total - wall_len - free_len + perim_hole * (hole_in_zone = True)
-            column_perim = perim_hole
-            column_perim_total = column_perim + column_perim_in_wall
+            If manual_column = False Then column_perim_total = perim_total - wall_len - free_len + perim_hole * (hole_in_zone = True)
             column_pan_area = column_perim_total * h_pan
             column_pan_area_delta_h = column_perim_total * delta_h_zone
             column_area = column_perim_total * (h_zone - h_pan - delta_h_zone)
@@ -9927,7 +9967,7 @@ Function Spec_VED(ByRef all_data As Variant) As Variant
                 mat = zone.Item(num + ";potn;" + p)
                 area = Round_w(zone.Item(num + ";pota;" + p) * k_zap_total, n_round_area)
                 If InStr(mat, fin_str) > 0 Then sum_pot = sum_pot + area
-                pos_out(n_row_p, 3) = Replace(Replace(Replace(mat, "%%", ""), fin_str, ""), fin_str_second, "")
+                pos_out(n_row_p, 3) = Replace(Replace(Replace(mat, "%%", ""), fin_str, ""), fin_str_sec, "")
                 pos_out(n_row_p, 4) = area
                 summ_area_pot = summ_area_pot + pos_out(n_row_p, 4)
             Next p
@@ -9948,7 +9988,7 @@ Function Spec_VED(ByRef all_data As Variant) As Variant
                 mat = zone.Item(num + ";wn;" + w)
                 area = Round_w(zone.Item(num + ";wa;" + w) * k_zap_total, n_round_area)
                 If InStr(mat, fin_str) > 0 Then sum_wall = sum_wall + area
-                pos_out(n_row_w, 5) = Replace(Replace(Replace(mat, "%%", ""), fin_str, ""), fin_str_second, "")
+                pos_out(n_row_w, 5) = Replace(Replace(Replace(mat, "%%", ""), fin_str, ""), fin_str_sec, "")
                 pos_out(n_row_w, 6) = area
             Next w
         Else
@@ -9969,7 +10009,7 @@ Function Spec_VED(ByRef all_data As Variant) As Variant
                     mat = zone.Item(num + ";cn;" + c)
                     area = Round_w(zone.Item(num + ";ca;" + c) * k_zap_total, n_round_area)
                     If InStr(mat, fin_str) > 0 Then sum_column = sum_column + area
-                    pos_out(n_row_c, 7) = Replace(Replace(Replace(mat, "%%", ""), fin_str, ""), fin_str_second, "")
+                    pos_out(n_row_c, 7) = Replace(Replace(Replace(mat, "%%", ""), fin_str, ""), fin_str_sec, "")
                     pos_out(n_row_c, 8) = area
                 Next c
             Else
@@ -9987,7 +10027,7 @@ Function Spec_VED(ByRef all_data As Variant) As Variant
                     mat = zone.Item(num + ";pnn;" + p)
                     area = Round_w(zone.Item(num + ";pna;" + p) * k_zap_total, n_round_area)
                     If InStr(mat, fin_str) > 0 Then sum_pan = sum_pan + area
-                    pos_out(n_row_pan, col_end + 1) = Replace(Replace(Replace(mat, "%%", ""), fin_str, ""), fin_str_second, "")
+                    pos_out(n_row_pan, col_end + 1) = Replace(Replace(Replace(mat, "%%", ""), fin_str, ""), fin_str_sec, "")
                     pos_out(n_row_pan, col_end + 2) = area
                     pos_out(n_row_pan, col_end + 3) = zone.Item(num + ";pnh;" + p)
                 Next p
@@ -10018,7 +10058,7 @@ Function Spec_VED(ByRef all_data As Variant) As Variant
         For Each mat In material_all
             If (Right(mat, 2) <> ";a") Then
                 n_row = n_row + 1
-                pos_out(n_row, 1) = Replace(Replace(Replace(materials.Item(mat), "%%", ""), fin_str, ""), fin_str_second, "")
+                pos_out(n_row, 1) = Replace(Replace(Replace(materials.Item(mat), "%%", ""), fin_str, ""), fin_str_sec, "")
                 pos_out(n_row, 4) = Round_w(materials.Item(mat + ";a") * k_zap_total, n_round_area)
             End If
         Next
