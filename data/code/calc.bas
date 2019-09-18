@@ -1,7 +1,7 @@
 Attribute VB_Name = "calc"
 Option Compare Text
 Option Base 1
-Public Const macro_version As String = "3.63"
+Public Const macro_version As String = "3.64"
 '-------------------------------------------------------
 'Типы элементов (столбец col_type_el)
 Public Const t_arm As Integer = 10
@@ -1367,6 +1367,7 @@ End Function
 
 Function DataCheck(ByVal array_in As Variant) As Variant
     If IsEmpty(array_in) Then DataCheck = Empty: Exit Function
+    If IsEmpty(pr_adress) Then r = ReadPrSortament()
     n_col = UBound(array_in, 2)
     n_ingore = 0
     Dim out_data: ReDim out_data(UBound(array_in, 1), n_col): n_row = 0
@@ -1419,6 +1420,8 @@ Function DataCheck(ByVal array_in As Variant) As Variant
                         array_in(i, col_pr_weight) = 0.01
                     End If
                     length_pos = Round_w(array_in(i, col_pr_length) / 1000, n_round_l)
+                    hh = pr_adress.Item(array_in(i, col_pr_st))
+                    array_in(i, col_pr_gost_st) = pr_adress.Item(array_in(i, col_pr_st))
                 Case t_mat
                 
                 Case t_izd
@@ -7701,9 +7704,11 @@ Function Spec_AS(ByRef all_data As Variant, ByVal type_spec As Integer) As Varia
                 For i = 1 To UBound(pos_out_sort, 1)
                     If pos_out_sort(i, 1) <> "Поз." And pos_out_sort(i, 3) <> "" And InStr(pos_out_sort(i, 1), "на отм.") = 0 Then
                         n_row = n_row + 1
-                        For j = 1 To UBound(pos_out_floor, 2)
-                            pos_out_floor(n_row, j) = pos_out_sort(i, j)
-                        Next j
+                        If n_row <= UBound(pos_out_sort, 1) Then
+                            For j = 1 To UBound(pos_out_floor, 2)
+                                pos_out_floor(n_row, j) = pos_out_sort(i, j)
+                            Next j
+                        End If
                     End If
                 Next i
             End If
