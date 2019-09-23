@@ -1,7 +1,7 @@
 Attribute VB_Name = "calc"
 Option Compare Text
 Option Base 1
-Public Const macro_version As String = "3.65"
+Public Const macro_version As String = "3.66"
 '-------------------------------------------------------
 'Типы элементов (столбец col_type_el)
 Public Const t_arm As Integer = 10
@@ -1949,7 +1949,7 @@ Function DataUniqParent(ByVal sub_pos_arr As Variant) As Variant
     Set out.Item("parent") = dparent
     Set out.Item("child") = dchild
     Set out.Item("qty") = dqty
-    If dfirst.Count Then Set out.Item("-") = dfirst
+    If dfirst.Count > 0 Then Set out.Item("-") = dfirst
     Set out.Item("name") = DataNameSubpos(sub_pos_arr)
     Set DataUniqParent = out
 End Function
@@ -1984,7 +1984,6 @@ Function DataWeightSubpos(ByVal array_in As Variant, ByVal floor_txt As String) 
                     Else
                         tweight = Round_w(weight_pm * length_pos * k_zap_total, n_round_w) * qty
                     End If
-                    hh = tweight
                 Case t_prokat
                     qty = array_in(i, col_qty)
                     If (qty = 0) Or IsEmpty(qty) Then qty = 1
@@ -2169,8 +2168,6 @@ Function ExportSheet(nm)
             Set fs = Nothing
         End If
         type_print = 0
-        hh = GetHeightSheet(Sh)
-        bb = GetWidthSheet(Sh)
         If SpecGetType(nm) = 11 Then type_print = 1
         If delim_group_ved And type_spec = 1 Then
             r = ExportSetPageBreaks(Sh, 420, 2, "Марка" & vbLf & "изделия.")
@@ -3162,7 +3159,7 @@ Function FormatSpec_KZH(ByVal Data_out As Range, ByVal n_row As Integer, ByVal n
     n_del = 0
     For i = 6 To n_row
         flag = 1
-        For j = 2 To n_col
+        For j = 2 To n_col + n_col_bet
             If Data_out(i, j) <> "-" Then flag = 0
         Next j
         If flag Then
@@ -5948,7 +5945,6 @@ Function SheetClear(type_out)
             If type_out(1) = -1 Then
                 Select Case type_spec
                     Case 1, 2, 4, 5, 11, 12, 13, 14, 20
-                        hh = 1
                         ThisWorkbook.Sheets(nm).Delete
                         n_del = n_del + 1
                         r = LogWrite(nm, "", "DEL")
@@ -6832,7 +6828,7 @@ Function SpecOneSubpos(ByVal all_data As Variant, ByVal subpos As String, ByVal 
         ReDim pos_naen(n_n, n_col_spec)
         If subpos <> "-" Then
             naen = subpos
-            If pos_data.Item(floor_txt).Item("name").Count Then
+            If pos_data.Item(floor_txt).Item("name").Count > 0 Then
                 If pos_data.Item(floor_txt).Item("name").exists(subpos) Then naen = pos_data.Item(floor_txt).Item("name").Item(subpos)(1)
                 If UserForm2.qtyOneSubpos_CB.Value Then
                     pos_naen(n_n, 1) = fin_str & naen
@@ -8161,7 +8157,9 @@ End Function
 Function Spec_KZH(ByRef all_data As Variant) As Variant
     floor_txt = "all_floor"
     is_bet = False
-    If show_bet_wkzh Then is_bet = Spec_CONC(all_data)
+    If show_bet_wkzh Then
+        is_bet = Spec_CONC(all_data)
+    End If
     Set name_subpos = pos_data.Item(floor_txt).Item("name") 'Словарь с именами сборок
     un_child = ArraySort(pos_data.Item(floor_txt).Item("child").Keys())
     un_parent = ArraySort(pos_data.Item(floor_txt).Item("parent").Keys())
@@ -8182,6 +8180,7 @@ Function Spec_KZH(ByRef all_data As Variant) As Variant
             сurrent_subpos = all_data(i, col_sub_pos)
             naen = " "
             If name_subpos.exists(сurrent_subpos) Then naen = name_subpos.Item(сurrent_subpos)(1)
+            flag = False
             Select Case сurrent_type_el
                 Case t_arm
                     If InStr(naen, "Заклад") = 0 Then
@@ -8219,7 +8218,6 @@ Function Spec_KZH(ByRef all_data As Variant) As Variant
     '2 - Прокат общий
     '3 - Арматура в закладных
     '4 - Прокат в закладных
-
     'Сформируем общую таблицу диаметров и классов арматуры
     n_row = 5
     If UBound(un_parent) >= 0 Then n_row = n_row + UBound(un_parent)
@@ -8303,11 +8301,23 @@ Function Spec_KZH(ByRef all_data As Variant) As Variant
     current_size = UBound(pos_out, 2)
     ReDim Preserve pos_out(n_row + sum_row, current_size + 1)
     Dim pos_out_bet()
-    n_conc = 0
-    For Each sub_bet In concrsubpos.Keys()
-        If InStr(sub_bet, "tot_") > 0 Then n_conc = n_conc + 1
-    Next
-    ReDim pos_out_bet(n_row + sum_row, n_conc + 1)
+        If is_bet = True Then
+        n_conc = 0
+        For Each sub_bet In concrsubpos.Keys()
+            If InStr(sub_bet, "tot_") > 0 Then n_conc = n_conc + 1
+        Next
+        ReDim pos_out_bet(n_row + sum_row, n_conc + 1)
+        pos_out_bet(1, 1) = "Объём бетона, куб.м."
+        pos_out_bet(1, n_conc + 1) = "Всего"
+        n_conc = 0
+        For Each sub_bet In concrsubpos.Keys()
+            If InStr(sub_bet, "tot_") > 0 Then
+                bet = Split(sub_bet, "_")(1)
+                n_conc = n_conc + 1
+                pos_out_bet(2, n_conc) = bet
+            End If
+        Next
+    End If
     For kk = 1 To 5
         pos_out(kk, current_size + 1) = "Всего"
     Next kk
@@ -8354,32 +8364,15 @@ Function Spec_KZH(ByRef all_data As Variant) As Variant
                     naen_bet = subb(1)
                     v_bet = concrsubpos.Item(sub_bet)
                     If bet_subpos = subpos Then 'Выбираем бетон для текущей сборки
-                        For jc = 1 To n_conc_end_col
-                            If pos_out_bet(2, jc) = naen_bet Then
-                                pos_out_bet(k, jc) = pos_out_bet(k, jc) + v_bet
-                                flag = 0
-                            End If
+                        For jc = 1 To UBound(pos_out_bet, 2)
+                            If pos_out_bet(2, jc) = naen_bet Then pos_out_bet(k, jc) = pos_out_bet(k, jc) + v_bet
                         Next jc
-                        If flag Then
-                            n_conc_end_col = n_conc_end_col + 1
-                            pos_out_bet(k, n_conc_end_col) = v_bet
-                            pos_out_bet(2, n_conc_end_col) = naen_bet
-                        End If
+                        pos_out_bet(k, UBound(pos_out_bet, 2)) = concrsubpos.Item(subpos & "_bet_qty")
                     End If
                 End If
             Next
         End If
     Next k
-    
-    If is_bet = True Then
-        pos_out_bet(1, 1) = "Объём бетона, куб.м."
-        pos_out_bet(1, UBound(pos_out_bet, 2)) = "Всего"
-        For k = 6 To n_row
-            For i = 1 To UBound(pos_out_bet, 2) - 1
-                pos_out_bet(k, UBound(pos_out_bet, 2)) = pos_out_bet(k, UBound(pos_out_bet, 2)) + Round_w(pos_out_bet(k, i), n_round_wkzh)
-            Next i
-        Next k
-    End If
     For i = 1 To current_size
         If pos_out(2, i) = "Прокат" Then
             tkey = "Прокат" & pos_out(1, i) & pos_out(3, i) & pos_out(4, i) & pos_out(5, i)
@@ -8465,21 +8458,6 @@ Function Spec_KZH(ByRef all_data As Variant) As Variant
             End If
         Next j
     Next i
-    If sum_row Then
-        pos_out(n_row + sum_row, 1) = "Итого"
-        For i = 2 To UBound(pos_out, 2)
-            For j = 6 To n_row
-                pos_out(n_row + sum_row, i) = pos_out(n_row + sum_row, i) + Round_w(pos_out(j, i), n_round_wkzh)
-            Next
-        Next
-        If is_bet = True Then
-            For i = 1 To UBound(pos_out_bet, 2)
-                For j = 6 To n_row
-                    pos_out_bet(n_row + sum_row, i) = pos_out_bet(n_row + sum_row, i) + Round_w(pos_out_bet(j, i), n_round_wkzh)
-                Next
-            Next
-        End If
-    End If
     If is_bet = True Then pos_out = ArrayTranspose(ArrayCombine(ArrayTranspose(pos_out), ArrayTranspose(pos_out_bet)))
     For i = 2 To UBound(pos_out, 2)
         For j = 6 To n_row
@@ -8490,6 +8468,15 @@ Function Spec_KZH(ByRef all_data As Variant) As Variant
             End If
         Next
     Next
+    If sum_row Then
+        pos_out(n_row + sum_row, 1) = "Итого"
+        For i = 2 To UBound(pos_out, 2)
+            pos_out(n_row + sum_row, i) = 0
+            For j = 6 To n_row
+                If pos_out(j, i) <> "-" Then pos_out(n_row + sum_row, i) = pos_out(n_row + sum_row, i) + pos_out(j, i)
+            Next
+        Next
+    End If
     Spec_KZH = pos_out
 End Function
 
@@ -8941,8 +8928,8 @@ Function Spec_CONC(ByRef all_data As Variant) As Boolean
             n_mat = UBound(all_bet_subpos, 1)
             spec_subpos = SpecMaterial(all_bet_subpos, n_mat, 2, nSubPos)
             For j = 1 To UBound(spec_subpos, 1)
-                bet = Trim(Replace(spec_subpos(j, 3), "B", "В"))
-                qty = spec_subpos(j, 4)
+                bet = spec_subpos(j, 3)
+                qty = Round_w(spec_subpos(j, 4), n_round_wkzh)
                 concrsubpos.Item(subpos & "_" & bet & "_qty") = qty
                 concrsubpos.Item(subpos & "_bet_qty") = concrsubpos.Item(subpos & "_bet_qty") + qty
                 concrsubpos.Item("bet_qty") = concrsubpos.Item("bet_qty") + qty
