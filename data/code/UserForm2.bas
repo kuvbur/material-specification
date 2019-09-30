@@ -19,7 +19,7 @@ Attribute VB_Exposed = False
 Option Compare Text
 Option Base 1
 
-Const form_version As String = "3.17"
+Const form_version As String = "3.18"
 Public CodePath, MaterialPath, SortamentPath As String
 Public lastsheet, lastconstrtype, lastconstr, lastfile, lastfilespec, lastfileadd, materialbook_index, name_izd As Variant
 
@@ -37,6 +37,18 @@ Private Sub AllPosButton_Click()
         End If
         r = OutEnded()
     End If
+End Sub
+
+Private Sub CommandButtonExportData_Click()
+    r = OutPrepare()
+    nm = ThisWorkbook.ActiveSheet.Name
+    type_spec = SpecGetType(nm)
+    If type_spec = 7 Then
+        r = ExportAttribut(nm)
+    Else
+        If Not (quiet) Then MsgBox ("Перейдите на лист _спец и повторите")
+    End If
+    r = OutEnded()
 End Sub
 
 Private Sub PosSubposButton_Click()
@@ -400,9 +412,9 @@ Sub remat()
             For i = 3 To n_izd_row
                 subpos = spec_izd(i, col_man_subpos)
                 pos = spec_izd(i, col_man_pos)
-                If name_izd.Exists(subpos) = False And subpos = pos And Len(subpos) > 1 Then
-                    For jj = 2 To 4
-                        adress_array(jj - 1) = "=" + objWh.Name + "!" + spec_izd_sheet.Cells(i, jj).Address()
+                If name_izd.exists(subpos) = False And subpos = pos And Len(subpos) > 1 Then
+                    For jj = 1 To 4
+                        adress_array(jj) = "=" + objWh.Name + "!" + spec_izd_sheet.Cells(i, jj).Address()
                     Next jj
                     name_izd.Item(subpos) = adress_array
                 End If

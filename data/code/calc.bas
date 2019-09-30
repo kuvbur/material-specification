@@ -1,7 +1,7 @@
 Attribute VB_Name = "calc"
 Option Compare Text
 Option Base 1
-Public Const macro_version As String = "3.67"
+Public Const macro_version As String = "3.69"
 '-------------------------------------------------------
 'Типы элементов (столбец col_type_el)
 Public Const t_arm As Integer = 10
@@ -187,6 +187,7 @@ Public Const col_man_pr_st As Integer = 15
 Public Const col_man_pr_okr As Integer = 16
 Public Const col_man_pr_ogn As Integer = 17
 Public Const max_col_man As Integer = col_man_dgib
+
 '-------------------------------------------------------
 Public symb_diam As String 'Символ диаметра в спецификацию
 Public gost2fklass, name_gost, reinforcement_specifications As Variant 'Разные массивы
@@ -238,6 +239,7 @@ Public inx_on_new As Boolean 'Обновлять содежрание после создания нового листа
 Public def_decode As Boolean 'Декодировать независимо от настроек
 Public Debug_mode As Boolean 'Режим отладки
 Public check_version As Boolean 'Проверять версию при загрузке
+Public lenght_ed_arm As Integer 'Максимальная длина стержня арматуры
 
 Function INISet()
     sIniFile = UserForm2.CodePath & "setting.ini"
@@ -272,6 +274,7 @@ Function INISet()
         show_bet_wkzh = INIReadKeyVal("ЛИСТЫ", "show_bet_wkzh")
         delim_group_ved = INIReadKeyVal("ЛИСТЫ", "delim_group_ved")
         show_sum_prim = INIReadKeyVal("ЛИСТЫ", "show_sum_prim")
+        lenght_ed_arm = INIReadKeyVal("РАСЧЁТЫ", "lenght_ed_arm")
         flag = False
     Else
         flag = True
@@ -306,6 +309,7 @@ Function INISet()
     If IsEmpty(show_bet_wkzh) Or flag Then show_bet_wkzh = False
     If IsEmpty(delim_group_ved) Or flag Then delim_group_ved = False
     If IsEmpty(show_sum_prim) Or flag Then show_sum_prim = True
+    If IsEmpty(lenght_ed_arm) Or flag Then lenght_ed_arm = 11700
     '----Запись умолчаний, если файл не найден
     If flag Then
         t = INIWriteKeyVal("РАСЧЁТЫ", "type_okrugl", type_okrugl)
@@ -338,6 +342,7 @@ Function INISet()
         t = INIWriteKeyVal("ЛИСТЫ", "show_bet_wkzh", True)
         t = INIWriteKeyVal("ЛИСТЫ", "show_sum_prim", True)
         t = INIWriteKeyVal("ЛИСТЫ", "delim_group_ved", False)
+        t = INIWriteKeyVal("РАСЧЁТЫ", "lenght_ed_arm", lenght_ed_arm)
     End If
     '----Принудительное включение
     delim_by_sheet = True
@@ -559,6 +564,12 @@ Function ArrayIsSecondDim(ByVal array_in As Variant) As Boolean
         End If
     End If
     Erase array_in
+End Function
+
+Function ArrayIsEmpty(parArray As Variant) As Boolean
+    ArrayIsEmpty = True
+    On Error Resume Next
+    ArrayIsEmpty = Not (LBound(parArray) <= UBound(parArray))
 End Function
 
 Function ArrayRedim(ByVal array_in As Variant, ByVal n_row As Integer) As Variant
@@ -992,7 +1003,7 @@ End Function
 
 Function ArrayUniqValColumn(ByVal array_in As Variant, ByVal cols As Long) As Variant
     Dim array_out()
-    If IsEmpty(array_in) Or Not IsArray(array_in) Then
+    If IsEmpty(array_in) Or Not IsArray(array_in) Or ArrayIsEmpty(array_in) Then
         ArrayUniqValColumn = Empty
         Exit Function
     End If
@@ -1295,8 +1306,12 @@ Function ConvNum2Otm(ByVal x As Variant) As Variant
         Else
             int_part = Int(Abs(x))
             ceil_part = (Abs(x) - int_part) * 1000
+            If ceil_part = 0 Then
+                ceil_part_txt = "000"
+            Else
+                ceil_part_txt = CStr(ceil_part)
+            End If
             int_part_txt = CStr(int_part)
-            ceil_part_txt = CStr(ceil_part)
             sgn_txt = "+": If x < 0 Then sgn_txt = "-"
             x = "'" + sgn_txt + int_part_txt + "." + ceil_part_txt
         End If
@@ -1326,7 +1341,7 @@ Function DataAddNullSubpos(ByVal array_in As Variant) As Variant
                 Else
                     add_txt = current_subpos & ", " & add_txt
                 End If
-                If name_subpos.Exists(current_subpos) Then
+                If name_subpos.exists(current_subpos) Then
                     naen = name_subpos(current_subpos)(1)
                     obozn = name_subpos(current_subpos)(2)
                 Else
@@ -1656,7 +1671,7 @@ Function DataNameSubpos(ByVal sub_pos_arr As Variant) As Object
             naen = all_subpos_in_sheet(i, col_m_naen)
             obozn = all_subpos_in_sheet(i, col_m_obozn)
             If InStr(naen, "!!!") = 0 And InStr(obozn, "!!!") = 0 Then
-                If name_subpos.Exists(subpos) Then name_subpos.Remove subpos
+                If name_subpos.exists(subpos) Then name_subpos.Remove subpos
                 name_subpos.Item(subpos) = Array(naen, obozn)
             End If
         Next i
@@ -1677,7 +1692,7 @@ Function DataNameSubpos(ByVal sub_pos_arr As Variant) As Object
             naen = all_subpos_in_sheet(i, col_m_naen)
             obozn = all_subpos_in_sheet(i, col_m_obozn)
             If InStr(naen, "!!!") = 0 And InStr(obozn, "!!!") = 0 Then
-                If name_subpos.Exists(subpos) Then name_subpos.Remove subpos
+                If name_subpos.exists(subpos) Then name_subpos.Remove subpos
                 name_subpos.Item(subpos) = Array(naen, obozn)
             End If
         Next i
@@ -1766,7 +1781,7 @@ Function DataRead(ByVal nm As String) As Variant
         Set pos_data.Item(floor_txt) = DataUniqParent(ArraySelectParam(out_data, t_subpos, col_type_el))
         Set pos_data.Item(floor_txt).Item("weight") = DataWeightSubpos(out_data, floor_txt)
         If Not IsEmpty(ArraySelectParam(out_data, "-", col_sub_pos)) Then
-            If pos_data.Item(floor_txt).Exists("-") Then
+            If pos_data.Item(floor_txt).exists("-") Then
                 pos_data.Item(floor_txt).Item("-").Item("-") = 1
             Else
                 Set dfirst = CreateObject("Scripting.Dictionary")
@@ -1799,7 +1814,7 @@ Function DataRead(ByVal nm As String) As Variant
                 Set pos_data.Item(floor_txt) = DataUniqParent(ArraySelectParam(out_data_floor, t_subpos, col_type_el))
                 Set pos_data.Item(floor_txt).Item("weight") = DataWeightSubpos(out_data_floor, floor_txt)
                 If Not IsEmpty(ArraySelectParam(out_data_floor, "-", col_sub_pos)) Then
-                    If pos_data.Item(floor_txt).Exists("-") Then
+                    If pos_data.Item(floor_txt).exists("-") Then
                         pos_data.Item(floor_txt).Item("-").Item("-") = 1
                     Else
                         Set dfirst = CreateObject("Scripting.Dictionary")
@@ -1919,30 +1934,30 @@ Function DataUniqParent(ByVal sub_pos_arr As Variant) As Variant
                     qty = sub_pos_arr(i, col_qty)
                     If ((spos = subpos) And (tparent <> "-")) Then 'Найден элемент второго уровня
                         flag = 0
-                        If Not dchild.Exists(subpos) Then dchild.Item(subpos) = 1
+                        If Not dchild.exists(subpos) Then dchild.Item(subpos) = 1
                     End If
                 Next i
-                If flag And (Not dparent.Exists(subpos)) Then dparent.Item(subpos) = 1
+                If flag And (Not dparent.exists(subpos)) Then dparent.Item(subpos) = 1
             End If
         Next
         For i = 1 To UBound(sub_pos_arr, 1)
             spos = sub_pos_arr(i, col_sub_pos)
             tparent = sub_pos_arr(i, col_parent)
             qty = sub_pos_arr(i, col_qty)
-            If dqty.Exists(tparent & "_" & spos) Then
+            If dqty.exists(tparent & "_" & spos) Then
                 dqty.Item(tparent & "_" & spos) = dqty.Item(tparent & "_" & spos) + qty
             Else
                 dqty.Item(tparent & "_" & spos) = qty
             End If
-            If Not (tparent = "-" And dparent.Exists(spos)) Then
-                If dqty.Exists("all" & spos) Then
+            If Not (tparent = "-" And dparent.exists(spos)) Then
+                If dqty.exists("all" & spos) Then
                     dqty.Item("all" & spos) = dqty.Item("all" & spos) + qty
                 Else
                     dqty.Item("all" & spos) = qty
                 End If
             End If
-            If tparent = "-" And dchild.Exists(spos) Then
-                If Not dfirst.Exists(spos) Then dfirst.Item(spos) = 1
+            If tparent = "-" And dchild.exists(spos) Then
+                If Not dfirst.exists(spos) Then dfirst.Item(spos) = 1
             End If
         Next i
     End If
@@ -2011,7 +2026,7 @@ Function DataWeightSubpos(ByVal array_in As Variant, ByVal floor_txt As String) 
     Next
     'Делим на количество вхождений, чтоб получить массу одной шт.
     For Each subpos In dweight.keys()
-        If pos_data.Item(floor_txt).Item("child").Exists(subpos) Then
+        If pos_data.Item(floor_txt).Item("child").exists(subpos) Then
             nSubPos = pos_data.Item(floor_txt).Item("qty").Item("all" & subpos)
         Else
             nSubPos = pos_data.Item(floor_txt).Item("qty").Item("-_" & subpos)
@@ -2027,7 +2042,7 @@ Function DataWeightSubpos(ByVal array_in As Variant, ByVal floor_txt As String) 
     'Для сборок первого уровня учтём вхождения сборок второго уровня
     For Each subpos In pos_data.Item(floor_txt).Item("parent").keys()
         For Each tchild In pos_data.Item(floor_txt).Item("child").keys()
-            If pos_data.Item(floor_txt).Item("qty").Exists(subpos & "_" & tchild) Then
+            If pos_data.Item(floor_txt).Item("qty").exists(subpos & "_" & tchild) Then
                 qty = pos_data.Item(floor_txt).Item("qty").Item(subpos & "_" & tchild) / pos_data.Item(floor_txt).Item("qty").Item("-_" & subpos)
                 tweight = dweight.Item(tchild)
                 dweight.Item(subpos) = dweight.Item(subpos) + qty * tweight
@@ -2092,12 +2107,100 @@ Function ExportList2CSV(ByRef ra As Variant, ByVal CSVfilename As String, Option
     ExportList2CSV = ExportSaveTXTfile(CSVfilename$, CSVtext$)
 End Function
 
+Function ExportArray2CSV(ByVal arr As Variant, ByVal CSVfilename As String, Optional ByVal ColumnsSeparator$ = ";", Optional ByVal RowsSeparator$ = vbNewLine) As String
+    buffer$ = ""
+    For i = 1 To UBound(arr, 1)
+        txt = ""
+        For j = 1 To UBound(arr, 2)
+            If arr(i, j) <> "" Then txt = txt & ColumnsSeparator$ & arr(i, j)
+        Next j
+        If txt <> "" Then
+            Range2CSV = Range2CSV & Mid(txt, Len(ColumnsSeparator$) + 1) & RowsSeparator$
+            If Len(Range2CSV) > 50000 Then buffer$ = buffer$ & Range2CSV: Range2CSV = ""
+        End If
+    Next i
+    CSVtext$ = buffer$ & Range2CSV
+    ExportArray2CSV = ExportSaveTXTfile(CSVfilename$, CSVtext$)
+End Function
+
 Function ExportSaveTXTfile(ByVal filename As String, ByVal txt As String) As Boolean
     Set fso = CreateObject("scripting.filesystemobject")
     Set ts = fso.CreateTextFile(filename, True)
     ts.Write txt: ts.Close
     ExportSaveTXTfile = Err = 0
     Set ts = Nothing: Set fso = Nothing
+End Function
+
+Function ExportAttribut(ByVal nm As String) As Boolean
+    '-------------------------------------------------------
+    out_data_raw = Empty
+    Dim out_data_diff
+    Set Data_out = Application.ThisWorkbook.Sheets(nm)
+    n_row = SheetGetSize(Data_out)(1)
+    col = max_col_man
+    spec = Data_out.Range(Data_out.Cells(1, 1), Data_out.Cells(n_row, max_col_man))
+    block_data = ArraySelectParam_2(spec, "АВТОКАД_?", col_man_naen)
+    For i = 1 To UBound(block_data, 1)
+        If InStr(block_data(i, col_man_subpos), "!") = 0 And InStr(block_data(i, col_man_pos), "!") = 0 Then
+            arr = Split(block_data(i, col_man_naen), "_")
+            block_data(i, col_man_pr_length) = arr(1)
+            block_data(i, col_man_pr_gost_pr) = arr(2)
+        End If
+    Next i
+    subpos_arr = ArrayUniqValColumn(block_data, col_man_subpos)
+    For Each subpos In subpos_arr
+        If InStr(subpos, "!") = 0 Then
+            block_data_subpos = ArraySelectParam_2(block_data, subpos, col_man_subpos)
+            coll = GetListFile(subpos + ".txt")
+            For i = 1 To UBound(coll, 1)
+                snm = coll(i, 1)
+                If coll(i, 1) = subpos Then
+                    tdate = FileDateTime(coll(i, 2))
+                    short_fname = coll(i, 1)
+                    out_data_sheet = ReadFile(coll(i, 1) + ".txt", 1, vbTab, vbNewLine, True)
+                    out_data_raw = ArrayCombine(out_data_raw, out_data_sheet)
+                End If
+            Next i
+            n_row = UBound(out_data_raw, 1)
+            max_col_acad = UBound(out_data_raw, 2)
+            'Описание файла c извлечением данных из автокада
+            col_acad_handle = 1
+            col_acad_blockname = 2
+            'Поиск подходящих столбцов по имени
+            col_acad_qty = -1 'Кол-во стержней в блоке
+            col_acad_diametr = -1
+            col_acad_length = -1
+            col_acad_pos = -1
+            For i = 1 To max_col_acad
+                If out_data_raw(1, i) = "КОЛИЧЕСТВО" Then col_acad_qty = i
+                If out_data_raw(1, i) = "ДИАМЕТР" Then col_acad_diametr = i
+                If out_data_raw(1, i) = "ПОЗИЦИЯ" Then col_acad_pos = i
+                If out_data_raw(1, i) = "ДЛИНА_СТЕРЖНЯ" Then col_acad_length = i
+            Next i
+            ReDim out_data_diff(n_row, 4)
+            n_diff = 0
+            n_diff = n_diff + 1
+            out_data_diff(n_diff, 1) = "HANDLE"
+            out_data_diff(n_diff, 2) = "BLOCKNAME"
+            out_data_diff(n_diff, 3) = "ПОЗИЦИЯ"
+            out_data_diff(n_diff, 4) = "ДИАМЕТР"
+            For i = 1 To n_row
+                block = ArraySelectParam_2(block_data_subpos, out_data_raw(i, col_acad_handle), col_man_pr_length, out_data_raw(i, col_acad_blockname), col_man_pr_gost_pr)
+                If Not IsEmpty(block) Then
+                    If out_data_raw(i, col_acad_diametr) <> block(1, col_man_diametr) Or out_data_raw(i, col_acad_pos) <> block(1, col_man_pos) Then
+                        n_diff = n_diff + 1
+                        out_data_diff(n_diff, 1) = out_data_raw(i, col_acad_handle)
+                        out_data_diff(n_diff, 2) = out_data_raw(i, col_acad_blockname)
+                        out_data_diff(n_diff, 3) = block(1, col_man_pos)
+                        out_data_diff(n_diff, 4) = block(1, col_man_diametr)
+                    End If
+                End If
+            Next i
+            CSVfilename$ = ThisWorkbook.path & "\list\Autocad_" & subpos & ".txt"
+            If n_diff > 0 Then r = ExportArray2CSV(out_data_diff, CSVfilename, vbTab, vbNewLine)
+        End If
+    Next
+    ExportAttribut = True
 End Function
 
 Function ExportSetPageBreaks(ByRef Sh As Variant, ByVal h_list As Double, Optional ByVal n_first As Integer, Optional ByVal page_delim As String) As Boolean
@@ -2173,6 +2276,10 @@ Function ExportSheet(nm)
             r = ExportSetPageBreaks(Sh, 420, 2, "Марка" & vbLf & "изделия.")
         Else
             If GetHeightSheet(Sh) > 420 Then r = ExportSetPageBreaks(Sh, 420, 2)
+        End If
+        If type_spec <> 1 Then
+            Sh.ResetAllPageBreaks
+            delim_group_ved = False
         End If
         r = ExportSheet2Pdf(Data_out, filename, type_print)
         r = LogWrite(filename, "PDF", "ОК")
@@ -2598,16 +2705,9 @@ Function FormatManual(ByVal nm As String) As Boolean
     Range(r_all).FormatConditions(1).StopIfTrue = False
 
     'Создаём столбец с марками элементов и добавим раскрывающийся список
-    sheet_subpos_name = Left(nm, Len(nm) - 5) & "_поз"
-    If SheetExist(sheet_subpos_name) Then
-        Set subpos_sheet = Application.ThisWorkbook.Sheets(sheet_subpos_name)
-        row = SheetGetSize(subpos_sheet)(1)
-        pos = subpos_sheet.Range(subpos_sheet.Cells(3, 1), subpos_sheet.Cells(row, 1))
-        If IsArray(pos) Then
-            un_pos = ArrayUniqValColumn(pos, 1)
-        Else
-            un_pos = Array(pos)
-        End If
+    Set name_subpos = DataNameSubpos(Empty)
+    If name_subpos.Count > 0 Then
+        un_pos = name_subpos.keys()
         If Not IsEmpty(un_pos) Then
             istart = max_col_man + 1
             iend = UBound(un_pos, 1)
@@ -4096,6 +4196,10 @@ End Function
 Function GetListFile(ByRef mask As String) As Variant
     path = ThisWorkbook.path & "\import"
     Set coll = FilenamesCollection(path, mask)
+    If coll.Count <= 0 Then
+        GetListFile = Empty
+        Exit Function
+    End If
     Dim out(): ReDim out(coll.Count, 2)
     i = 0
     For Each Fl In coll
@@ -4312,6 +4416,213 @@ Function LogWrite(ByVal sheet_name As String, ByVal suffix As String, ByVal rezu
     i = i + 1: log_sheet.Cells(j, i) = UserForm2.ignore_subpos_CB
 End Function
 
+Function DataReadAutoArm(ByVal subpos As String) As Variant
+    '-------------------------------------------------------
+    'Описание файла c извлечением данных из автокада
+    col_acad_pos = 1
+    col_acad_qty_all = 2  'Кол-во блоков
+    col_acad_qty = 3 'Кол-во стержней в блоке
+    col_acad_diametr = 4
+    col_acad_length = 5
+    col_acad_layer = 6
+    col_acad_klass = 7
+    col_acad_fon = 8
+    col_acad_mp = 9
+    col_acad_gnut = 10
+    max_col_acad = 6
+    
+    out_data_raw = Empty
+    path = ThisWorkbook.path & "\import"
+    Set coll = FilenamesCollection(path, subpos + ".xls")
+    For Each snm In coll
+        If Not IsEmpty(snm) Then
+            tdate = FileDateTime(snm)
+            fname = snm
+            full_fname = Split(fname, "\")
+            n_path = UBound(full_fname)
+            short_fname = full_fname(n_path)
+        End If
+        If Split(short_fname, ".")(0) = subpos Then
+            Set spec_book = GetObject(snm)
+            For Each nm In GetListOfSheet(spec_book)
+                Set spec_sheet = spec_book.Sheets(nm)
+                n = SheetGetSize(spec_sheet)
+                out_data_sheet = spec_sheet.Range(spec_sheet.Cells(2, 1), spec_sheet.Cells(n(1), n(2)))
+                out_data_raw = ArrayCombine(out_data_raw, out_data_sheet)
+            Next
+            spec_book.Close True
+        End If
+    Next
+    If IsEmpty(out_data_raw) Then
+        DataReadAutoArm = Empty
+        Exit Function
+    End If
+    n_row = UBound(out_data_raw, 1)
+    Dim out_data: ReDim out_data(n_row, col_man_klass)
+    Dim out_data_up: ReDim out_data_up(1, col_man_klass)
+    For j = 1 To UBound(out_data_up, 2)
+        out_data_up(1, j) = Empty
+    Next j
+    short_fname = " " + full_fname(n_path) + ".." + full_fname(n_path - 3) + ".." + full_fname(n_path - 4)
+    out_data_up(1, col_man_subpos) = subpos
+    out_data_up(1, col_man_pos) = "!!!"
+    out_data_up(1, col_man_obozn) = "'" + Str(tdate)
+    out_data_up(1, col_man_naen) = "АВТОКАД_" + short_fname
+    n_row_out = 0
+    For i = 1 To n_row
+        pos = out_data_raw(i, col_acad_pos)
+        qty_all = ConvTxt2Num(out_data_raw(i, col_acad_qty_all))
+        qty_in_one = ConvTxt2Num(out_data_raw(i, col_acad_qty))
+        diametr = ConvTxt2Num(out_data_raw(i, col_acad_diametr))
+        Length = ConvTxt2Num(out_data_raw(i, col_acad_length))
+        If IsNumeric(qty_all) And IsNumeric(qty_in_one) And IsNumeric(diametr) And IsNumeric(Length) Then
+            For j = 1 To UBound(out_data, 2)
+                out_data(i, j) = Empty
+            Next j
+            n_row_out = n_row_out + 1
+            qty = qty_all * qty_in_one
+            out_data(n_row_out, col_man_subpos) = subpos
+            out_data(n_row_out, col_man_naen) = "АВТОКАД_" + Trim(out_data_raw(i, col_acad_layer))
+            out_data(n_row_out, col_man_qty) = qty
+            out_data(n_row_out, col_man_pos) = Trim(out_data_raw(i, col_acad_pos))
+            out_data(n_row_out, col_man_diametr) = diametr
+            If Length > lenght_ed_arm Then
+                out_data(n_row_out, col_man_length) = Length
+                out_data(n_row_out, col_man_prim) = "п.м."
+            Else
+                out_data(n_row_out, col_man_length) = Length
+            End If
+            out_data(n_row_out, col_man_klass) = "A500C"
+        End If
+    Next i
+    If n_row_out <> n_row Then out_data = ArrayRedim(out_data, n_row_out)
+    out_data = ArrayCombine(out_data_up, out_data)
+    DataReadAutoArm = out_data
+End Function
+
+Function DataReadAutoArm_2way(ByVal subpos As String) As Variant
+    '-------------------------------------------------------
+    'Описание файла c извлечением данных из автокада
+    col_acad_handle = 1
+    col_acad_blockname = 2
+    out_data_raw = Empty
+    coll = GetListFile(subpos + ".txt")
+    If IsEmpty(coll) Then
+        DataReadAutoArm_2way = Empty
+        Exit Function
+    End If
+    For i = 1 To UBound(coll, 1)
+        snm = coll(i, 1)
+        If coll(i, 1) = subpos Then
+            tdate = FileDateTime(coll(i, 2))
+            short_fname = coll(i, 1)
+            out_data_sheet = ReadFile(coll(i, 1) + ".txt", 1, vbTab, vbNewLine, True)
+            out_data_raw = ArrayCombine(out_data_raw, out_data_sheet)
+        End If
+    Next i
+    If IsEmpty(out_data_raw) Then
+        DataReadAutoArm_2way = Empty
+        Exit Function
+    End If
+    n_row = UBound(out_data_raw, 1)
+    max_col_acad = UBound(out_data_raw, 2)
+    'Поиск подходящих столбцов по имени
+    col_acad_qty = -1 'Кол-во стержней в блоке
+    col_acad_diametr = -1
+    col_acad_length = -1
+    col_acad_pos = -1
+    For i = 1 To max_col_acad
+        If out_data_raw(1, i) = "КОЛИЧЕСТВО" Then col_acad_qty = i
+        If out_data_raw(1, i) = "ДИАМЕТР" Then col_acad_diametr = i
+        If out_data_raw(1, i) = "ПОЗИЦИЯ" Then col_acad_pos = i
+        If out_data_raw(1, i) = "ДЛИНА_СТЕРЖНЯ" Then col_acad_length = i
+    Next i
+    Dim out_data: ReDim out_data(n_row, col_man_klass)
+    Dim out_data_up: ReDim out_data_up(1, col_man_klass)
+    For j = 1 To UBound(out_data_up, 2)
+        out_data_up(1, j) = Empty
+    Next j
+    out_data_up(1, col_man_subpos) = subpos
+    out_data_up(1, col_man_pos) = "!!!"
+    out_data_up(1, col_man_obozn) = "'" + Str(tdate)
+    out_data_up(1, col_man_naen) = "АВТОКАД_" + short_fname
+    n_row_out = 0
+    For i = 2 To n_row
+        pos = out_data_raw(i, col_acad_pos)
+        qty = ConvTxt2Num(out_data_raw(i, col_acad_qty))
+        diametr = ConvTxt2Num(out_data_raw(i, col_acad_diametr))
+        Length = ConvTxt2Num(out_data_raw(i, col_acad_length))
+        If IsNumeric(qty) And IsNumeric(diametr) And IsNumeric(Length) Then
+            For j = 1 To UBound(out_data, 2)
+                out_data(i, j) = Empty
+            Next j
+            n_row_out = n_row_out + 1
+            out_data(n_row_out, col_man_subpos) = subpos
+            out_data(n_row_out, col_man_naen) = "АВТОКАД_" + out_data_raw(i, col_acad_handle) + "_" + out_data_raw(i, col_acad_blockname)
+            out_data(n_row_out, col_man_qty) = qty
+            out_data(n_row_out, col_man_pos) = Trim(out_data_raw(i, col_acad_pos))
+            out_data(n_row_out, col_man_diametr) = diametr
+            If Length > lenght_ed_arm Then
+                out_data(n_row_out, col_man_length) = Length
+                out_data(n_row_out, col_man_prim) = "п.м."
+            Else
+                out_data(n_row_out, col_man_length) = Length
+            End If
+            out_data(n_row_out, col_man_klass) = "A500C"
+        End If
+    Next i
+    If n_row_out <> n_row Then out_data = ArrayRedim(out_data, n_row_out)
+    out_data = ArrayCombine(out_data_up, out_data)
+    DataReadAutoArm_2way = out_data
+End Function
+
+
+Function ManualAddAuto(ByVal nm As String) As Boolean
+    Set arm_data = CreateObject("Scripting.Dictionary")
+    Set Data_out = Application.ThisWorkbook.Sheets(nm)
+    n_row = SheetGetSize(Data_out)(1)
+    col = max_col_man
+    spec = Data_out.Range(Data_out.Cells(1, 1), Data_out.Cells(n_row, max_col_man))
+    subpos_arr = ArrayUniqValColumn(spec, col_man_subpos)
+    del_row = ""
+    For Each subpos In subpos_arr
+        If Len(Trim(subpos)) > 0 And InStr(subpos, "Марка") = 0 Then
+            out_data = DataReadAutoArm_2way(subpos) 'Ищем файлы с извлечением данных и сводим их в массив
+            If Not IsEmpty(out_data) Then
+                'Проходим по таблице удаляем строки со старым извлечением данных
+                For i = 1 To n_row
+                    If Not IsError(spec(i, col_man_subpos)) And Not IsError(spec(i, col_man_naen)) Then
+                        If spec(i, col_man_subpos) = subpos And InStr(spec(i, col_man_naen), "ВТОКАД_") > 0 Then Data_out.Rows(i).ClearContents
+                        If InStr(spec(i, col_man_naen), "АВТОКАД_Извлечение данных") > 0 Then Data_out.Rows(i).ClearContents
+                    Else
+                        hh = 1
+                    End If
+                Next i
+                arm_data.Item(subpos) = out_data
+            End If
+        End If
+    Next
+    Set Data_out = Application.ThisWorkbook.Sheets(nm)
+    n_row = SheetGetSize(Data_out)(1)
+    n_row_end = n_row + 4
+    Data_out.Cells(n_row_end, col_man_subpos) = "!!!"
+    Data_out.Cells(n_row_end, col_man_pos) = "!!!"
+    Data_out.Cells(n_row_end, col_man_obozn) = "НИЖЕ ЭТИХ СТРОК НИЧЕГО ВРУЧНУЮ НЕ ВВОДИТЬ"
+    Data_out.Cells(n_row_end, col_man_naen) = "АВТОКАД_Извлечение данных"
+    n_row_end = n_row_end + 2
+    For Each subpos In arm_data.keys()
+        out_data = arm_data.Item(subpos)
+        r = ManualPasteIzd2Sheet(out_data, n_row_end, subpos, nm)
+        n_row_end = n_row_end + UBound(out_data, 1)
+    Next
+    n_row_end = n_row_end + 1
+    Data_out.Cells(n_row_end, col_man_subpos) = "!!!"
+    Data_out.Cells(n_row_end, col_man_pos) = "!!!"
+    Data_out.Cells(n_row_end, col_man_obozn) = "НИЖЕ ЭТИХ СТРОК НИЧЕГО ВРУЧНУЮ НЕ ВВОДИТЬ"
+    Data_out.Cells(n_row_end, col_man_naen) = "АВТОКАД_Извлечение данных"
+    ManualAddAuto = True
+End Function
+
 Function ManualAdd(ByVal lastfileadd As String) As Boolean
     nm = ActiveSheet.Name
     If SpecGetType(nm) <> 7 Then
@@ -4324,10 +4635,8 @@ Function ManualAdd(ByVal lastfileadd As String) As Boolean
     Else
         add_array = DataRead(lastfileadd)
     End If
-    
     add_array = DataSumByControlSum(add_array)
     man_arr = DataRead(nm)
-
     For Each t_el In Array(t_arm, t_prokat, t_mat, t_izd, t_subpos)
         t = ManualDiff(add_array, man_arr, t_el)
         If IsArray(t) Then diff_array = ArrayCombine(diff_array, t)
@@ -4571,8 +4880,8 @@ Function ManualCheck(nm) As Boolean
                         r = ManualCeilAlert(Data_out.Cells(i, col_man_qty), "Необходимо указать количество")
                         n_err = n_err + 1
                     End If
-                    If Length > 11700 And prim <> "п.м." Then
-                        r = ManualCeilAlert(Data_out.Cells(i, col_man_prim), "Стержни длиной выше 11,7 должны идти в п.м.")
+                    If Length > lenght_ed_arm And prim <> "п.м." Then
+                        r = ManualCeilAlert(Data_out.Cells(i, col_man_prim), "Стержни длиной выше" + ConvNum2Txt(lenght_ed_arm / 1000) + "должны идти в п.м.")
                         n_err = n_err + 1
                     End If
                     If Length < 100 Then
@@ -4586,6 +4895,21 @@ Function ManualCheck(nm) As Boolean
                         r = ManualCeilAlert(Data_out.Cells(i, col_man_length), "Длина ОДНОГО слоя, всё должно быть в мм", "info")
                         r = ManualCeilAlert(Data_out.Cells(i, col_man_qty), "Кол-во слоёв", "info")
                         If prim <> "п.м." Then r = ManualCeilAlert(Data_out.Cells(i, col_man_prim), "Должны идти в п.м.")
+                    End If
+                    If InStr(naen, "ВТОКАД_") > 0 Then
+                        With Data_out.Range(Data_out.Cells(i, 1), Data_out.Cells(i, max_col_man)).Interior
+                            .Pattern = xlSolid
+                            .PatternColorIndex = xlAutomatic
+                            .ThemeColor = xlThemeColorAccent2
+                            .TintAndShade = 0.799981688894314
+                            .PatternTintAndShade = 0
+                        End With
+                        If Length > lenght_ed_arm And Data_out.Cells(i, col_man_length).HasFormula = False Then
+                            addr_nahl = Data_out.Cells(i, col_man_nahl).Address(RowAbsolute:=False, ColumnAbsolute:=False)
+                            form = "=Арм_Длина_ПМ(" + ConvNum2Txt(Length) + "," + addr_nahl + "," + ConvNum2Txt(lenght_ed_arm) + ")"
+                            Data_out.Cells(i, col_man_length).ClearContents
+                            Data_out.Cells(i, col_man_length).Formula = form
+                        End If
                     End If
                 Case t_mat
                     If (prim <> "кв.м." And prim <> "куб.м.") Then
@@ -4655,7 +4979,7 @@ Function ManualCheck(nm) As Boolean
                         End With
                     End If
                 Case t_subpos 'Правила для маркировки сборок
-                    If name_subpos.Exists(subpos) Then
+                    If name_subpos.exists(subpos) Then
                         tnaen = name_subpos.Item(subpos)(1)
                         tobozn = name_subpos.Item(subpos)(2)
                         Data_out.Cells(i, col_man_obozn) = tobozn
@@ -4685,7 +5009,7 @@ Function ManualCheck(nm) As Boolean
                         suff = "_par"
                     End If
                     ky = pos & " " & obozn & " " & naen & suff
-                    If dsubpos.Exists(ky) Then
+                    If dsubpos.exists(ky) Then
                         dsubpos.Item(ky) = dsubpos.Item(ky) + 1
                         dsubpos.Item(ky + "_adr") = dsubpos.Item(ky + "_adr") + "+" + Data_out.Cells(i, 1).Address
                     Else
@@ -4746,15 +5070,15 @@ Function ManualCheck(nm) As Boolean
             klass = row(col_man_klass) ' Класс
             r_opr = Арм_МинРадиус(diametr, klass) - 0.5 * diametr
             Data_out.Cells(i, col_man_dgib) = r_opr
-            If Not ank_subpos.Exists(subpos & "_бет") Then
+            If Not ank_subpos.exists(subpos & "_бет") Then
                 Data_out.Cells(i, col_man_ank) = "НЕТ БЕТОНА"
                 Data_out.Cells(i, col_man_nahl) = "НЕТ БЕТОНА"
             Else
                 beton = ank_subpos.Item(subpos & "_бет")
                 kseism = 1
-                If ank_subpos.Exists(subpos & "_kseism") Then kseism = 1.3
+                If ank_subpos.exists(subpos & "_kseism") Then kseism = 1.3
                 type_arm = "растянутая"
-                If ank_subpos.Exists(subpos & pos & "тип") Then type_arm = ank_subpos.Item(subpos & pos & "тип")
+                If ank_subpos.exists(subpos & pos & "тип") Then type_arm = ank_subpos.Item(subpos & pos & "тип")
                 type_out = "L"
                 l_ank = Арм_Анкеровка(diametr, klass, beton, kseism, type_arm, type_out)
                 l_nahl = Арм_Нахлёст(diametr, klass, beton, kseism, type_arm, type_out)
@@ -4764,7 +5088,7 @@ Function ManualCheck(nm) As Boolean
         End If
     Next
     For Each subpos In ArrayUniqValColumn(spec, col_man_subpos)
-        If ank_subpos.Exists(subpos & "_бет") And concrsubpos.Exists(subpos) Then
+        If ank_subpos.exists(subpos & "_бет") And concrsubpos.exists(subpos) Then
             flag_eq = 0
             i = 0
             bet_ank = ank_subpos.Item(subpos & "_бет")
@@ -4797,7 +5121,7 @@ Function ManualCheck(nm) As Boolean
                 obozn = row(col_man_obozn) ' Обозначение
                 naen = row(col_man_naen) ' Наименование
                 ky = pos & " " & obozn & " " & naen & ""
-                If dsubpos.Exists(ky) Then
+                If dsubpos.exists(ky) Then
                     dsubpos.Item(ky) = dsubpos.Item(ky) + 1
                     dsubpos.Item(ky + "_adr") = ""
                 Else
@@ -4915,19 +5239,63 @@ Function ManualPaste2Sheet(ByRef array_in As Variant) As Boolean
     r = ManualCheck(Sh.Name)
 End Function
 
-Function ManualPasteIzd2Sheet(ByRef array_in As Variant) As Boolean
-    Set Sh = Application.ThisWorkbook.ActiveSheet
+Function ManualPasteIzd2Sheet(ByRef array_in As Variant, Optional ByVal n_first_row_t As Integer, Optional ByVal subpos As String, Optional ByVal nm As String) As Boolean
+    If IsEmpty(array_in) Then
+        ManualPasteIzd2Sheet = False
+        Exit Function
+    End If
+    If nm = "" Then
+        Set Sh = Application.ThisWorkbook.ActiveSheet
+    Else
+        Set Sh = Application.ThisWorkbook.Sheets(nm)
+    End If
     If SpecGetType(Sh.Name) <> 7 And SpecGetType(Sh.Name) <> 15 Then
         MsgBox ("Перейдите на лист с ручной спецификацией (заканчивается на _спец) и повторите")
         ManualPasteIzd2Sheet = False
         Exit Function
     End If
-    n_row = ActiveCell.row
-    n_col = UBound(array_in)
-    subpos = Sh.Cells(n_row - 1, 1).Value
-    Sh.Cells(n_row, 1).Value = subpos
-    Sh.Range(Sh.Cells(n_row, 2), Sh.Cells(n_row, n_col)) = array_in
-    r = ManualCheck(Sh.Name)
+    n_add = 1
+    If n_first_row_t = 0 Then
+        n_first_row = ActiveCell.row
+        is_row_epmty = True
+        For i = 1 To max_col_man
+            If Len(Sh.Cells(n_first_row, i).Value) > 0 Then is_row_epmty = False
+        Next i
+        If is_row_epmty Then n_add = 0
+    Else
+        n_first_row = n_first_row_t
+    End If
+    If ArrayIsSecondDim(array_in) Then
+        n_col = UBound(array_in, 2)
+        n_row = UBound(array_in, 1) - 1
+    Else
+        n_col = UBound(array_in)
+        n_row = 0
+    End If
+    If subpos = "" Then
+        subpos = Sh.Cells(n_first_row - 1, 1).Value
+        addr = Sh.Cells(n_first_row - 1, 1).Address(RowAbsolute:=False, ColumnAbsolute:=False)
+    End If
+    If subpos = "" Then
+        For i = n_first_row To 3 Step -1
+            If Len(Trim(Sh.Cells(i, 1).Value)) > 0 And subpos = "" Then
+                subpos = Sh.Cells(i, 1).Value
+                addr = Sh.Cells(i, 1).Address(RowAbsolute:=False, ColumnAbsolute:=False)
+            End If
+        Next i
+    End If
+    n_first_row = n_first_row + n_add
+    For i = n_first_row To n_first_row + n_row
+        Rows(i).Insert Shift:=xlDown
+    Next i
+    Sh.Range(Sh.Cells(n_first_row, 1), Sh.Cells(n_first_row + n_row, n_col)) = array_in
+    If addr <> "" Then
+        Sh.Range(Sh.Cells(n_first_row, 1), Sh.Cells(n_first_row + n_row, 1)).Formula = "=" + addr
+    Else
+        Sh.Range(Sh.Cells(n_first_row, 1), Sh.Cells(n_first_row + n_row, 1)).Value = subpos
+    End If
+    If n_first_row_t = 0 Then r = ManualCheck(Sh.Name)
+    ManualPasteIzd2Sheet = True
 End Function
 
 Function ManualUndoPos(ByVal nm As String) As Boolean
@@ -5005,6 +5373,7 @@ Function ManualPos(ByVal nm As String, ByVal type_pos As Integer) As Boolean
     'Лишние элементы убираем
     un_parent = ArraySort(ArrayCombine(pos_data.Item(floor_txt).Item("parent").keys(), Array("-"))) 'для всех сборок и элементов вне сборок
     arm = ArraySelectParam_2(out_data, t_arm, col_type_el, un_parent, col_sub_pos)
+    un_parent = ArrayUniqValColumn(arm, col_sub_pos)
     Select Case type_pos
     Case 1
         If Not IsEmpty(arm) Then cur_pos = posarmsort(chksum_pos, arm, 0, type_pos)
@@ -5087,6 +5456,7 @@ Function ManualPos(ByVal nm As String, ByVal type_pos As Integer) As Boolean
             If Not IsEmpty(pos) Then spec_sheet.Cells(i, 2) = pos
         End If
     Next i
+    r = ManualCheck(nm)
     ManualPos = True
 End Function
 
@@ -5099,6 +5469,7 @@ Function ManualSpec(ByVal nm As String, Optional ByVal add_array As Variant) As 
         flag_add = 0
         mod_array = Empty
     End If
+    r = ManualAddAuto(nm)
     Set spec_sheet = Application.ThisWorkbook.Sheets(nm)
     sheet_size = SheetGetSize(spec_sheet)
     n_row = sheet_size(1)
@@ -5329,7 +5700,7 @@ Function ManualSpec(ByVal nm As String, Optional ByVal add_array As Variant) As 
                 If pos_out(j, col_type_el) = t_izd Then
                     pos = pos_out(j, col_pos)
                     naen = pos_out(j, col_m_naen)
-                    If subpos_el.Exists(pos & naen) Then
+                    If subpos_el.exists(pos & naen) Then
                         subpos = pos_out(j, col_sub_pos)
                         pos_out(j, col_marka) = subpos & subpos_delim & pos_out(j, col_pos)
                         pos_out(j, col_sub_pos) = pos_out(j, col_pos)
@@ -5624,11 +5995,11 @@ Function OutPrepare() As Boolean
     OutPrepare = True
 End Function
 
-Function ReadFile(ByRef mask As String) As Variant
+Function ReadFile(ByVal mask As String, Optional ByVal FirstRow& = 1, Optional ByVal ColumnsSeparator$ = ";", Optional ByVal RowsSeparator$ = vbNewLine, Optional ByVal read_sys_file As Boolean = False) As Variant
     On Error Resume Next
     Set coll = FilenamesCollection(ThisWorkbook.path & "\import\", mask)
     For Each file In coll
-        arr = ArrayCombine(arr, ReadTxt(file))
+        arr = ArrayCombine(arr, ReadTxt(file, FirstRow&, ColumnsSeparator$, RowsSeparator$, read_sys_file))
     Next
     ReadFile = arr
     Erase arr
@@ -6418,7 +6789,7 @@ Function SheetReadOption()
     End If
     With ThisWorkbook
         For Each sheet In ThisWorkbook.Worksheets
-            If Not sheet_option.Exists(sheet.Name & ";k_zap") Then
+            If Not sheet_option.exists(sheet.Name & ";k_zap") Then
                 If SpecGetType(sheet.Name) > 0 Then r = SheetDefultOption(sheet.Name)
             End If
         Next
@@ -6844,7 +7215,7 @@ Function SpecOneSubpos(ByVal all_data As Variant, ByVal subpos As String, ByVal 
         If subpos <> "-" Then
             naen = subpos
             If pos_data.Item(floor_txt).Item("name").Count > 0 Then
-                If pos_data.Item(floor_txt).Item("name").Exists(subpos) Then naen = pos_data.Item(floor_txt).Item("name").Item(subpos)(1)
+                If pos_data.Item(floor_txt).Item("name").exists(subpos) Then naen = pos_data.Item(floor_txt).Item("name").Item(subpos)(1)
                 If UserForm2.qtyOneSubpos_CB.Value Then
                     pos_naen(n_n, 1) = fin_str & naen
                     If UserForm2.qtyOneFloor_CB.Value Then
@@ -6896,7 +7267,7 @@ Function SpecOneSubpos(ByVal all_data As Variant, ByVal subpos As String, ByVal 
             Case 2, 13
                 If subpos = "-" Then
                     u1 = (сurrent_subpos = "-") 'Элементы вне сборок
-                    u2 = (pos_data.Item(floor_txt).Item("-").Exists(сurrent_subpos) And (сurrent_parent = "-") And (сurrent_type_el = t_subpos))   'Элементы вложенных сборок
+                    u2 = (pos_data.Item(floor_txt).Item("-").exists(сurrent_subpos) And (сurrent_parent = "-") And (сurrent_type_el = t_subpos))   'Элементы вложенных сборок
                     usl = u1 Or u2
                 Else
                     u1 = ((сurrent_parent = "-") And (сurrent_subpos = subpos) And (сurrent_type_el <> t_subpos)) 'Элементы главной сборки
@@ -7244,25 +7615,25 @@ Function SpecMetallPlate(ByVal prokat_prof As String, ByVal prokat_naen As Strin
     abc = Split(prokat_naen, "*")
     If UBound(abc) > 0 Then
         flag_read = True
-        A = 0: B = 0: t = 100000: S = 0
+        a = 0: B = 0: t = 100000: S = 0
         For nn = 0 To UBound(abc)
             k = ConvTxt2Num(abc(nn))
             If IsNumeric(k) Then
                 k = k / 1000
-                If k > A Then A = k
+                If k > a Then a = k
                 If k < t Then t = k
                 S = S + k
             End If
         Next nn
-        B = S - A - t
+        B = S - a - t
         B = Round(B, 3)
-        A = Round(A, 3)
+        a = Round(a, 3)
         t = Round(t, 3)
         prokat_prof = "--" + ConvNum2Txt(t * 1000)
-        prokat_naen = "--" + ConvNum2Txt(t * 1000) + "x" + ConvNum2Txt(B * 1000) + "x" + ConvNum2Txt(A * 1000)
-        we_plate_one = A * B * t * 7850
+        prokat_naen = "--" + ConvNum2Txt(t * 1000) + "x" + ConvNum2Txt(B * 1000) + "x" + ConvNum2Txt(a * 1000)
+        we_plate_one = a * B * t * 7850
     End If
-    If B < 0.000001 Or t < 0.000001 Or A < 0.000001 Then
+    If B < 0.000001 Or t < 0.000001 Or a < 0.000001 Then
         MsgBox ("Ошибка в имени типа профиля листа " + prokat_naen_t)
         array_out(1) = "ОШИБКА ТИПА ПРОФИЛЯ ЛИСТА"
         array_out(2) = 0.001
@@ -7280,15 +7651,15 @@ Function SpecMetallPlate(ByVal prokat_prof As String, ByVal prokat_naen As Strin
 '        If Not UserForm2.pr_pm_CB.Value Then we = we * L
 '    End If
 
-    L = B * A
+    L = B * a
     we = t * 7850
     If Not UserForm2.pr_pm_CB.Value Then we = we * L
     If (UserForm2.keep_pos_CB.Value And UserForm2.pr_pm_CB.Value) Or Not UserForm2.pr_pm_CB.Value Then
         If Not UserForm2.pr_pm_CB.Value Then we = we / L
         If flag_read Then
             If Round(B * 1000, 1) = 0 Then
-                l_plate = L / A
-                we_plate = we / A
+                l_plate = L / a
+                we_plate = we / a
             Else
                 l_plate = 1
                 we_plate = L * we
@@ -7310,7 +7681,7 @@ Function SpecMetallPlate(ByVal prokat_prof As String, ByVal prokat_naen As Strin
     array_out(2) = l_plate
     array_out(3) = we_plate
     array_out(4) = we_plate_one
-    array_out(5) = A
+    array_out(5) = a
     array_out(6) = B
     array_out(7) = t
     SpecMetallPlate = array_out
@@ -7360,7 +7731,7 @@ Function SpecSubpos(ByVal subp As Variant, ByVal n_subp As Integer, ByVal type_s
                     obozn = subp(j, col_m_obozn)
                     naen = subp(j, col_m_naen)
                     If InStr(naen, "!!!") <> 0 Or InStr(obozn, "!!!") <> 0 Then
-                        If pos_data.Item(floor_txt).Item("name").Exists(pos) Then
+                        If pos_data.Item(floor_txt).Item("name").exists(pos) Then
                             naen = pos_data.Item(floor_txt).Item("name").Item(pos)(1)
                             obozn = pos_data.Item(floor_txt).Item("name").Item(pos)(2)
                         End If
@@ -7370,7 +7741,7 @@ Function SpecSubpos(ByVal subp As Variant, ByVal n_subp As Integer, ByVal type_s
                     pos_out(i, 3) = naen
                     pos_out(i, 4) = pos_out(i, 4) + n_el
                     pos_out(i, 5) = Weight
-                    If show_sum_prim Then pos_out(i, 6) = pos_out(i, 6) + n_el * Weight
+                    If show_sum_prim And IsNumeric(Weight) Then pos_out(i, 6) = pos_out(i, 6) + n_el * Weight
                 End Select
             End If
         Next j
@@ -7411,7 +7782,7 @@ Function Spec_AS(ByRef all_data As Variant, ByVal type_spec As Integer) As Varia
     End If
     qty_parent = UBound(pos_data.Item(floor_txt).Item("parent").keys()) + 1
     qty_child = UBound(pos_data.Item(floor_txt).Item("child").keys()) + 1
-    qty_empty = pos_data.Item(floor_txt).Exists("-")
+    qty_empty = pos_data.Item(floor_txt).exists("-")
     For inxfloor = 1 To nfloor
         If spec_version > 1 And UserForm2.qtyOneFloor_CB.Value Then
             n_floor = floor_txt_arr(inxfloor, 1)
@@ -7420,7 +7791,7 @@ Function Spec_AS(ByRef all_data As Variant, ByVal type_spec As Integer) As Varia
             all_data = ArraySelectParam_2(all_data_allfloor, t_floor, col_floor, n_floor, col_nfloor)
             qty_parent_floor = UBound(pos_data.Item(floor_txt).Item("parent").keys()) + 1
             qty_child_floor = UBound(pos_data.Item(floor_txt).Item("child").keys()) + 1
-            qty_empty_floor = pos_data.Item(floor_txt).Exists("-")
+            qty_empty_floor = pos_data.Item(floor_txt).exists("-")
         Else
             qty_parent_floor = qty_parent
             qty_child_floor = qty_child
@@ -7453,7 +7824,7 @@ Function Spec_AS(ByRef all_data As Variant, ByVal type_spec As Integer) As Varia
                     End If
                 Case 13
                     end_col = 6 + qty_parent
-                    If pos_data.Item("all_floor").Exists("-") Then end_col = end_col + 1
+                    If pos_data.Item("all_floor").exists("-") Then end_col = end_col + 1
                     ReDim pos_out(2, end_col)
                     pos_out(1, 1) = "Поз."
                     pos_out(1, 2) = "Обозначение"
@@ -7524,13 +7895,14 @@ Function Spec_AS(ByRef all_data As Variant, ByVal type_spec As Integer) As Varia
         
         If type_spec = 2 Then
             If qty_parent_floor > 0 Then
+                hh = pos_data.Item(floor_txt).Item("parent").keys()
                 For Each subpos In ArraySort(pos_data.Item(floor_txt).Item("parent").keys(), 1)
                     pos_out_onesubpos = SpecOneSubpos(all_data, subpos, type_spec, floor_txt)
                     If UserForm2.qtyOneFloor_CB.Value Then
-                        If Not pos_out_dic.Exists(subpos) Then Set pos_out_dic.Item(subpos) = CreateObject("Scripting.Dictionary")
+                        If Not pos_out_dic.exists(subpos) Then Set pos_out_dic.Item(subpos) = CreateObject("Scripting.Dictionary")
                         For i = 1 To UBound(pos_out_onesubpos, 1)
                             type_el = CStr(pos_out_onesubpos(i, 7))
-                            If Not pos_out_dic.Item(subpos).Exists(type_el) Then Set pos_out_dic.Item(subpos).Item(type_el) = CreateObject("Scripting.Dictionary")
+                            If Not pos_out_dic.Item(subpos).exists(type_el) Then Set pos_out_dic.Item(subpos).Item(type_el) = CreateObject("Scripting.Dictionary")
                             pos = CStr(pos_out_onesubpos(i, 1))
                             obozn = CStr(pos_out_onesubpos(i, 2))
                             naen = CStr(pos_out_onesubpos(i, 3))
@@ -7539,7 +7911,7 @@ Function Spec_AS(ByRef all_data As Variant, ByVal type_spec As Integer) As Varia
                             pos_out_onesubpos(i, 8) = floor_txt
                             row_key = pos + "%" + obozn + "%" + naen + "%" + ves
                             row_type = ArrayRow(pos_out_onesubpos, i, True)
-                            If Not pos_out_dic.Item(subpos).Item(type_el).Exists(row_key) Then
+                            If Not pos_out_dic.Item(subpos).Item(type_el).exists(row_key) Then
                                 pos_out_dic.Item(subpos).Item(type_el).Item(row_key) = row_type
                             Else
                                 pos_out_dic.Item(subpos).Item(type_el).Item(row_key) = ArrayCombine(pos_out_dic.Item(subpos).Item(type_el).Item(row_key), row_type)
@@ -7551,13 +7923,13 @@ Function Spec_AS(ByRef all_data As Variant, ByVal type_spec As Integer) As Varia
                 Next
             End If
             subpos = "-"
-            If pos_data.Item(floor_txt).Exists(subpos) Then
+            If pos_data.Item(floor_txt).exists(subpos) Then
                 pos_out_onesubpos = SpecOneSubpos(all_data, subpos, type_spec, floor_txt)
                 If UserForm2.qtyOneFloor_CB.Value Then
-                    If Not pos_out_dic.Exists(subpos) Then Set pos_out_dic.Item(subpos) = CreateObject("Scripting.Dictionary")
+                    If Not pos_out_dic.exists(subpos) Then Set pos_out_dic.Item(subpos) = CreateObject("Scripting.Dictionary")
                     For i = 1 To UBound(pos_out_onesubpos, 1)
                         type_el = CStr(pos_out_onesubpos(i, 7))
-                        If Not pos_out_dic.Item(subpos).Exists(type_el) Then Set pos_out_dic.Item(subpos).Item(type_el) = CreateObject("Scripting.Dictionary")
+                        If Not pos_out_dic.Item(subpos).exists(type_el) Then Set pos_out_dic.Item(subpos).Item(type_el) = CreateObject("Scripting.Dictionary")
                         pos = CStr(pos_out_onesubpos(i, 1))
                         obozn = CStr(pos_out_onesubpos(i, 2))
                         naen = CStr(pos_out_onesubpos(i, 3))
@@ -7566,7 +7938,7 @@ Function Spec_AS(ByRef all_data As Variant, ByVal type_spec As Integer) As Varia
                         pos_out_onesubpos(i, 8) = floor_txt
                         row_key = pos + "%" + obozn + "%" + naen + "%" + ves
                         row_type = ArrayRow(pos_out_onesubpos, i, True)
-                        If Not pos_out_dic.Item(subpos).Item(type_el).Exists(row_key) Then
+                        If Not pos_out_dic.Item(subpos).Item(type_el).exists(row_key) Then
                             pos_out_dic.Item(subpos).Item(type_el).Item(row_key) = row_type
                         Else
                             pos_out_dic.Item(subpos).Item(type_el).Item(row_key) = ArrayCombine(pos_out_dic.Item(subpos).Item(type_el).Item(row_key), row_type)
@@ -7579,14 +7951,14 @@ Function Spec_AS(ByRef all_data As Variant, ByVal type_spec As Integer) As Varia
         End If
         
         If type_spec = 3 Then
-            If (pos_data.Item(floor_txt).Exists("-") Or (UserForm2.show_subpos_CB.Value And (UBound(pos_data.Item(floor_txt).Item("parent").keys()) >= 0))) Then
+            If (pos_data.Item(floor_txt).exists("-") Or (UserForm2.show_subpos_CB.Value And (UBound(pos_data.Item(floor_txt).Item("parent").keys()) >= 0))) Then
                 pos_out_onesubpos = SpecOneSubpos(all_data, "-", type_spec, floor_txt)
                 If UserForm2.qtyOneFloor_CB.Value Then
                     subpos = "-"
-                    If Not pos_out_dic.Exists(subpos) Then Set pos_out_dic.Item(subpos) = CreateObject("Scripting.Dictionary")
+                    If Not pos_out_dic.exists(subpos) Then Set pos_out_dic.Item(subpos) = CreateObject("Scripting.Dictionary")
                     For i = 1 To UBound(pos_out_onesubpos, 1)
                         type_el = CStr(pos_out_onesubpos(i, 7))
-                        If Not pos_out_dic.Item(subpos).Exists(type_el) Then Set pos_out_dic.Item(subpos).Item(type_el) = CreateObject("Scripting.Dictionary")
+                        If Not pos_out_dic.Item(subpos).exists(type_el) Then Set pos_out_dic.Item(subpos).Item(type_el) = CreateObject("Scripting.Dictionary")
                         pos = CStr(pos_out_onesubpos(i, 1))
                         obozn = CStr(pos_out_onesubpos(i, 2))
                         naen = CStr(pos_out_onesubpos(i, 3))
@@ -7595,7 +7967,7 @@ Function Spec_AS(ByRef all_data As Variant, ByVal type_spec As Integer) As Varia
                         pos_out_onesubpos(i, 8) = floor_txt
                         row_key = pos + "%" + obozn + "%" + naen + "%" + ves
                         row_type = ArrayRow(pos_out_onesubpos, i, True)
-                        If Not pos_out_dic.Item(subpos).Item(type_el).Exists(row_key) Then
+                        If Not pos_out_dic.Item(subpos).Item(type_el).exists(row_key) Then
                             pos_out_dic.Item(subpos).Item(type_el).Item(row_key) = row_type
                         Else
                             pos_out_dic.Item(subpos).Item(type_el).Item(row_key) = ArrayCombine(pos_out_dic.Item(subpos).Item(type_el).Item(row_key), row_type)
@@ -7664,7 +8036,7 @@ Function Spec_AS(ByRef all_data As Variant, ByVal type_spec As Integer) As Varia
                     Next i
                 Next
             End If
-            If pos_data.Item(floor_txt).Exists("-") Then
+            If pos_data.Item(floor_txt).exists("-") Then
                 pos_out_tmp = SpecOneSubpos(all_data, "-", type_spec, floor_txt)
                 n_col_sb = end_col - 3
                 For i = 1 To UBound(pos_out_tmp, 1)
@@ -7786,7 +8158,7 @@ Function Spec_AS(ByRef all_data As Variant, ByVal type_spec As Integer) As Varia
             End If
         Next
         subpos = "-"
-        If pos_out_dic.Exists(subpos) Then
+        If pos_out_dic.exists(subpos) Then
             For Each type_el In pos_out_dic.Item(subpos).keys
                 For Each row In ArraySort(pos_out_dic.Item(subpos).Item(type_el).keys)
                     arr = ArraySort(pos_out_dic.Item(subpos).Item(type_el).Item(row), 1)
@@ -8194,7 +8566,7 @@ Function Spec_KZH(ByRef all_data As Variant) As Variant
         If сurrent_type_el = t_arm Or сurrent_type_el = t_prokat Then
             сurrent_subpos = all_data(i, col_sub_pos)
             naen = " "
-            If name_subpos.Exists(сurrent_subpos) Then naen = name_subpos.Item(сurrent_subpos)(1)
+            If name_subpos.exists(сurrent_subpos) Then naen = name_subpos.Item(сurrent_subpos)(1)
             flag = False
             Select Case сurrent_type_el
                 Case t_arm
@@ -8236,7 +8608,7 @@ Function Spec_KZH(ByRef all_data As Variant) As Variant
     'Сформируем общую таблицу диаметров и классов арматуры
     n_row = 5
     If UBound(un_parent) >= 0 Then n_row = n_row + UBound(un_parent)
-    If pos_data.Item(floor_txt).Exists("-") Then n_row = n_row + 1
+    If pos_data.Item(floor_txt).exists("-") Then n_row = n_row + 1
     sum_row = 0: If n_row - 5 > 1 And sum_row_wkzh = True Then sum_row = 1
     Dim pos_out: ReDim pos_out(n_row + sum_row, 1)
     For j = 1 To 4
@@ -8347,7 +8719,7 @@ Function Spec_KZH(ByRef all_data As Variant) As Variant
     Set weight_index = CreateObject("Scripting.Dictionary")
     weight_index.comparemode = 1
     For k = 6 To n_row
-        If (pos_data.Item(floor_txt).Exists("-") And k = n_row) Or (UBound(un_parent) <= 0) Then
+        If (pos_data.Item(floor_txt).exists("-") And k = n_row) Or (UBound(un_parent) <= 0) Then
             subpos = "-"
             nSubPos = 1
         Else
@@ -8408,19 +8780,19 @@ Function Spec_KZH(ByRef all_data As Variant) As Variant
         For j = 1 To UBound(arm_arr(i), 1)
             subpos = arm_arr(i)(j, col_sub_pos)
             tparent = arm_arr(i)(j, col_parent)
-            u1 = (pos_data.Item(floor_txt).Item("parent").Exists(subpos) Or pos_data.Item(floor_txt).Item("parent").Exists(tparent))
-            If pos_data.Item(floor_txt).Exists("-") Then u2 = ((subpos = "-") Or (pos_data.Item(floor_txt).Item("-").Exists(subpos) And tparent = "-"))
+            u1 = (pos_data.Item(floor_txt).Item("parent").exists(subpos) Or pos_data.Item(floor_txt).Item("parent").exists(tparent))
+            If pos_data.Item(floor_txt).exists("-") Then u2 = ((subpos = "-") Or (pos_data.Item(floor_txt).Item("-").exists(subpos) And tparent = "-"))
             If u1 Or u2 Then
                 If u2 Then
                     nSubPos = 1
                     k = weight_index.Item("row" & tparent)
                 End If
                 If u1 Then
-                    If pos_data.Item(floor_txt).Item("parent").Exists(subpos) Then
+                    If pos_data.Item(floor_txt).Item("parent").exists(subpos) Then
                         nSubPos = pos_data.Item(floor_txt).Item("qty").Item("-_" & subpos)
                         k = weight_index.Item("row" & subpos)
                     End If
-                    If pos_data.Item(floor_txt).Item("parent").Exists(tparent) Then
+                    If pos_data.Item(floor_txt).Item("parent").exists(tparent) Then
                         nSubPos = pos_data.Item(floor_txt).Item("qty").Item("-_" & tparent)
                         k = weight_index.Item("row" & tparent)
                     End If
@@ -8780,7 +9152,7 @@ Function VedAddAreaGR(ByVal area As Double, ByVal mat_fin As String, ByVal type_
             mat = Trim(mat)
             materials_by_type.Item(type_name + type_constr + mat) = materials_by_type.Item(type_name + type_constr + mat) + area
             If InStr(type_constr, ";pot;") > 0 And zonenum_pot Then
-                If materials_by_type.Exists(type_name + ";pot_num" + mat) Then
+                If materials_by_type.exists(type_name + ";pot_num" + mat) Then
                     materials_by_type.Item(type_name + ";pot_num" + mat) = materials_by_type.Item(type_name + ";pot_num" + mat) + ";" + Trim(num)
                 Else
                     materials_by_type.Item(type_name + ";pot_num" + mat) = Trim(num)
@@ -8795,7 +9167,7 @@ Function VedAddAreaGR(ByVal area As Double, ByVal mat_fin As String, ByVal type_
             mat = Trim(all_name_mat(ni))
             materials_by_type.Item(type_name + type_constr + mat) = materials_by_type.Item(type_name + type_constr + mat) + area
             If InStr(type_constr, ";pot;") > 0 And zonenum_pot Then
-                If materials_by_type.Exists(type_name + ";pot_num" + mat) Then
+                If materials_by_type.exists(type_name + ";pot_num" + mat) Then
                     materials_by_type.Item(type_name + ";pot_num" + mat) = materials_by_type.Item(type_name + ";pot_num" + mat) + ";" + Trim(num)
                 Else
                     materials_by_type.Item(type_name + ";pot_num" + mat) = Trim(num)
@@ -8860,7 +9232,7 @@ Function VedAddArea(ByRef zone As Variant, ByRef materials As Variant, ByVal mat
     End If
     flag = 0
     If perim > 0.01 Then
-        If zone.Exists(num + "perim;") Then
+        If zone.exists(num + "perim;") Then
             zone.Item(num + "perim;") = zone.Item(num + "perim;") + perim
         Else
             zone.Item(num + "perim;") = perim
@@ -8873,19 +9245,19 @@ Function VedAddArea(ByRef zone As Variant, ByRef materials As Variant, ByVal mat
             If Left(naen_mat, 1) <> "" Then naen_mat = StrConv(Left(naen_mat, 1), vbUpperCase) + Right(naen_mat, Len(naen_mat) - 1)
             If Left(naen_mat, 1) = ";" Then naen_mat = Trim(Right(naen_mat, Len(naen_mat) - 1))
             If naen_mat <> "" And Not IsEmpty(naen_mat) And InStr(naen_mat, "--") = 0 And InStr(naen_mat, "УНИВЕРСАЛЬНОЕ") = 0 And InStr(naen_mat, "е задан") = 0 Then
-                If Not zone.Exists(num) Then
+                If Not zone.exists(num) Then
                     Set mat_collect = CreateObject("Scripting.Dictionary")
                     mat_collect.Item(mat) = 1
                     Set zone.Item(num) = mat_collect
                     flag = flag + 1
                 Else
-                    If Not zone.Item(num).Exists(mat) Then
+                    If Not zone.Item(num).exists(mat) Then
                         zone.Item(num).Item(mat) = 1
                         flag = flag + 1
                     End If
                 End If
                 
-                If zone.Exists(num + "n;" + mat) Then
+                If zone.exists(num + "n;" + mat) Then
                     zone.Item(num + "a;" + mat) = zone.Item(num + "a;" + mat) + area_mat
                 Else
                     zone.Item(num + "a;" + mat) = area_mat
@@ -8893,7 +9265,7 @@ Function VedAddArea(ByRef zone As Variant, ByRef materials As Variant, ByVal mat
                 End If
                 
                 If h_pan > 0.01 Then
-                    If Not zone.Exists(num + "h;" + mat) Then
+                    If Not zone.exists(num + "h;" + mat) Then
                         zone.Item(num + "h;" + mat) = h_pan
                     End If
                 End If
@@ -8904,7 +9276,7 @@ Function VedAddArea(ByRef zone As Variant, ByRef materials As Variant, ByVal mat
                     fname = "": If InStr(mat_clear, type_) = 0 Then fname = "Потолок: "
                     naen_mat = fname + naen_mat
                 End If
-                If materials.Exists(mat) Then
+                If materials.exists(mat) Then
                     materials.Item(mat + ";a") = materials.Item(mat + ";a") + area_mat
                 Else
                     materials.Item(mat) = naen_mat
@@ -8985,8 +9357,8 @@ Function Spec_NRM(ByRef all_data As Variant) As Variant
         v_bet = 0
         v_arm = 0
         naen_bet = ""
-        If concrsubpos.Exists(subpos & "_bet_qty") Then
-            If concrsubpos.Exists(subpos & "@бет") Then
+        If concrsubpos.exists(subpos & "_bet_qty") Then
+            If concrsubpos.exists(subpos & "@бет") Then
                 bet_ank = concrsubpos.Item(subpos & "@бет")
                 For Each sub_bet In concrsubpos.keys()
                     If InStr(sub_bet, "_") > 0 And Right(sub_bet, 4) = "_qty" And InStr(sub_bet, "bet") = 0 Then
@@ -9995,7 +10367,7 @@ Function Spec_VED(ByRef all_data As Variant) As Variant
             pos_out(n_row + 1, n_col_out) = prim
         End If
         '-- ПОТОЛКИ ---
-        If Not zone.Exists(num + ";pot") Then
+        If Not zone.exists(num + ";pot") Then
             pot = Empty
         Else
             pot = ArraySort(zone.Item(num + ";pot").keys())
@@ -10016,7 +10388,7 @@ Function Spec_VED(ByRef all_data As Variant) As Variant
             pos_out(n_row_p, 4) = "-"
         End If
         '-- СТЕНЫ ---
-        If Not zone.Exists(num + ";w") Then
+        If Not zone.exists(num + ";w") Then
             wall = Empty
         Else
             wall = ArraySort(zone.Item(num + ";w").keys())
@@ -10037,7 +10409,7 @@ Function Spec_VED(ByRef all_data As Variant) As Variant
         End If
          '-- КОЛОННЫ ---
         If is_column Then
-            If Not zone.Exists(num + ";c") Then
+            If Not zone.exists(num + ";c") Then
                 colum = Empty
             Else
                 colum = ArraySort(zone.Item(num + ";c").keys())
@@ -10059,7 +10431,7 @@ Function Spec_VED(ByRef all_data As Variant) As Variant
         End If
          '-- ПАНЕЛИ ---
         If is_pan Then
-            If zone.Exists(num + ";pn") Then
+            If zone.exists(num + ";pn") Then
                 panel = ArraySort(zone.Item(num + ";pn").keys())
                 For Each p In panel
                     n_row_pan = n_row_pan + 1
@@ -10379,7 +10751,7 @@ Function VedRead(ByVal lastfilespec As String) As Variant
             out_data(i, col_s_numb_zone) = n_zone
         Else
             n_zone = ConvNum2Txt(out_data(i, col_s_numb_zone))
-            If zone_num.Exists(n_zone) Then
+            If zone_num.exists(n_zone) Then
                 'Если такая зона уже есть - добавим их количество. Но вообще зон с одинаковым номером быть не дОлжно.
                 zone_num.Item(n_zone) = zone_num.Item(n_zone) + 1
                 n_zone = n_zone + "@@" + CStr(zone_num.Item(n_zone))
@@ -10408,7 +10780,7 @@ Function VedRead(ByVal lastfilespec As String) As Variant
             End If
             If out_data(i, col_s_area_wall) > 0 Then
                 If InStr(name_mat, "ОШИБКА") > 0 Then
-                    If Not add_rule.Exists(name_mat) Then add_rule.Item(name_mat) = name_mat
+                    If Not add_rule.exists(name_mat) Then add_rule.Item(name_mat) = name_mat
                     out_data(i, col_s_mat_wall) = "ОШИБКА"
                 Else
                     out_data(i, col_s_mat_wall) = name_mat
@@ -10427,7 +10799,7 @@ Function VedRead(ByVal lastfilespec As String) As Variant
                     material = out_data(i, col_s_type_pol)
                     name_mat = VedNameMat(layer, material, rules)
                     If InStr(name_mat, "ОШИБКА") > 0 Then
-                        If Not add_rule.Exists(name_mat) Then add_rule.Item(name_mat) = name_mat
+                        If Not add_rule.exists(name_mat) Then add_rule.Item(name_mat) = name_mat
                         out_data(i, col_s_type_pol) = "ОШИБКА"
                     Else
                         out_data(i, col_s_type_pol) = name_mat
@@ -10468,7 +10840,7 @@ Function VedRead(ByVal lastfilespec As String) As Variant
                     layer = "Потолок"
                     name_mat = VedNameMat(layer, material, rules)
                     If InStr(name_mat, "ОШИБКА") > 0 Then
-                       If Not add_rule.Exists(name_mat) Then add_rule.Item(name_mat) = name_mat
+                       If Not add_rule.exists(name_mat) Then add_rule.Item(name_mat) = name_mat
                     Else
                         type_ = "Низ лестничных маршей: "
                         name_mat = type_ + out_data(i, col_s_mpot_zone) + ";" + type_ + name_mat
@@ -10553,7 +10925,7 @@ Function VedRead(ByVal lastfilespec As String) As Variant
                     material = zone_el(i, col_s_type_pot_zone)
                     name_mat = VedNameMat(layer, material, rules)
                     If InStr(name_mat, "ОШИБКА") > 0 Then
-                        If Not add_rule.Exists(name_mat) Then add_rule.Item(name_mat) = name_mat
+                        If Not add_rule.exists(name_mat) Then add_rule.Item(name_mat) = name_mat
                     Else
                         n_add = n_add + 1
                         add_pol(col_s_numb_zone, n_add) = zone_el(i, col_s_numb_zone)
@@ -10600,13 +10972,21 @@ Function VedReadPol(ByVal lastfilespec As String) As Variant
         VedReadPol = Empty
         Exit Function
     End If
-    n_row_a = UBound(out_data, 1) - 1
+    n_row_a = UBound(out_data, 1)
     n_col_a = UBound(out_data, 2)
     If n_col_a <= col_s_layer Then
         VedReadPol = Empty
         Exit Function
     End If
-    ReDim Preserve out_data(n_row_a, max_s_col)
+    If n_col_a < max_s_col Then
+        Dim out_data_t: ReDim out_data_t(n_row_a, max_s_col)
+        For i = 1 To n_row_a
+            For j = 1 To n_col_a
+                out_data_t(i, j) = out_data(i, j)
+            Next j
+        Next i
+        out_data = out_data_t
+    End If
     Dim add_pol: ReDim add_pol(n_col_a, max_s_col)
     n_add = 0
     n_zone = 999999
@@ -10705,7 +11085,8 @@ Function VedReadPol(ByVal lastfilespec As String) As Variant
 End Function
 
 Function VedWriteLog(ByVal nm As String)
-    If Debug_mode = False Then Exit Function
+    ilg = 1
+    If Debug_mode = False Or ilg = 1 Then Exit Function
     nm_log = Right(nm, 24) & "_log"
     If SheetExist(nm_log) Then
         Worksheets(nm_log).Activate
@@ -10810,7 +11191,8 @@ Function VedSplitSheet(ByVal lastfilespec As String)
 End Function
 
 Function VedSplitFile(ByVal lastfilespec As String)
-    raw_data = ReadTxt(ThisWorkbook.path & "\import\" & lastfilespec & "_разб" & ".txt", 1, vbTab, vbNewLine)
+    list_razb = GetListFile("_разб" & ".txt")
+    raw_data = ReadTxt(list_razb(1, 2), 1, vbTab, vbNewLine)
     sheet_name = ArrayUniqValColumn(raw_data, 1)
     n_split = UBound(sheet_name, 1)
     Dim split_data: ReDim split_data(n_split, 3)
