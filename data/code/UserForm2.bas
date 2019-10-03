@@ -19,7 +19,7 @@ Attribute VB_Exposed = False
 Option Compare Text
 Option Base 1
 
-Const form_version As String = "3.21"
+Const form_version As String = "3.22"
 Public CodePath, MaterialPath, SortamentPath As String
 Public lastsheet, lastconstrtype, lastconstr, lastfile, lastfilespec, lastfileadd, materialbook_index, name_izd As Variant
 
@@ -393,6 +393,7 @@ Sub remat()
             listadd(n_add) = sheet
         End If
     Next
+    Dim add_spec(): ReDim add_spec(UBound(listFile, 1)): n_add = 0
     For i = 1 To UBound(listFile, 1)
         flag_add = 1
         tf_name = listFile(i, 1)
@@ -403,6 +404,10 @@ Sub remat()
         If flag_add = 1 Then
             type_spec = SpecGetType(tf_name)
             If type_spec <> 7 And type_spec <> 2 And type_spec <> 3 Then flag_add = 0
+            If type_spec = 22 Then
+                n_add = n_add + 1
+                add_spec(n_add) = Split(tf_name, "_")(0)
+            End If
         End If
         If flag_add = 1 Then
             n_man = n_man + 1
@@ -410,6 +415,8 @@ Sub remat()
             listspec(n_man) = listFile(i, 1)
         End If
     Next i
+    ReDim Preserve add_spec(n_add)
+    listspec = ArrayUniqValColumn(ArrayCombine(listspec, add_spec), 1)
     Set name_izd = CreateObject("Scripting.Dictionary")
     Dim adress_array: ReDim adress_array(4)
     For Each objWh In ThisWorkbook.Worksheets
