@@ -19,7 +19,7 @@ Attribute VB_Exposed = False
 Option Compare Text
 Option Base 1
 
-Const form_version As String = "3.18"
+Const form_version As String = "3.21"
 Public CodePath, MaterialPath, SortamentPath As String
 Public lastsheet, lastconstrtype, lastconstr, lastfile, lastfilespec, lastfileadd, materialbook_index, name_izd As Variant
 
@@ -182,10 +182,11 @@ Private Sub dischargeButton_Click()
     r = OutPrepare()
     nm = ThisWorkbook.ActiveSheet.Name
     type_spec = SpecGetType(nm)
-    If type_spec = 3 Or type_spec = 7 Then
-        suffix = "_норм"
-        r = Spec_Select(nm, suffix)
+    If type_spec <> 3 Or type_spec <> 7 Then
+        If InStr(nm, "_") > 0 Then nm = Split(nm, "_")(0)
     End If
+    suffix = "_норм"
+    r = Spec_Select(nm, suffix)
     r = OutEnded()
 End Sub
 
@@ -393,9 +394,17 @@ Sub remat()
         End If
     Next
     For i = 1 To UBound(listFile, 1)
-            type_spec = SpecGetType(listFile(i, 1))
-        If ((listFile(i, 1) <> "Полы") * (listFile(i, 1) <> _
-            "Отметки_перемычек") * (listFile(i, 1) <> "Типы_полов") * (InStr(listFile(i, 1), "_сист") = 0) And type_spec <> 21) Then
+        flag_add = 1
+        tf_name = listFile(i, 1)
+        If tf_name = "Полы" Then flag_add = 0
+        If tf_name = "Отметки_перемычек" Then flag_add = 0
+        If tf_name = "Типы_полов" Then flag_add = 0
+        If InStr(tf_name, "_сист") > 0 Then flag_add = 0
+        If flag_add = 1 Then
+            type_spec = SpecGetType(tf_name)
+            If type_spec <> 7 And type_spec <> 2 And type_spec <> 3 Then flag_add = 0
+        End If
+        If flag_add = 1 Then
             n_man = n_man + 1
             ReDim Preserve listspec(n_man)
             listspec(n_man) = listFile(i, 1)
