@@ -19,7 +19,7 @@ Attribute VB_Exposed = False
 Option Compare Text
 Option Base 1
 
-Const form_version As String = "3.22"
+Const form_version As String = "3.23"
 Public CodePath, MaterialPath, SortamentPath As String
 Public lastsheet, lastconstrtype, lastconstr, lastfile, lastfilespec, lastfileadd, materialbook_index, name_izd As Variant
 
@@ -65,6 +65,13 @@ Private Sub PosSubposButton_Click()
         End If
         r = OutEnded()
     End If
+End Sub
+
+Private Sub ReloadTXTButton_Click()
+    rv = False
+    r = OutPrepare()
+    rv = SheetAddTxt()
+    r = OutEnded()
 End Sub
 
 Private Sub UndoPosButton_Click()

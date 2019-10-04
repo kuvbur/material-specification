@@ -1,7 +1,7 @@
 Attribute VB_Name = "calc"
 Option Compare Text
 Option Base 1
-Public Const macro_version As String = "3.73"
+Public Const macro_version As String = "3.74"
 '-------------------------------------------------------
 'Типы элементов (столбец col_type_el)
 Public Const t_arm As Integer = 10
@@ -240,7 +240,7 @@ Public def_decode As Boolean 'Декодировать независимо от настроек
 Public Debug_mode As Boolean 'Режим отладки
 Public check_version As Boolean 'Проверять версию при загрузке
 Public lenght_ed_arm As Integer 'Максимальная длина стержня арматуры
-
+Public hard_round_km As Boolean
 Function INISet()
     sIniFile = UserForm2.CodePath & "setting.ini"
     If CBool(Len(Dir$(sIniFile))) Then
@@ -275,6 +275,7 @@ Function INISet()
         delim_group_ved = INIReadKeyVal("ЛИСТЫ", "delim_group_ved")
         show_sum_prim = INIReadKeyVal("ЛИСТЫ", "show_sum_prim")
         lenght_ed_arm = INIReadKeyVal("РАСЧЁТЫ", "lenght_ed_arm")
+        hard_round_km = INIReadKeyVal("РАСЧЁТЫ", "hard_round_km")
         flag = False
     Else
         flag = True
@@ -310,6 +311,7 @@ Function INISet()
     If IsEmpty(delim_group_ved) Or flag Then delim_group_ved = False
     If IsEmpty(show_sum_prim) Or flag Then show_sum_prim = True
     If IsEmpty(lenght_ed_arm) Or flag Then lenght_ed_arm = 11700
+    If IsEmpty(hard_round_km) Or flag Then hard_round_km = True
     '----Запись умолчаний, если файл не найден
     If flag Then
         t = INIWriteKeyVal("РАСЧЁТЫ", "type_okrugl", type_okrugl)
@@ -343,6 +345,7 @@ Function INISet()
         t = INIWriteKeyVal("ЛИСТЫ", "show_sum_prim", True)
         t = INIWriteKeyVal("ЛИСТЫ", "delim_group_ved", False)
         t = INIWriteKeyVal("РАСЧЁТЫ", "lenght_ed_arm", 11700)
+        t = INIWriteKeyVal("РАСЧЁТЫ", "hard_round_km", True)
     End If
     '----Принудительное включение
     delim_by_sheet = True
@@ -892,13 +895,34 @@ Function ArraySelectParam_2(ByVal array_in As Variant, ByVal param1 As Variant, 
         n_row_s = 0
         ReDim arrout(n_row)
         For j = 1 To n_row
+            flag1 = 0 'Не записывать ни в коем случае
             For Each tparam1 In param1
                 If array_in(j) = tparam1 Then
-                    n_row_s = n_row_s + 1
-                    arrout(n_row_s) = array_in(j)
-                    Exit For
+                    flag1 = 1 'Конечно, записывать
+                Else
+                    If InStr(tparam1, "?") > 0 Then
+                        tpar = array_in(j)
+                        If IsNumeric(tpar) Then tparam1 = ConvNum2Txt(tpar)
+                        If Right(tparam1, 1) = "?" And Left(tparam1, 1) = "?" Then
+                            tparam1 = Trim(Replace(tparam1, "?", ""))
+                            If InStr(tpar, tparam1) > 0 Then flag1 = 1
+                        End If
+                        If Left(tparam1, 1) = "?" Then
+                            tparam1 = Trim(Replace(tparam1, "?", ""))
+                            If Right(tpar, Len(tparam1)) = tparam1 Then flag1 = 1
+                        End If
+                        If Right(tparam1, 1) = "?" Then
+                            tparam1 = Trim(Replace(tparam1, "?", ""))
+                            If Left(tpar, Len(tparam1)) = tparam1 Then flag1 = 1
+                        End If
+                    End If
                 End If
+                If flag1 = 1 Then Exit For
             Next
+            If flag1 = 1 Then
+                n_row_s = n_row_s + 1
+                arrout(n_row_s) = array_in(j)
+            End If
         Next j
         If n_row_s > 0 Then
             ReDim Preserve arrout(n_row_s)
@@ -1543,13 +1567,13 @@ Function DataCheck(ByVal array_in As Variant) As Variant
                     weight_pm = GetWeightForDiametr(diametr, klass)
                     length_pos = Round_w(array_in(i, col_length) / 1000, n_round_l)
                 Case t_prokat
-                    name_pr = GetShortNameForGOST(array_in(i, col_pr_gost_prof))
-                    If InStr(1, name_pr, "Лист") > 0 Then
-                        naen_plate = SpecMetallPlate(array_in(i, col_pr_prof), array_in(i, col_pr_naen), 0, 0)
-                        array_in(i, col_pr_weight) = naen_plate(4)
-                        array_in(i, col_pr_length) = naen_plate(5) * naen_plate(6)
-                    End If
-                    
+'                    name_pr = GetShortNameForGOST(array_in(i, col_pr_gost_prof))
+'                    If InStr(1, name_pr, "Лист") > 0 Then
+'                        naen_plate = SpecMetallPlate(array_in(i, col_pr_prof), array_in(i, col_pr_naen), 0, 0)
+'                        s_list = naen_plate(5) * naen_plate(6) * 1000
+'                        w_list = naen_plate(6) * 7850
+'                        array_in(i, col_pr_length) = naen_plate(5) * naen_plate(6) * 1000
+'                    End If
                     If Not IsNumeric(array_in(i, col_pr_weight)) Then
                         array_in(i, col_pr_weight) = 0.01
                         r = LogWrite("Нулевая масса элемента проката", array_in(i, col_sub_pos) + " " + array_in(i, col_pos), array_in(i, col_pr_naen))
@@ -5017,6 +5041,97 @@ Function ManualAddAuto(ByVal nm As String) As Boolean
     Data_out.Cells(n_row_end, col_man_obozn) = "НИЖЕ ЭТИХ СТРОК НИЧЕГО ВРУЧНУЮ НЕ ВВОДИТЬ"
     Data_out.Cells(n_row_end, col_man_naen) = "АВТОКАД_Извлечение данных"
     ManualAddAuto = True
+End Function
+
+Function SheetAddTxt() As Boolean
+    coll = GetListFile(nm + ".txt")
+    If IsEmpty(coll) Then
+        SheetAddTxt = False
+        Exit Function
+    End If
+    import_txt_arr = ArraySelectParam_2(coll, "?_сист?", 1)
+    If IsEmpty(import_txt_arr) Then
+        SheetAddTxt = False
+        Exit Function
+    End If
+    import_sheet_arr = ArraySelectParam_2(GetListOfSheet(ThisWorkbook), "?из архикада?")
+    Set import_sheet = CreateObject("Scripting.Dictionary")
+        If Not IsEmpty(import_sheet_arr) Then
+        For Each nm In import_sheet_arr
+            Set Data_out = Application.ThisWorkbook.Sheets(nm)
+            n_col = SheetGetSize(Data_out)(2)
+            header_sheet = Data_out.Range(Data_out.Cells(1, 1), Data_out.Cells(2, n_col))
+            header_sheet = Join(ArrayRow(header_sheet, 1)) + Join(ArrayRow(header_sheet, 2))
+            header_sheet = Replace(header_sheet, " ", "")
+            header_sheet = Replace(header_sheet, "_", "")
+            header_sheet = LCase(header_sheet)
+            If InStr(header_sheet, "@@") > 0 Then
+                header_sheet = Split(header_sheet, "@@")(2)
+            End If
+            If Len(header_sheet) > 0 Then import_sheet.Item(header_sheet) = nm
+            Set Data_out = Nothing
+        Next
+    End If
+    
+    For i = 1 To UBound(import_txt_arr, 1)
+        short_fname = import_txt_arr(i, 1)
+        tdate_txt = FileDateTime(import_txt_arr(i, 2))
+        data_txt = ReadFile(import_txt_arr(i, 1) + ".txt", 1, vbTab, vbNewLine)
+        If Not IsEmpty(data_txt) Then
+            header_txt = Join(ArrayRow(data_txt, 1)) + Join(ArrayRow(data_txt, 2))
+            header_txt = Replace(header_txt, " ", "")
+            header_txt = Replace(header_txt, "_", "")
+            header_txt = LCase(header_txt)
+            If import_sheet.exists(header_txt) Then
+                For Each conn In Application.ThisWorkbook.Connections
+                    connName = Replace(conn.Name, " ", "")
+                    connName = Replace(connName, "_", "")
+                    connName = Replace(connName, "excel", "")
+                    connName = LCase(connName)
+                    If InStr(header_txt, connName) > 0 And Len(connName) > 0 Then
+                        conn.Delete
+                    End If
+                Next conn
+                sheet_name = import_sheet.Item(header_txt)
+            Else
+                sheet_name = "из архикада"
+                head_txt = Trim(Join(ArrayRow(data_txt, 1)))
+                If InStr(head_txt, " ") > 0 Then
+                    n = Split(head_txt, " ")
+                    For nn = 1 To UBound(n)
+                        sheet_name = sheet_name + " " + n(nn)
+                    Next nn
+                Else
+                    sheet_name = sheet_name + " " + head_txt
+                End If
+                sheet_name = Replace(sheet_name, "ЖБ", "")
+                sheet_name = Replace(sheet_name, "  ", " ")
+                sheet_name = Trim(Left(sheet_name, 31))
+            End If
+            data_txt(1, 1) = CStr(tdate_txt) + " @@ " + CStr(import_txt_arr(i, 2)) + " @@ "
+            n_row = UBound(data_txt, 1)
+            n_col = UBound(data_txt, 2)
+            For j = 3 To n_row
+                For k = 1 To n_col
+                    If InStr(data_txt(j, k), ".") > 0 Then
+                        vval = ConvTxt2Num(data_txt(j, k))
+                        If IsNumeric(vval) Then
+                            vval = ConvNum2Txt(vval)
+                            vval = Replace(vval, ".", ",")
+                            data_txt(j, k) = vval
+                        End If
+                    End If
+                Next k
+            Next j
+            r = SheetNew(sheet_name)
+            Set Sh = Application.ThisWorkbook.Sheets(sheet_name)
+            Sh.Range(Sh.Cells(1, 1), Sh.Cells(n_row, n_col)) = data_txt
+        End If
+    Next i
+
+
+
+
 End Function
 
 Function ManualAdd(ByVal lastfileadd As String) As Boolean
@@ -8883,14 +8998,19 @@ Function Spec_KM(ByRef all_data As Variant) As Variant
                     'Из-за особенностей ГОСТа минимальное значение - 100 кг.
                     'Не плохой такой источник экономии
                     Weight# = Round_w(Weight# / koef, n_okr)
-                    If Weight# < (1 / (10 ^ n_okr)) Then
-                        wt = ConvNum2Txt(Weight#)
-                        If Len(wt) > Len(w_format) Then
-                            w_format_t = "0."
-                            For nnul = 1 To Len(wt) - Len(w_format_t)
-                                w_format_t = w_format_t + "0"
-                            Next nnul
-                            w_format = w_format_t
+                    w_min = 1 / (10 ^ n_okr)
+                    If Weight# < w_min Then
+                        If hard_round_km Then
+                            Weight# = w_min
+                        Else
+                            wt = ConvNum2Txt(Weight#)
+                            If Len(wt) > Len(w_format) Then
+                                w_format_t = "0."
+                                For nnul = 1 To Len(wt) - Len(w_format_t)
+                                    w_format_t = w_format_t + "0"
+                                Next nnul
+                                w_format = w_format_t
+                            End If
                         End If
                     End If
                     'Записываем в массив результат
