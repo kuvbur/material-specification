@@ -16,10 +16,12 @@ Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
 
 
+
+
 Option Compare Text
 Option Base 1
 
-Const form_version As String = "3.23"
+Const form_version As String = "3.24"
 Public CodePath, MaterialPath, SortamentPath As String
 Public lastsheet, lastconstrtype, lastconstr, lastfile, lastfilespec, lastfileadd, materialbook_index, name_izd As Variant
 
@@ -422,7 +424,7 @@ Sub remat()
             listspec(n_man) = listFile(i, 1)
         End If
     Next i
-    ReDim Preserve add_spec(n_add)
+    If n_add > 0 Then ReDim Preserve add_spec(n_add)
     listspec = ArrayUniqValColumn(ArrayCombine(listspec, add_spec), 1)
     Set name_izd = CreateObject("Scripting.Dictionary")
     Dim adress_array: ReDim adress_array(4)
@@ -446,10 +448,14 @@ Sub remat()
     Next objWh
     listadd = ArraySort(name_izd.keys())
     r = ReList(ListBoxFileSpec, listspec)
-    r = ReList(ListBoxName, listadd)
+    If Not IsEmpty(listadd) Then
+        r = ReList(ListBoxName, listadd)
+        lastfileadd = listadd(1)
+    Else
+        lastfileadd = ""
+    End If
     lastfile = ThisWorkbook.ActiveSheet.Name
     lastfilespec = ThisWorkbook.ActiveSheet.Name
-    lastfileadd = listadd(1)
 End Sub
 
 Private Sub SaveCodeButton_Click()

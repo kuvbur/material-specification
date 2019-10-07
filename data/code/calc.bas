@@ -1,7 +1,7 @@
 Attribute VB_Name = "calc"
 Option Compare Text
 Option Base 1
-Public Const macro_version As String = "3.74"
+Public Const macro_version As String = "3.75"
 '-------------------------------------------------------
 'Типы элементов (столбец col_type_el)
 Public Const t_arm As Integer = 10
@@ -1567,7 +1567,7 @@ Function DataCheck(ByVal array_in As Variant) As Variant
                     weight_pm = GetWeightForDiametr(diametr, klass)
                     length_pos = Round_w(array_in(i, col_length) / 1000, n_round_l)
                 Case t_prokat
-'                    name_pr = GetShortNameForGOST(array_in(i, col_pr_gost_prof))
+                    name_pr = GetShortNameForGOST(array_in(i, col_pr_gost_prof))
 '                    If InStr(1, name_pr, "Лист") > 0 Then
 '                        naen_plate = SpecMetallPlate(array_in(i, col_pr_prof), array_in(i, col_pr_naen), 0, 0)
 '                        s_list = naen_plate(5) * naen_plate(6) * 1000
@@ -10024,17 +10024,17 @@ Function Spec_VED_GR(ByRef all_data As Variant) As Variant
     If UBound(out_data, 2) = max_col_type_2 Then spec_type = 2 'Без лестниц
     If UBound(out_data, 2) = max_col_type_1 Then spec_type = 3 'Только зоны
     '------- Предварительная выборка элементов --------------------
-    zones_el_all = ArraySelectParam(out_data, "ЗОНА", col_s_type)
-    walls_el_all = ArraySelectParam(out_data, "СТЕНА", col_s_type)
-    pots_el_all = ArraySelectParam(out_data, "Потолок", col_s_type_el)
-    pols_el_all = ArraySelectParam(out_data, "Пол", col_s_type_el)
+    zones_el_all = ArraySelectParam_2(out_data, "ЗОНА", col_s_type)
+    walls_el_all = ArraySelectParam_2(out_data, "СТЕНА", col_s_type)
+    pots_el_all = ArraySelectParam_2(out_data, "Потолок", col_s_type_el)
+    pols_el_all = ArraySelectParam_2(out_data, "Пол", col_s_type_el)
     '--------------------------------------------------------------
     un_type_otd = ArrayUniqValColumn(zones_el_all, col_s_type_otd)
     materials_by_type.Item("list") = un_type_otd
     For Each type_name In un_type_otd
         If InStr(type_name, "Без отделки") = 0 Then
             If IsNumeric(type_name) Then type_name = CStr(type_name)
-            zone_bytype_el = ArraySelectParam(zones_el_all, type_name, col_s_type_otd) 'Список зон с этим типом отделки
+            zone_bytype_el = ArraySelectParam_2(zones_el_all, type_name, col_s_type_otd) 'Список зон с этим типом отделки
             un_n_zone_type = ArrayUniqValColumn(zone_bytype_el, col_s_numb_zone) 'Список номеров зон
             materials_by_type.Item(type_name + ";zone") = un_n_zone_type
             '------- Предварительная выборка элементов --------------------
@@ -10062,7 +10062,7 @@ Function Spec_VED_GR(ByRef all_data As Variant) As Variant
                 ' Теперь для каждой зоны с этим типом отделки считаем всё что можем
                 is_error = 0
                 If IsNumeric(num) Then num = CStr(num)
-                zone_el = ArraySelectParam(zone_bytype_el, num, col_s_numb_zone)
+                zone_el = ArraySelectParam_2(zone_bytype_el, num, col_s_numb_zone)
                 If Not IsEmpty(zone_el) Then
                     ' --- Финишная отделка для данного типа ----
                     fin_pot = fin_str + Replace(zone_el(1, col_s_mpot_zone), "@", "; ")
@@ -10108,7 +10108,7 @@ Function Spec_VED_GR(ByRef all_data As Variant) As Variant
                             column_perim_total = value_param / 1000
                             If Abs(column_perim_total) < 0.002 Then column_perim_total = -1
                         End If
-                        wall_razd = ArraySelectParam(walls_el, "Разделитель", col_s_mat_wall)
+                        wall_razd = ArraySelectParam_2(walls_el, "Разделитель", col_s_mat_wall)
                         If Not IsEmpty(wall_razd) Then
                             For wi = 1 To UBound(wall_razd, 1)
                                 free_len_wall = free_len_wall + wall_razd(wi, col_s_freelen_zone) / 1000
@@ -10152,7 +10152,7 @@ Function Spec_VED_GR(ByRef all_data As Variant) As Variant
                     tot_area_zone = tot_area_zone + (perim_total - free_len) * h_zone
                     tot_perim_zone = tot_perim_zone + perim_total
                     ' --- Длины стен и дверей ---
-                    wall = ArraySelectParam(walls_el, num, col_s_numb_zone)
+                    wall = ArraySelectParam_2(walls_el, num, col_s_numb_zone)
                     wall_len = 0
                     door_len = 0
                     If Not IsEmpty(wall) Then
@@ -10208,7 +10208,7 @@ Function Spec_VED_GR(ByRef all_data As Variant) As Variant
                             twall_h = 0
                             tpan_area = 0
                             tup_area = 0
-                            wall_by_key = ArraySelectParam(wall, w, col_s_mat_wall)
+                            wall_by_key = ArraySelectParam_2(wall, w, col_s_mat_wall)
                             For i = 1 To UBound(wall_by_key, 1)
                                 twall_area = wall_by_key(i, col_s_area_wall)
                                 If twall_area > 0 Then
@@ -10283,11 +10283,11 @@ Function Spec_VED_GR(ByRef all_data As Variant) As Variant
                     area_total_pot = 0
                     noPot = False
                     If spec_type < 3 Then
-                        pot = ArraySelectParam(pots_el, num, col_s_numb_zone, "Потолок")
+                        pot = ArraySelectParam_2(pots_el, num, col_s_numb_zone, "Потолок", col_s_type_el)
                         un_pot = ArrayUniqValColumn(pot, col_s_type_pol)
                         If Not IsEmpty(un_pot) Then
                             For Each p In un_pot
-                                pot_by_type = ArraySelectParam(pot, p, col_s_type_pol)
+                                pot_by_type = ArraySelectParam_2(pot, p, col_s_type_pol)
                                 n_pot = UBound(pot_by_type, 1)
                                 pot_area = 0
                                 pot_perim = 0
@@ -10330,7 +10330,7 @@ Function Spec_VED_GR(ByRef all_data As Variant) As Variant
                     area_total_pol = 0
                     diff_area_pol = 0
                     If spec_type < 3 Then
-                        pol = ArraySelectParam(pols_el, num, col_s_numb_zone)
+                        pol = ArraySelectParam_2(pols_el, num, col_s_numb_zone)
                         If Not IsEmpty(pol) Then
                             n_pol = UBound(pol, 1)
                             For i = 1 To n_pol
@@ -11566,7 +11566,7 @@ Function VedReadPol(ByVal lastfilespec As String) As Variant
         Next i
         out_data = out_data_t
     End If
-    Dim add_pol: ReDim add_pol(n_col_a, max_s_col)
+    Dim add_pol: ReDim add_pol(max_s_col, n_row_a)
     n_add = 0
     n_zone = 999999
     For i = 1 To n_row_a
@@ -11656,7 +11656,7 @@ Function VedReadPol(ByVal lastfilespec As String) As Variant
         Next i
     End If
     If n_add > 0 Then
-        ReDim Preserve add_pol(n_col_a, n_add)
+        ReDim Preserve add_pol(max_s_col, n_add)
         add_pol = ArrayTranspose(add_pol)
         out_data = ArrayCombine(out_data, add_pol)
     End If
