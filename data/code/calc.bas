@@ -1,7 +1,7 @@
 Attribute VB_Name = "calc"
 Option Compare Text
 Option Base 1
-Public Const macro_version As String = "3.75"
+Public Const macro_version As String = "3.76"
 '-------------------------------------------------------
 'Типы элементов (столбец col_type_el)
 Public Const t_arm As Integer = 10
@@ -1879,7 +1879,8 @@ Function DataRead(ByVal nm As String) As Variant
     Else
         nsfile = nm
     End If
-    Select Case SpecGetType(nm)
+    type_spec = SpecGetType(nm)
+    Select Case type_spec
         Case 7
             'Читаем с листа
             out_data = ManualSpec(nm)
@@ -1917,7 +1918,7 @@ Function DataRead(ByVal nm As String) As Variant
             'Отключаем неиспользуемое
             UserForm2.qtyOneFloor_CB.Value = False
         End If
-        If DataIsShort(out_data) Then out_data = DataShort(out_data)
+        If DataIsShort(out_data) And type_spec <> 7 Then out_data = DataShort(out_data)
     Else
         spec_version = 3
     End If
@@ -1927,7 +1928,7 @@ Function DataRead(ByVal nm As String) As Variant
         If IsEmpty(out_data) Then errread = 0
         out_data = ArrayCombine(out_data, out_data_mat)
     End If
-    If Not DataIsSpec(out_data) And SpecGetType(nm) <> 7 Or errread Then
+    If Not DataIsSpec(out_data) And type_spec <> 7 Or errread Then
         MsgBox ("Неверный формат файла")
         r = LogWrite(nm, "", "Неверный формат файла")
         DataRead = Empty
