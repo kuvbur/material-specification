@@ -2,28 +2,28 @@ Attribute VB_Name = "update"
 Option Compare Text
 Option Base 1
 
-Public Const update_version As String = "3.2"
+Public Const update_version As String = "3.3"
 Function CheckVersion()
     If Ping() And check_version Then
+        Debug_mode = False
+        r = ExportAllMod()
+        change_log = DownloadMod("changelog" & ".txt")
         msg_upd = ""
         common_git = DownloadMod("common" & ".bas")
         common_local = ConvTxtNum(common_version)
         If common_git > common_local Then msg_upd = msg_upd & "Загружена новая версия модуля common -" & CStr(common_git) & vbNewLine
-
         calc_git = DownloadMod("calc" & ".bas")
         calc_local = ConvTxtNum(macro_version)
         If calc_git > calc_local Then msg_upd = msg_upd & "Загружена новая версия модуля calc -" & CStr(calc_git) & vbNewLine
-
         r = DownloadMod("UserForm2.frx")
         form_git = DownloadMod("UserForm2" & ".bas")
         form_local = ConvTxtNum(UserForm2.form_ver.Caption)
         If form_git > form_local Then msg_upd = msg_upd & "Загружена новая версия формы -" & CStr(form_git) & vbNewLine
-        
         update_git = DownloadMod("update" & ".bas")
         update_local = ConvTxtNum(update_version)
         If update_git > update_local Then msg_upd = msg_upd & "Загружена новая версия модуля update -" & CStr(update_git) & vbNewLine
         If Len(msg_upd) > 1 Then
-            msg_upd = msg_upd & "Перейти к иструкции по обновлению?"
+            msg_upd = msg_upd & vbNewLine & change_log & vbNewLine & "Перейти к иструкции по обновлению?"
             intMessage = MsgBox(msg_upd, vbYesNo, "Доступно обновление")
             Set objShell = CreateObject("Wscript.Shell")
             If intMessage = vbYes Then objShell.Run ("https://kuvbur.blogspot.com/")
@@ -65,12 +65,14 @@ Function DownloadMod(ByVal namemod As String) As Variant
         oStream.SaveToFile gitdir & "/" & namemod, 2
         oStream.Close
     End If
-    If InStr(namemod, ".bas") > 0 Then
+    If InStr(namemod, ".bas") > 0 Or InStr(namemod, ".txt") > 0 Then
         On Error Resume Next
         Set fso = CreateObject("scripting.filesystemobject")
         Set ts = fso.OpenTextFile(gitdir & "/" & namemod, 1, True): txt$ = ts.ReadAll: ts.Close
         Set ts = Nothing: Set fso = Nothing
         txt = Trim(txt): Err.Clear
+    End If
+    If InStr(namemod, ".bas") > 0 Then
         seach_txt = "version As String ="
         For Each tRows In Split(txt, vbNewLine)
             If InStr(tRows, seach_txt) Then
@@ -79,7 +81,11 @@ Function DownloadMod(ByVal namemod As String) As Variant
             End If
         Next
     Else
-        Version_file = 0
+        If InStr(namemod, ".txt") > 0 Then
+            Version_file = txt
+        Else
+            Version_file = 0
+        End If
     End If
     DownloadMod = Version_file
 End Function

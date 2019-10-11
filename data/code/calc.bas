@@ -1,7 +1,7 @@
 Attribute VB_Name = "calc"
 Option Compare Text
 Option Base 1
-Public Const macro_version As String = "3.76"
+Public Const macro_version As String = "3.77"
 '-------------------------------------------------------
 'Типы элементов (столбец col_type_el)
 Public Const t_arm As Integer = 10
@@ -1297,7 +1297,11 @@ Function ControlSumEl(ByVal array_in As Variant) As String
             If pm Then
                 param(11) = "lpm"
             Else
-                param(11) = "l" + ConvNum2Txt(Int(Length) * 1000000)
+                If Not IsNumeric(Length) Then
+                    r = LogWrite("Неизвестная длина проката - " & pos & suboos, naen, "ОШИБКА")
+                Else
+                    param(11) = "l" + ConvNum2Txt(Int(Length) * 1000000)
+                End If
                 If Not IsNumeric(naen) Then param(11) = param(11) + naen
             End If
             
@@ -1568,18 +1572,21 @@ Function DataCheck(ByVal array_in As Variant) As Variant
                     length_pos = Round_w(array_in(i, col_length) / 1000, n_round_l)
                 Case t_prokat
                     name_pr = GetShortNameForGOST(array_in(i, col_pr_gost_prof))
-'                    If InStr(1, name_pr, "Лист") > 0 Then
-'                        naen_plate = SpecMetallPlate(array_in(i, col_pr_prof), array_in(i, col_pr_naen), 0, 0)
-'                        s_list = naen_plate(5) * naen_plate(6) * 1000
-'                        w_list = naen_plate(6) * 7850
-'                        array_in(i, col_pr_length) = naen_plate(5) * naen_plate(6) * 1000
-'                    End If
+                    If InStr(1, name_pr, "Лист") > 0 And IsNumeric(array_in(i, col_pr_length)) = False Then
+                        naen_plate = SpecMetallPlate(array_in(i, col_pr_prof), array_in(i, col_pr_naen), 0, 0)
+                        s_list = naen_plate(5) * naen_plate(6) * 1000
+                        w_list = naen_plate(6) * 7850
+                        If InStr(1, naen_plate(1), "ОШИБКА") = 0 Then
+                            array_in(i, col_pr_length) = s_list
+                            array_in(i, col_pr_weight) = w_list
+                        End If
+                    End If
                     If Not IsNumeric(array_in(i, col_pr_weight)) Then
                         array_in(i, col_pr_weight) = 0.01
                         r = LogWrite("Нулевая масса элемента проката", array_in(i, col_sub_pos) + " " + array_in(i, col_pos), array_in(i, col_pr_naen))
                         n_error = n_error + 1
                     End If
-                    If Not IsNumeric(array_in(i, col_pr_length)) And InStr(1, name_pr, "Лист") = 0 Then
+                    If Not IsNumeric(array_in(i, col_pr_length)) Then
                         r = LogWrite("Непонятная длина проката", array_in(i, col_sub_pos) + " " + array_in(i, col_pos), array_in(i, col_pr_naen))
                         n_error = n_error + 1
                     End If
@@ -1598,6 +1605,10 @@ Function DataCheck(ByVal array_in As Variant) As Variant
                     array_in(i, col_pos) = Empty
                     array_in(i, col_type_el) = t_mat
                     array_in(i, col_m_weight) = "-"
+                Case t_wind
+                    If IsNumeric(array_in(i, col_m_weight)) = False Then array_in(i, col_m_weight) = 0
+                Case t_perem
+                Case t_perem_m
             End Select
             If array_in(i, col_sub_pos) = "" Then array_in(i, col_sub_pos) = "-"
             If array_in(i, col_sub_pos) = " " Then array_in(i, col_sub_pos) = "-"
@@ -1890,12 +1901,8 @@ Function DataRead(ByVal nm As String) As Variant
             file = ArraySelectParam(listFile, nsfile, 1)
             If IsEmpty(file) Then
                 'Если файла нет - поищем листы с суффиксом "_спец"
+                nsht = nsfile & "_спец"
                 listsheet = GetListOfSheet(ThisWorkbook)
-                If IsEmpty(type_spec) Then
-                    nsht = nm & "_спец"
-                Else
-                    nsht = type_spec(0) & "_спец"
-                End If
                 sheet = ArraySelectParam(listsheet, nsht, 1)
                 If IsEmpty(sheet) Then
                     'Нет ни файла, ни листа.
@@ -8400,17 +8407,22 @@ Function Spec_AS(ByRef all_data As Variant, ByVal type_spec As Integer) As Varia
             Else
                 pos_end(1, 1) = Space(60) & "* расход на все изделия"
             End If
-            For Each subpos In ArraySort(pos_data.Item(floor_txt).Item(ch_key).keys(), 1)
-                pos_out_onesubpos = SpecOneSubpos(all_data, subpos, type_spec, floor_txt)
-                If delim_group_ved Then
-                    If UBound(pos_out, 1) > 1 Then pos_out_onesubpos = ArrayCombine(pos_out_up, pos_out_onesubpos)
-                    pos_out_onesubpos = ArrayCombine(pos_out_onesubpos, pos_end)
-                    pos_out = ArrayCombine(pos_out, pos_out_onesubpos)
-                Else
-                    pos_out = ArrayCombine(pos_out, SpecOneSubpos(all_data, subpos, type_spec, floor_txt))
-                    pos_out = ArrayCombine(pos_out, pos_end)
-                End If
-            Next
+            subpos_arr = pos_data.Item(floor_txt).Item(ch_key).keys()
+            If UBound(subpos_arr) > 0 Then
+                For Each subpos In ArraySort(pos_data.Item(floor_txt).Item(ch_key).keys(), 1)
+                    pos_out_onesubpos = SpecOneSubpos(all_data, subpos, type_spec, floor_txt)
+                    If delim_group_ved Then
+                        If UBound(pos_out, 1) > 1 Then pos_out_onesubpos = ArrayCombine(pos_out_up, pos_out_onesubpos)
+                        pos_out_onesubpos = ArrayCombine(pos_out_onesubpos, pos_end)
+                        pos_out = ArrayCombine(pos_out, pos_out_onesubpos)
+                    Else
+                        pos_out = ArrayCombine(pos_out, SpecOneSubpos(all_data, subpos, type_spec, floor_txt))
+                        pos_out = ArrayCombine(pos_out, pos_end)
+                    End If
+                Next
+            Else
+                MsgBox ("Сборки отсутвуют.")
+            End If
         End If
         
         If type_spec = 2 Then
@@ -8864,7 +8876,7 @@ Function Spec_WIN(ByRef all_data As Variant) As Variant
     For i = 1 To n_row_out
         prim = ""
         If pos_out(i, n_col_qty + 2)(3) = "" Then
-            If pos_out(i, n_col_qty + 2)(1) > 0 Then prim = prim + ConvNum2Txt(pos_out(i, n_col_qty + 2)(1)) + "кг. "
+            If pos_out(i, n_col_qty + 2)(1) > 0 Then prim = prim + ConvNum2Txt(pos_out(i, n_col_qty + 2)(1)) + "кг. " & vbLf
             If pos_out(i, n_col_qty + 2)(2) > 0 Then prim = prim + ConvNum2Txt(pos_out(i, n_col_qty + 2)(2)) + "кв.м."
         Else
             prim = pos_out(i, n_col_qty + 2)(3)
