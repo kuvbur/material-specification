@@ -1,7 +1,7 @@
 Attribute VB_Name = "calc"
 Option Compare Text
 Option Base 1
-Public Const macro_version As String = "3.77"
+Public Const macro_version As String = "3.78"
 '-------------------------------------------------------
 'Типы элементов (столбец col_type_el)
 Public Const t_arm As Integer = 10
@@ -1891,10 +1891,12 @@ Function DataRead(ByVal nm As String) As Variant
         nsfile = nm
     End If
     type_spec = SpecGetType(nm)
+    isReadFromSheet = False
     Select Case type_spec
         Case 7
             'Читаем с листа
             out_data = ManualSpec(nm)
+            isReadFromSheet = True
         Case Else
             'Проверим - есть ли такой файл
             listFile = GetListFile("*.txt")
@@ -1911,6 +1913,7 @@ Function DataRead(ByVal nm As String) As Variant
                     'Читаем с листа
                     r = ManualCheck(nsht)
                     out_data = ManualSpec(nsht)
+                    isReadFromSheet = True
                 End If
             Else
                 'Читаем из файла
@@ -1925,7 +1928,7 @@ Function DataRead(ByVal nm As String) As Variant
             'Отключаем неиспользуемое
             UserForm2.qtyOneFloor_CB.Value = False
         End If
-        If DataIsShort(out_data) And type_spec <> 7 Then out_data = DataShort(out_data)
+        If DataIsShort(out_data) And isReadFromSheet = False Then out_data = DataShort(out_data)
     Else
         spec_version = 3
     End If
