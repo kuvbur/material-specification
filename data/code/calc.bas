@@ -1,7 +1,7 @@
 Attribute VB_Name = "calc"
 Option Compare Text
 Option Base 1
-Public Const macro_version As String = "3.78"
+Public Const macro_version As String = "3.79"
 '-------------------------------------------------------
 'Типы элементов (столбец col_type_el)
 Public Const t_arm As Integer = 10
@@ -8411,7 +8411,7 @@ Function Spec_AS(ByRef all_data As Variant, ByVal type_spec As Integer) As Varia
                 pos_end(1, 1) = Space(60) & "* расход на все изделия"
             End If
             subpos_arr = pos_data.Item(floor_txt).Item(ch_key).keys()
-            If UBound(subpos_arr) > 0 Then
+            If UBound(subpos_arr) - LBound(subpos_arr) + 1 > 0 Then
                 For Each subpos In ArraySort(pos_data.Item(floor_txt).Item(ch_key).keys(), 1)
                     pos_out_onesubpos = SpecOneSubpos(all_data, subpos, type_spec, floor_txt)
                     If delim_group_ved Then
@@ -10114,7 +10114,7 @@ Function Spec_VED_GR(ByRef all_data As Variant) As Variant
                             h_pot = h_zone
                             tfin_up_zone = zone_el(1, col_s_mwall_up_zone)
                         Else
-                            tfin_up_zone = "Выше " + CStr(h_pot) + "м.:%%" + zone_el(1, col_s_mwall_up_zone)
+                            tfin_up_zone = "Выше " + CStr(h_pot) + "м.:%%" + CStr(zone_el(1, col_s_mwall_up_zone))
                         End If
                         fin_up_zone = fin_str_sec + Replace(tfin_up_zone, "@", "; ")
                         param_zone = zone_el(1, col_s_param_zone)
@@ -10144,8 +10144,8 @@ Function Spec_VED_GR(ByRef all_data As Variant) As Variant
                     If h_pot < 0.01 Then h_pot = h_zone
                     delta_h_zone = h_zone - h_pot 'Полоска над потолком
                     If is_delta_h Then
-                        fin_wall = fin_str + "До " + CStr(h_pot) + "м.:%%" + zone_el(1, col_s_mwall_zone)
-                        fin_column = fin_str + "До " + CStr(h_pot) + "м.:%%" + zone_el(1, col_s_mcolumn_zone)
+                        fin_wall = fin_str + "До " + CStr(h_pot) + "м.:%%" + CStr(zone_el(1, col_s_mwall_zone))
+                        fin_column = fin_str + "До " + CStr(h_pot) + "м.:%%" + CStr(zone_el(1, col_s_mcolumn_zone))
                     End If
                     If h_pan < 0.01 And h_pan > 0 Then
                         r = LogWrite("Проверьте высоту панелей, должна быть в мм. - " + CStr(h_pan), "Ошибка", num)
@@ -10445,6 +10445,7 @@ Function Spec_VED_GR(ByRef all_data As Variant) As Variant
     n_col_out = 7
     If is_pan Then n_col_out = n_col_out + 3
     If is_column Then n_col_out = n_col_out + 2
+    If show_surf_area And delim_by_sheet = True Then n_col_out = n_col_out + 3
     Dim pos_out: ReDim pos_out(3400, n_col_out)
     pos_out(1, 1) = "Тип"
     pos_out(1, 2) = "Номера помещений"
@@ -10693,10 +10694,10 @@ Function Spec_VED(ByRef all_data As Variant) As Variant
                 h_pan = h_pan * 1000
             End If
             zone.Item(num + ";zoneh;") = h_zone
-            fin_pot = fin_str + zone_el(1, col_s_mpot_zone)
-            fin_pan = fin_str + zone_el(1, col_s_mpan_zone)
-            fin_wall = fin_str + zone_el(1, col_s_mwall_zone)
-            fin_column = fin_str + zone_el(1, col_s_mcolumn_zone)
+            fin_pot = fin_str + CStr(zone_el(1, col_s_mpot_zone))
+            fin_pan = fin_str + CStr(zone_el(1, col_s_mpan_zone))
+            fin_wall = fin_str + CStr(zone_el(1, col_s_mwall_zone))
+            fin_column = fin_str + CStr(zone_el(1, col_s_mcolumn_zone))
             If InStr(fin_column, "<>") > 0 Then
                 column_is_wall = True
                 fin_column = Replace(fin_column, "<>", "")
@@ -10712,7 +10713,7 @@ Function Spec_VED(ByRef all_data As Variant) As Variant
                     h_pot = h_zone
                     tfin_up_zone = zone_el(1, col_s_mwall_up_zone)
                 Else
-                    tfin_up_zone = "Выше " + CStr(h_pot) + "м.:%%" + zone_el(1, col_s_mwall_up_zone)
+                    tfin_up_zone = "Выше " + CStr(h_pot) + "м.:%%" + CStr(zone_el(1, col_s_mwall_up_zone))
                 End If
                 fin_up_zone = fin_str_sec + Replace(tfin_up_zone, "@", "; ")
                 column_perim_total = GetZoneParam(zone_el(1, col_s_param_zone), "Cp")
@@ -10742,8 +10743,8 @@ Function Spec_VED(ByRef all_data As Variant) As Variant
             delta_h_zone = h_zone - h_pot 'Полоска над потолком
             If delta_h_zone < 0 Then delta_h_zone = 0
             If delta_h_zone > 0 Then
-                fin_wall = fin_str + "До " + CStr(h_pot) + "м.:%%" + zone_el(1, col_s_mwall_zone)
-                fin_column = fin_str + "До " + CStr(h_pot) + "м.:%%" + zone_el(1, col_s_mcolumn_zone)
+                fin_wall = fin_str + "До " + CStr(h_pot) + "м.:%%" + CStr(zone_el(1, col_s_mwall_zone))
+                fin_column = fin_str + "До " + CStr(h_pot) + "м.:%%" + CStr(zone_el(1, col_s_mcolumn_zone))
             End If
             If UBound(zone_el, 1) > 1 Then
                 r = LogWrite("Одинаковых зон - " + CStr(UBound(zone_el, 1)), "Ошибка", num)
