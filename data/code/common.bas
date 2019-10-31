@@ -2,7 +2,7 @@ Attribute VB_Name = "common"
 Option Compare Text
 Option Base 1
 
-Public Const common_version As String = "3.94"
+Public Const common_version As String = "3.95"
 Public Const Pi As Double = 3.141592653589
 Public ank_data As Variant
 Public Function GetLeghtByID(id As String, table As Range, n_col_id As Integer, n_col_l As Integer) As Variant
@@ -72,7 +72,7 @@ Private Function set_ank_data()
     ank_data.Item("15") = 0.75
     ank_data.Item("20") = 0.9
     ank_data.Item("25") = 1.05
-    ank_data.Item("30") = 1.2
+    ank_data.Item("30") = 1.15
     ank_data.Item("35") = 1.3
     ank_data.Item("40") = 1.4
     ank_data.Item("45") = 1.45
