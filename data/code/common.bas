@@ -71,6 +71,7 @@ Private Function set_ank_data()
     ank_data.Item("12.5") = 0.66
     ank_data.Item("15") = 0.75
     ank_data.Item("20") = 0.9
+    ank_data.Item("22.5") = 1
     ank_data.Item("25") = 1.05
     ank_data.Item("30") = 1.15
     ank_data.Item("35") = 1.3
