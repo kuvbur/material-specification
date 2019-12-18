@@ -1,7 +1,7 @@
 Attribute VB_Name = "calc"
 Option Compare Text
 Option Base 1
-Public Const macro_version As String = "3.83"
+Public Const macro_version As String = "3.84"
 '-------------------------------------------------------
 'Типы элементов (столбец col_type_el)
 Public Const t_arm As Integer = 10
@@ -227,6 +227,7 @@ Public zonenum_pot As Boolean
 Public delim_by_sheet As Boolean
 Public delim_group_ved As Boolean
 Public delim_zone_fin As Boolean
+Public ignore_zap_material As Boolean
 Public n_round_area As Integer 'Площадь в ведомость отделки
 Public ignore_pos As String 'Игнорировать элементы, содержащих ЭТО в позиции или марке
 Public subpos_delim As String 'Разделитель основной и вложенной сборки
@@ -278,6 +279,7 @@ Function INISet()
         show_sum_prim = INIReadKeyVal("ЛИСТЫ", "show_sum_prim")
         lenght_ed_arm = INIReadKeyVal("РАСЧЁТЫ", "lenght_ed_arm")
         hard_round_km = INIReadKeyVal("РАСЧЁТЫ", "hard_round_km")
+        ignore_zap_material = INIReadKeyVal("РАСЧЁТЫ", "ignore_zap_material")
         flag = False
     Else
         flag = True
@@ -315,6 +317,7 @@ Function INISet()
     If IsEmpty(lenght_ed_arm) Or flag Then lenght_ed_arm = 11700
     If IsEmpty(hard_round_km) Or flag Then hard_round_km = True
     If IsEmpty(delim_zone_fin) Or flag Then delim_zone_fin = False
+    If IsEmpty(ignore_zap_material) Or flag Then ignore_zap_material = False
     '----Запись умолчаний, если файл не найден
     If flag Then
         t = INIWriteKeyVal("РАСЧЁТЫ", "type_okrugl", type_okrugl)
@@ -350,6 +353,7 @@ Function INISet()
         t = INIWriteKeyVal("ЛИСТЫ", "delim_group_ved", False)
         t = INIWriteKeyVal("РАСЧЁТЫ", "lenght_ed_arm", 11700)
         t = INIWriteKeyVal("РАСЧЁТЫ", "hard_round_km", True)
+        t = INIWriteKeyVal("РАСЧЁТЫ", "ignore_zap_material", False)
     End If
     '----Принудительное включение
     delim_by_sheet = True
@@ -4758,6 +4762,7 @@ Function DataReadAutoMat(ByVal nm As String) As Variant
                             kzap_mat = 1
                         End If
                     End If
+                    If ignore_zap_material Then kzap_mat = 1
                     If InStr(name_param, "едизм") > 0 Then edizm = tvalue
                     If InStr(name_param, "расход") > 0 Then
                         tvalue = Replace(tvalue, ":", "\")
@@ -9675,10 +9680,12 @@ Function Spec_Select(ByVal lastfilespec As String, ByVal suffix As String, Optio
         End If
     End If
     pos_out_all = Empty
+    msg_zap_mat = ""
+    If ignore_zap_material Then msg_zap_mat = vbLf & "Запас на раскрой материала не учитывается"
     Dim pos_zag()
     Select Case type_spec
         Case 1, 2, 3, 13
-            If Not (quiet) Then MsgBox ("Коэффицент запаса для объёма, площади и длин " & ConvNum2Txt(k_zap_total))
+            If Not (quiet) Then MsgBox ("Коэффицент запаса для объёма, площади и длин " & ConvNum2Txt(k_zap_total) & msg_zap_mat)
             pos_out = Spec_AS(all_data, type_spec)
         Case 4
             pos_out = Spec_KM(all_data)
