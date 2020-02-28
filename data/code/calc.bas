@@ -1,7 +1,7 @@
 Attribute VB_Name = "calc"
 Option Compare Text
 Option Base 1
-Public Const macro_version As String = "3.84"
+Public Const macro_version As String = "3.85"
 '-------------------------------------------------------
 'Типы элементов (столбец col_type_el)
 Public Const t_arm As Integer = 10
@@ -117,12 +117,10 @@ Public Const col_s_perim_pol_2 As Integer = 28
 Public Const col_s_n_mun_zone_2 As Integer = 29
 Public Const col_s_mun_zone_2 As Integer = 30
 Public Const max_col_type_2_2 As Integer = 30
-
 Public Const col_s_tipverh_l_2 As Integer = 31
 Public Const col_s_tipl_l_2 As Integer = 32
 Public Const col_s_tipniz_l_2 As Integer = 33
 Public Const col_s_tippl_l_2 As Integer = 34
-
 Public Const col_s_areaverh_l_2 As Integer = 35
 Public Const col_s_areal_l_2 As Integer = 36
 Public Const col_s_areaniz_l_2 As Integer = 37
@@ -191,6 +189,7 @@ Public Const max_col_man As Integer = col_man_dgib
 Public symb_diam As String 'Символ диаметра в спецификацию
 Public gost2fklass, name_gost, reinforcement_specifications As Variant 'Разные массивы
 Public pr_adress As Variant
+Public swap_gost As Variant
 Public k_zap_total As Double
 Public w_format As String 'Формат вывода в техничку
 Public pos_data As Variant
@@ -4361,7 +4360,9 @@ End Function
 
 Function GetGOSTForKlass(ByVal klass As String) As String
     If IsEmpty(gost2fklass) Then r = ReadReinforce()
-    GetGOSTForKlass = gost2fklass.Item(klass)
+    gost = gost2fklass.Item(klass)
+    If Len(swap_gost.Item(gost)) > 0 Then gost = swap_gost.Item(gost)
+    GetGOSTForKlass = gost
 End Function
 
 Function GetHeightSheet(ByRef Sh As Variant) As Double
@@ -4457,6 +4458,7 @@ End Function
 
 Function GetNameForGOST(ByVal gost As String) As String
     If IsEmpty(name_gost) Then r = ReadMetall()
+    If Len(swap_gost.Item(gost)) > 0 Then gost = swap_gost.Item(gost)
     For i = 1 To UBound(name_gost, 1)
         If name_gost(i, 1) = gost Then
             GetNameForGOST = name_gost(i, 2) & vbLf & gost
@@ -4509,13 +4511,13 @@ End Function
 
 Function GetShortNameForGOST(ByVal gost As String) As String
     If IsEmpty(name_gost) Then r = ReadMetall()
+    If Len(swap_gost.Item(gost)) > 0 Then gost = swap_gost.Item(gost)
     For i = 1 To UBound(name_gost, 1)
         If name_gost(i, 1) = gost Then
             GetShortNameForGOST = " " & name_gost(i, 3) & " "
             Exit Function
         End If
     Next
-    
 End Function
 
 Function GetWeightForDiametr(ByVal diametr As Integer, ByVal klass As String) As Double
@@ -4725,6 +4727,7 @@ Function DataReadAutoMat(ByVal nm As String) As Variant
             Else
                 naen = Trim(tnaen)
             End If
+            If Len(swap_gost.Item(obozn)) > 0 Then obozn = swap_gost.Item(obozn)
             If InStr(naen, "по уклону") > 0 And InStr(naen, " от") > 0 And InStr(naen, " до") > 0 Then
                 naen = Replace(naen, " до", " до " + CStr(Int(tthickness * 1000)) + "мм.")
             End If
@@ -6635,6 +6638,7 @@ Function ReadPrSortament()
     If Not SheetExist("!System") Then ThisWorkbook.Worksheets.Add.Name = "!System"
     Set Sh = Application.ThisWorkbook.Sheets("!System") 'На этом скрытом листе будем хранить данные для списков
     Set tpr_adress = CreateObject("Scripting.Dictionary") 'В этом словаре будем хранить адреса
+    Set swap_gost = CreateObject("Scripting.Dictionary") 'Для срочной замены ГОСТов
     'Сначала - металл
     SortamentPath = SetPath()
     file = SortamentPath & "Сортаменты.txt"
@@ -6754,6 +6758,17 @@ Function ReadPrSortament()
     Sh.Cells(4, n_start) = "Тип 3"
     Sh.Cells(5, n_start) = "Тип 4"
     tpr_adress.Item("Окраска") = "'!System'!" & Sh.Range(Sh.Cells(1, n_start), Sh.Cells(5, n_start)).Address
+    
+    n_start = n_end + 2
+    'Замена ГОСТов
+    file = SortamentPath & "Замена ГОСТов.txt"
+    f_list_gost = ReadTxt(file, 1, vbTab, vbNewLine, True)
+    If Not IsEmpty(f_list_gost) Then
+        n_gost = UBound(f_list_gost, 1)
+        For i = 1 To n_gost
+            swap_gost.Item(f_list_gost(i, 1)) = f_list_gost(i, 2)
+        Next
+    End If
     Set pr_adress = tpr_adress
     ReadPrSortament = True
 End Function
@@ -6817,7 +6832,11 @@ Function ReadTxt(ByVal filename$, Optional ByVal FirstRow& = 1, Optional ByVal C
             arr(i + 1, j) = ConvTxt2Num(Trim(tmpArr2(j - 1)))
         Next j
     Next i
-    ReadTxt = arr
+    If Len(txt) = 0 Then
+        ReadTxt = Empty
+    Else
+        ReadTxt = arr
+    End If
     Erase arr
 End Function
 
@@ -7748,16 +7767,18 @@ Function SpecMaterial(ByVal mat As Variant, ByVal n_mat As Integer, ByVal type_s
                 current_chksum = mat(j, col_chksum)
             End If
             If current_chksum = un_pos_mat(i) Then
+                gost = mat(j, col_m_obozn)
+                If Len(swap_gost.Item(gost)) > 0 Then gost = swap_gost.Item(gost)
                 Select Case type_spec
                 Case 1
                     pos_out(i, 1) = mat(j, col_sub_pos) & n_txt
                     pos_out(i, 2) = " "
-                    pos_out(i, 3) = mat(j, col_m_naen) & " по " & mat(j, col_m_obozn) & ", " & mat(j, col_m_edizm)
+                    pos_out(i, 3) = mat(j, col_m_naen) & " по " & gost & ", " & mat(j, col_m_edizm)
                     pos_out(i, 4) = pos_out(i, 4) + (Round_w(mat(j, col_qty) * k_zap_total, 2) / nSubPos)
                     pos_out(i, 5) = "-"
                 Case Else
                     pos_out(i, 1) = " "
-                    pos_out(i, 2) = mat(j, col_m_obozn)
+                    pos_out(i, 2) = gost
                     pos_out(i, 3) = mat(j, col_m_naen)
                     pos_out(i, 4) = pos_out(i, 4) + (Round_w(mat(j, col_qty) * k_zap_total, 2) / nSubPos)
                     pos_out(i, 5) = "-"
@@ -8097,6 +8118,8 @@ Function SpecProkat(ByVal prokat As Variant, ByVal n_prokat As Integer, ByVal ty
                 Else
                     we = Round_w(we * k_zap_total, n_round_w)
                 End If
+                gost = prokat(j, col_pr_gost_prof)
+                If Len(swap_gost.Item(gost)) > 0 Then gost = swap_gost.Item(gost)
                 Select Case type_spec
                     Case 1
                         If UserForm2.pr_pm_CB.Value Or pm Then
@@ -8107,9 +8130,9 @@ Function SpecProkat(ByVal prokat As Variant, ByVal n_prokat As Integer, ByVal ty
                                 pos_out(i, 2) = " "
                             End If
                             If InStr(1, name_pr, "Лист") Then
-                                pos_out(i, 3) = name_pr & prokat(j, col_pr_gost_prof) & " " & naen_plate(1)
+                                pos_out(i, 3) = name_pr & gost & " " & naen_plate(1)
                             Else
-                                pos_out(i, 3) = name_pr & prokat(j, col_pr_gost_prof) & " " & prokat(j, col_pr_prof) & " L = п.м."
+                                pos_out(i, 3) = name_pr & gost & " " & prokat(j, col_pr_prof) & " L = п.м."
                             End If
                             pos_out(i, 4) = pos_out(i, 4) + (L * n_el)
                             pos_out(i, 5) = we
@@ -8117,9 +8140,9 @@ Function SpecProkat(ByVal prokat As Variant, ByVal n_prokat As Integer, ByVal ty
                             pos_out(i, 1) = prokat(j, col_sub_pos) & n_txt
                             pos_out(i, 2) = prokat(j, col_pos)
                             If InStr(1, name_pr, "Лист") Then
-                                pos_out(i, 3) = name_pr & prokat(j, col_pr_gost_prof) & " " & naen_plate(1)
+                                pos_out(i, 3) = name_pr & gost & " " & naen_plate(1)
                             Else
-                                pos_out(i, 3) = name_pr & prokat(j, col_pr_gost_prof) & " " & prokat(j, col_pr_prof) & " L=" & L * 1000 & "мм."
+                                pos_out(i, 3) = name_pr & gost & " " & prokat(j, col_pr_prof) & " L=" & L * 1000 & "мм."
                             End If
                             pos_out(i, 4) = pos_out(i, 4) + n_el
                             pos_out(i, 5) = we
@@ -8131,7 +8154,7 @@ Function SpecProkat(ByVal prokat As Variant, ByVal n_prokat As Integer, ByVal ty
                             Else
                                 pos_out(i, 1) = " "
                             End If
-                            pos_out(i, 2) = prokat(j, col_pr_gost_prof)
+                            pos_out(i, 2) = gost
                             If InStr(1, name_pr, "Лист") Then
                                 pos_out(i, 3) = name_pr & " " & naen_plate(1)
                             Else
@@ -8143,7 +8166,7 @@ Function SpecProkat(ByVal prokat As Variant, ByVal n_prokat As Integer, ByVal ty
                             If show_sum_prim Then pos_out(i, 6) = pos_out(i, 6) + Round_w(L * we, n_round_w) * n_el
                         Else
                             pos_out(i, 1) = prokat(j, col_pos)
-                            pos_out(i, 2) = prokat(j, col_pr_gost_prof)
+                            pos_out(i, 2) = gost
                             If InStr(1, name_pr, "Лист") Then
                                 pos_out(i, 3) = name_pr & " " & naen_plate(1)
                             Else
