@@ -18,7 +18,7 @@
   - По сборкам (Форма 8 ГОСТ Р 21.1101-2013)
   
 # Установка
-  - Скопировать по ссылке https://github.com/kuvbur/material-specification/archive/master.zip
+  - Скачать архив по ссылке https://github.com/kuvbur/material-specification/archive/master.zip
   - Распаковать в отдельную папку
   - Проверить пункты в списке http://kuvbur.blogspot.com/2018/07/excel.html
   - Открыть файл Спец.xlsm
