@@ -1,5 +1,7 @@
 ﻿*.pdf
 *.zip
+*.bak
+*.dwl
 
 ~$*.*
 data/code/old/*
@@ -11,4 +13,6 @@ data/code/from_git/*
 import/*
 
 list/*
+
+
 

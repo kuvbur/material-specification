@@ -14,16 +14,22 @@ Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
 Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
-
-
-
-
 Option Compare Text
 Option Base 1
 
-Const form_version As String = "3.24"
+Const form_version As String = "3.25"
 Public CodePath, MaterialPath, SortamentPath As String
 Public lastsheet, lastconstrtype, lastconstr, lastfile, lastfilespec, lastfileadd, materialbook_index, name_izd As Variant
+
+#If Win64 Then
+    Private Declare PtrSafe Function ShellExecute Lib "shell32.dll" Alias "ShellExecuteA" ( _
+    ByVal hwnd As LongPtr, ByVal lpOperation As String, ByVal lpFile As String, _
+    ByVal lpParameters As String, ByVal lpDirectory As String, ByVal nShowCmd As LongPtr) As Long
+#Else
+    Private Declare Function ShellExecute Lib "shell32.dll" Alias "ShellExecuteA"( _
+    ByVal hwnd As Long, ByVal lpOperation As String, ByVal lpFile As String, _
+    ByVal lpParameters As String, ByVal lpDirectory As String, ByVal nShowCmd As Long) As Long
+#End If
 
 Private Sub AllPosButton_Click()
     ans = MsgBox("Отменить будет не просто. Нажмите Да, если сделали резервную копию", vbYesNo)
@@ -51,6 +57,11 @@ Private Sub CommandButtonExportData_Click()
         If Not (quiet) Then MsgBox ("Перейдите на лист _спец и повторите")
     End If
     r = OutEnded()
+End Sub
+
+Private Sub HelpButton_Click()
+    strUrl = "https://docs.google.com/document/d/1bedvuS3quC37ivwVWzWDyfZSt_zxFPhGAQAQ38g3Ubo/edit?usp=sharing"
+    r = ShellExecute(0, "open", strUrl, 0, 0, 1)
 End Sub
 
 Private Sub PosSubposButton_Click()

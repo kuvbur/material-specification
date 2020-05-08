@@ -2,7 +2,7 @@ Attribute VB_Name = "update"
 Option Compare Text
 Option Base 1
 
-Public Const update_version As String = "3.3"
+Public Const update_version As String = "3.4"
 Function CheckVersion()
     If Ping() And check_version Then
         Debug_mode = False
@@ -23,10 +23,10 @@ Function CheckVersion()
         update_local = ConvTxtNum(update_version)
         If update_git > update_local Then msg_upd = msg_upd & "Загружена новая версия модуля update -" & CStr(update_git) & vbNewLine
         If Len(msg_upd) > 1 Then
-            msg_upd = msg_upd & vbNewLine & change_log & vbNewLine & "Перейти к иструкции по обновлению?"
+            msg_upd = msg_upd & vbNewLine & change_log & vbNewLine & "Открыть справку с инструкцией?"
             intMessage = MsgBox(msg_upd, vbYesNo, "Доступно обновление")
             Set objShell = CreateObject("Wscript.Shell")
-            If intMessage = vbYes Then objShell.Run ("https://kuvbur.blogspot.com/")
+            If intMessage = vbYes Then objShell.Run ("https://docs.google.com/document/d/1bedvuS3quC37ivwVWzWDyfZSt_zxFPhGAQAQ38g3Ubo/edit#bookmark=id.5awyi0cjwmrs")
         End If
     End If
 End Function

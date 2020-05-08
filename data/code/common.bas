@@ -2,7 +2,7 @@ Attribute VB_Name = "common"
 Option Compare Text
 Option Base 1
 
-Public Const common_version As String = "3.95"
+Public Const common_version As String = "3.97"
 Public Const Pi As Double = 3.141592653589
 Public ank_data As Variant
 Public Function GetLeghtByID(id As String, table As Range, n_col_id As Integer, n_col_l As Integer) As Variant
@@ -263,6 +263,30 @@ Public Function Арм_Элемент_Хомут(ByVal L As Integer, ByVal H As Integer, ByVal 
     Арм_Элемент_Хомут = lout
 End Function
 
+Public Function Арм_Элемент_Шпилька(ByVal L As Integer, ByVal diam_osn As Integer, ByVal diam As Integer, ByVal class As String) As Double
+    r_min = Арм_МинРадиус(diam, class)
+    r_osn = diam_osn / 2 + diam / 2
+    'Диаметр гиба - не менее минимального
+    If r_osn > r_min Then
+        r = r_osn
+    Else
+        r = r_min
+    End If
+    'Длина загиба на 180
+    agib = 180
+    lr_180 = (Pi * r * agib) / 180
+    'Заведение стержня в тело - 75 или 6d
+    If 6 * diam > 75 Then
+        ank = 6 * diam
+    Else
+        ank = 75
+    End If
+    lout = L + ank * 2 + lr_180 * 2
+    krat = "10мм"
+    lout = Арм_Округление(lout, krat)
+    Арм_Элемент_Шпилька = lout
+End Function
+
 Public Function Арм_Длина_ПМ(ByVal L As Variant, ByVal lnahl As Variant, Optional ByVal led As Variant = 11700) As Long
     n_nahl = Round(L / led)
     If n_nahl * led < L Then n_nahl = n_nahl + 1
@@ -291,3 +315,6 @@ Public Function SetPlast_Razm(diam As Integer) As String
             SetPlast_Razm = "150*150"
     End Select
 End Function
+
+
+
