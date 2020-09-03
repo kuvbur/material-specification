@@ -1,6 +1,5 @@
 VERSION 5.00
 Begin {C62A69F0-16DC-11CE-9E98-00AA00574A4F} UserForm2 
-   Caption         =   " "
    ClientHeight    =   10755
    ClientLeft      =   45
    ClientTop       =   390
@@ -17,7 +16,7 @@ Attribute VB_Exposed = False
 Option Compare Text
 Option Base 1
 
-Const form_version As String = "3.25"
+Const form_version As String = "3.28"
 Public CodePath, MaterialPath, SortamentPath As String
 Public lastsheet, lastconstrtype, lastconstr, lastfile, lastfilespec, lastfileadd, materialbook_index, name_izd As Variant
 
@@ -26,7 +25,7 @@ Public lastsheet, lastconstrtype, lastconstr, lastfile, lastfilespec, lastfilead
     ByVal hwnd As LongPtr, ByVal lpOperation As String, ByVal lpFile As String, _
     ByVal lpParameters As String, ByVal lpDirectory As String, ByVal nShowCmd As LongPtr) As Long
 #Else
-    Private Declare Function ShellExecute Lib "shell32.dll" Alias "ShellExecuteA"( _
+    Private Declare Function ShellExecute Lib "shell32.dll" Alias "ShellExecuteA" ( _
     ByVal hwnd As Long, ByVal lpOperation As String, ByVal lpFile As String, _
     ByVal lpParameters As String, ByVal lpDirectory As String, ByVal nShowCmd As Long) As Long
 #End If
@@ -39,7 +38,7 @@ Private Sub AllPosButton_Click()
         type_spec = SpecGetType(nm)
         If type_spec = 7 Then
             r = ManualPos(nm, 1)
-            r = LogWrite(nm, "ОК", "Перенумеровано сквнозной нумерацией")
+            r = LogWrite(nm, "ОК", "Перенумеровано сквозной нумерацией")
         Else
             If Not (quiet) Then MsgBox ("Перейдите на лист _спец и повторите")
         End If
@@ -249,10 +248,25 @@ Private Sub UserForm_Initialize()
     MaterialPath = CheckPath(MaterialPatht.Text)
     SortamentPath = CheckPath(SortamentPatht.Text)
     CodePath = CheckPath(CodePatht.Text)
-    If use_tmp_CB.Value Then Set materialbook_index = ReadConstr()
-    r = INISet()
-    If check_version Then r = CheckVersion()
-    FormRebild
+    f = Split(ThisWorkbook.FullName, "\")
+    form_caption = Split(f(UBound(f)), ".")(0)
+    If UBound(f) >= 2 Then form_caption = f(UBound(f) - 2) + "/" + form_caption
+    UserForm2.Caption = form_caption
+    If ModeType() Then
+        MsgBox ("Папки не найдены. Создаю новые.")
+        is_create = CreateFolders()
+        If is_create And ModeType() Then
+            MsgBox ("Папки созданы")
+        Else
+            MsgBox ("Ошиб")
+        End If
+        Exit Sub
+    Else
+        If use_tmp_CB.Value Then Set materialbook_index = ReadConstr()
+        r = INISet()
+        If check_version Then r = CheckVersion()
+        FormRebild
+    End If
 End Sub
 
 Function CheckPath(ByVal path) As String
@@ -382,11 +396,15 @@ End Sub
 
 Function ReList(ByRef objListBox As Variant, ByRef arr As Variant) As _
     Boolean
-    objListBox.Clear
-    For i = 1 To UBound(arr)
-        objListBox.AddItem (arr(i))
-    Next i
-    ReList = True
+        objListBox.Clear
+    If Not IsEmpty(arr) Then
+        For i = 1 To UBound(arr)
+            objListBox.AddItem (arr(i))
+        Next i
+        ReList = False
+    Else
+        ReList = True
+    End If
 End Function
 
 Sub remat()
@@ -413,28 +431,30 @@ Sub remat()
             listadd(n_add) = sheet
         End If
     Next
-    Dim add_spec(): ReDim add_spec(UBound(listFile, 1)): n_add = 0
-    For i = 1 To UBound(listFile, 1)
-        flag_add = 1
-        tf_name = listFile(i, 1)
-        If tf_name = "Полы" Then flag_add = 0
-        If tf_name = "Отметки_перемычек" Then flag_add = 0
-        If tf_name = "Типы_полов" Then flag_add = 0
-        If InStr(tf_name, "_сист") > 0 Then flag_add = 0
-        If flag_add = 1 Then
-            type_spec = SpecGetType(tf_name)
-            If type_spec <> 7 And type_spec <> 2 And type_spec <> 3 Then flag_add = 0
-            If type_spec = 22 Then
-                n_add = n_add + 1
-                add_spec(n_add) = Split(tf_name, "_")(0)
+    If Not IsEmpty(listFile) Then
+        Dim add_spec(): ReDim add_spec(UBound(listFile, 1)): n_add = 0
+        For i = 1 To UBound(listFile, 1)
+            flag_add = 1
+            tf_name = listFile(i, 1)
+            If tf_name = "Полы" Then flag_add = 0
+            If tf_name = "Отметки_перемычек" Then flag_add = 0
+            If tf_name = "Типы_полов" Then flag_add = 0
+            If InStr(tf_name, "_сист") > 0 Then flag_add = 0
+            If flag_add = 1 Then
+                type_spec = SpecGetType(tf_name)
+                If type_spec <> 7 And type_spec <> 2 And type_spec <> 3 Then flag_add = 0
+                If type_spec = 22 Then
+                    n_add = n_add + 1
+                    add_spec(n_add) = Split(tf_name, "_")(0)
+                End If
             End If
-        End If
-        If flag_add = 1 Then
-            n_man = n_man + 1
-            ReDim Preserve listspec(n_man)
-            listspec(n_man) = listFile(i, 1)
-        End If
-    Next i
+            If flag_add = 1 Then
+                n_man = n_man + 1
+                ReDim Preserve listspec(n_man)
+                listspec(n_man) = listFile(i, 1)
+            End If
+        Next i
+    End If
     If n_add > 0 Then ReDim Preserve add_spec(n_add)
     listspec = ArrayUniqValColumn(ArrayCombine(listspec, add_spec), 1)
     Set name_izd = CreateObject("Scripting.Dictionary")

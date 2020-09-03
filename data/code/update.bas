@@ -2,7 +2,7 @@ Attribute VB_Name = "update"
 Option Compare Text
 Option Base 1
 
-Public Const update_version As String = "3.4"
+Public Const update_version As String = "3.41"
 Function CheckVersion()
     If Ping() And check_version Then
         Debug_mode = False
@@ -110,6 +110,98 @@ Function NameAllMod() As Boolean
     r = CheckName("common")
     Application.EnableEvents = True
     Application.ScreenUpdating = True
+End Function
+
+Function ModeType() As Boolean
+    ismat = CreateObject("Scripting.FileSystemObject").FolderExists(UserForm2.MaterialPath)
+    issort = CreateObject("Scripting.FileSystemObject").FolderExists(UserForm2.SortamentPath)
+    iscode = CreateObject("Scripting.FileSystemObject").FolderExists(UserForm2.CodePath)
+    If ismat And issort And iscode Then
+        read_only_mode = False
+    Else
+        read_only_mode = True
+    End If
+    ModeType = read_only_mode
+End Function
+
+Function Download_Sortament() As Boolean
+    myURL = "https://raw.githubusercontent.com/kuvbur/material-specification/master/data/sort.zip"
+    Dim WinHttpReq As Object
+    Set WinHttpReq = CreateObject("Microsoft.XMLHTTP")
+    WinHttpReq.Open "GET", myURL, False
+    WinHttpReq.send
+    myURL = WinHttpReq.responseBody
+    If WinHttpReq.Status = 200 Then
+        If Not CreateObject("Scripting.FileSystemObject").FolderExists(ThisWorkbook.path & "\data") Then
+            MkDir (ThisWorkbook.path & "\data")
+        End If
+        If Not CreateObject("Scripting.FileSystemObject").FolderExists(UserForm2.SortamentPath) Then
+            MkDir (UserForm2.SortamentPath)
+        End If
+        Set oStream = CreateObject("ADODB.Stream")
+        oStream.Open
+        oStream.Type = 1
+        oStream.Write WinHttpReq.responseBody
+        oStream.SaveToFile ThisWorkbook.path & "\data\sort.zip", 2
+        oStream.Close
+        Set oApp = CreateObject("Shell.Application")
+        For Each it In oApp.Namespace(ThisWorkbook.path & "\data\sort.zip").Items: DoEvents: DoEvents: Next
+        oApp.Namespace(ThisWorkbook.path & "\data").CopyHere oApp.Namespace(ThisWorkbook.path & "\data\sort.zip").Items
+        Download_Sortament = True
+    Else
+        Download_Sortament = False
+    End If
+End Function
+
+Function Download_Settings() As Boolean
+    myURL = "https://raw.githubusercontent.com/kuvbur/material-specification/master/data/code/setting.ini"
+    Set WinHttpReq = CreateObject("Microsoft.XMLHTTP")
+    WinHttpReq.Open "GET", myURL, False
+    WinHttpReq.send
+    myURL = WinHttpReq.responseBody
+    If WinHttpReq.Status = 200 Then
+        If Not CreateObject("Scripting.FileSystemObject").FolderExists(ThisWorkbook.path & "\data") Then
+            MkDir (ThisWorkbook.path & "\data")
+        End If
+        If Not CreateObject("Scripting.FileSystemObject").FolderExists(UserForm2.CodePath) Then
+            MkDir (UserForm2.CodePath)
+        End If
+        Set oStream = CreateObject("ADODB.Stream")
+        oStream.Open
+        oStream.Type = 1
+        oStream.Write WinHttpReq.responseBody
+        oStream.SaveToFile ThisWorkbook.path & "/data/code/setting.ini", 2
+        oStream.Close
+        Download_Settings = True
+    Else
+        Download_Settings = False
+    End If
+End Function
+
+Function CreateFolders() As Boolean
+    If Not CreateObject("Scripting.FileSystemObject").FolderExists(ThisWorkbook.path & "\import") Then
+        MkDir (ThisWorkbook.path & "\import")
+    End If
+    If Not CreateObject("Scripting.FileSystemObject").FolderExists(ThisWorkbook.path & "\list") Then
+        MkDir (ThisWorkbook.path & "\list")
+    End If
+    If Not CreateObject("Scripting.FileSystemObject").FolderExists(ThisWorkbook.path & "\data") Then
+        MkDir (ThisWorkbook.path & "\data")
+    End If
+    If Not CreateObject("Scripting.FileSystemObject").FolderExists(UserForm2.CodePath) Then
+        MkDir (UserForm2.CodePath)
+    End If
+    If Not CreateObject("Scripting.FileSystemObject").FolderExists(UserForm2.SortamentPath) Then
+        MkDir (UserForm2.SortamentPath)
+    End If
+    If Not CreateObject("Scripting.FileSystemObject").FolderExists(UserForm2.MaterialPath) Then
+        MkDir (UserForm2.MaterialPath)
+    End If
+    If Download_Sortament() And Download_Settings() Then
+        CreateFolders = True
+    Else
+        CreateFolders = False
+    End If
 End Function
 
 Function ExportMod(ByVal namemod As String, Optional ByVal pathtmp As String = "", Optional ByVal in_ver As String = "") As Boolean

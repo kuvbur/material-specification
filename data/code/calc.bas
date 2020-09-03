@@ -1,7 +1,7 @@
 Attribute VB_Name = "calc"
 Option Compare Text
 Option Base 1
-Public Const macro_version As String = "3.86"
+Public Const macro_version As String = "3.89"
 '-------------------------------------------------------
 'Типы элементов (столбец col_type_el)
 Public Const t_arm As Integer = 10
@@ -242,8 +242,34 @@ Public Debug_mode As Boolean 'Режим отладки
 Public check_version As Boolean 'Проверять версию при загрузке
 Public lenght_ed_arm As Integer 'Максимальная длина стержня арматуры
 Public hard_round_km As Boolean
+
+Public clear_bet_name As Boolean 'Удаляем пояснения к марке бетона, сдаланные в скобках
+Public zap_only_mp As Boolean 'Запас только для п.м арматуры и материала
+
+Function SheetHideManual() As Boolean
+    Dim sheet As Worksheet
+    With ThisWorkbook
+        For Each sheet In ThisWorkbook.Worksheets
+            tspec = SpecGetType(sheet.Name)
+            flag_hide = False
+            If tspec = 7 Then flag_hide = True
+            If tspec = 9 Then flag_hide = True
+            If tspec = 10 Then flag_hide = True
+            If tspec = 12 Then flag_hide = True
+            If tspec = 15 Then flag_hide = True
+            If tspec = 21 Then flag_hide = True
+            If tspec = 22 Then flag_hide = True
+            If tspec = 23 Then flag_hide = True
+            If tspec = 24 Then flag_hide = True
+            If flag_hide = True Then Sheets(sheet.Name).Visible = False
+        Next
+    End With
+End Function
+
 Function INISet()
+    If ModeType() = True Then Exit Function
     sIniFile = UserForm2.CodePath & "setting.ini"
+    If Not CBool(Len(Dir$(sIniFile))) Then r = Download_Settings()
     If CBool(Len(Dir$(sIniFile))) Then
         type_okrugl = INIReadKeyVal("РАСЧЁТЫ", "type_okrugl")
         n_round_l = INIReadKeyVal("РАСЧЁТЫ", "n_round_l")
@@ -279,6 +305,8 @@ Function INISet()
         lenght_ed_arm = INIReadKeyVal("РАСЧЁТЫ", "lenght_ed_arm")
         hard_round_km = INIReadKeyVal("РАСЧЁТЫ", "hard_round_km")
         ignore_zap_material = INIReadKeyVal("РАСЧЁТЫ", "ignore_zap_material")
+        clear_bet_name = INIReadKeyVal("РАСЧЁТЫ", "clear_bet_name")
+        zap_only_mp = INIReadKeyVal("РАСЧЁТЫ", "zap_only_mp")
         flag = False
     Else
         flag = True
@@ -317,6 +345,8 @@ Function INISet()
     If IsEmpty(hard_round_km) Or flag Then hard_round_km = True
     If IsEmpty(delim_zone_fin) Or flag Then delim_zone_fin = False
     If IsEmpty(ignore_zap_material) Or flag Then ignore_zap_material = False
+    If IsEmpty(clear_bet_name) Or flag Then clear_bet_name = False
+    If IsEmpty(zap_only_mp) Or flag Then zap_only_mp = False
     '----Запись умолчаний, если файл не найден
     If flag Then
         t = INIWriteKeyVal("РАСЧЁТЫ", "type_okrugl", type_okrugl)
@@ -353,6 +383,8 @@ Function INISet()
         t = INIWriteKeyVal("РАСЧЁТЫ", "lenght_ed_arm", 11700)
         t = INIWriteKeyVal("РАСЧЁТЫ", "hard_round_km", True)
         t = INIWriteKeyVal("РАСЧЁТЫ", "ignore_zap_material", False)
+        t = INIWriteKeyVal("РАСЧЁТЫ", "clear_bet_name", False)
+        t = INIWriteKeyVal("РАСЧЁТЫ", "zap_only_mp", False)
     End If
     '----Принудительное включение
     delim_by_sheet = True
@@ -379,6 +411,7 @@ Function INIReadKeyVal(ByVal sSection As String, ByVal sKey As String) As Varian
     bKeyExists = False
     sIniFileContent = INIReadFile(sIniFile)    'Read the file into memory
     aIniLines = Split(sIniFileContent, vbCrLf)
+    If UBound(aIniLines) < 1 Then aIniLines = Split(sIniFileContent, vbLf)
     For i = 0 To UBound(aIniLines)
         sLine = Trim(aIniLines(i))
         If bSectionExists = True And Left(sLine, 1) = "[" And Right(sLine, 1) = "]" Then
@@ -456,6 +489,9 @@ Function INIReadFile(ByVal strFile As String) As String
     sFile = Space(LOF(FileNumber))
     Get #FileNumber, , sFile
     Close FileNumber
+'    sFile = Replace(sFile, " = ", "=")
+'    sFile = Replace(sFile, "= ", "=")
+'    sFile = Replace(sFile, " =", "=")
     INIReadFile = sFile
 End Function
 
@@ -631,6 +667,7 @@ Function ArrayEmp2Space(ByRef array_in As Variant) As Variant
             For i = 1 To UBound(array_in, 1)
                 If Not IsNumeric(array_in(i)) Then array_in(i) = Trim(array_in(i))
                 If array_in(i) = "" Then array_in(i) = " "
+                If array_in(i) = "-" Then array_in(i) = " "
                 If array_in(i) = 0 Then array_in(i) = " "
                 If IsNumeric(array_in(i)) And type_okrugl > 2 Then array_in(i) = Round(array_in(i), 4)
             Next
@@ -639,6 +676,7 @@ Function ArrayEmp2Space(ByRef array_in As Variant) As Variant
                 For j = 1 To UBound(array_in, 2)
                     If Not IsNumeric(array_in(i, j)) Then array_in(i, j) = Trim(array_in(i, j))
                     If array_in(i, j) = "" Then array_in(i, j) = " "
+                    If array_in(i, j) = "-" Then array_in(i, j) = " "
                     If array_in(i, j) = 0 Then array_in(i, j) = " "
                     If IsNumeric(array_in(i, j)) And type_okrugl > 2 Then array_in(i, j) = Round(array_in(i, j), 4)
                 Next
@@ -2202,11 +2240,15 @@ Function DataWeightSubpos(ByVal array_in As Variant, ByVal floor_txt As String) 
                     If (qty = 0) Or IsEmpty(qty) Then qty = 1
                     fon = array_in(i, col_fon)
 'If k_zap_total > 1 Then qty = qty + Round((k_zap_total - 1) * qty, 0)
-                    If fon Then
+                    If fon Or UserForm2.arm_pm_CB.Value Then
                         length_pos = Round_w(length_pos * k_zap_total, n_round_l)
                         tweight = length_pos * weight_pm * qty
                     Else
-                        tweight = Round_w(weight_pm * length_pos * k_zap_total, n_round_w) * qty
+                        If zap_only_mp Then
+                            tweight = Round_w(weight_pm * length_pos, n_round_w) * qty
+                        Else
+                            tweight = Round_w(weight_pm * length_pos * k_zap_total, n_round_w) * qty
+                        End If
                     End If
                 Case t_prokat
                     qty = array_in(i, col_qty)
@@ -2220,7 +2262,16 @@ Function DataWeightSubpos(ByVal array_in As Variant, ByVal floor_txt As String) 
                         length_pos = Round_w(array_in(i, col_pr_length) / 1000, 3)
                         weight_pm = array_in(i, col_pr_weight) * length_pos
                     End If
-                    tweight = Round_w(weight_pm * k_zap_total, n_round_w) * qty
+                    pm = False: If InStr(array_in(i, col_chksum), "lpm") > 0 Then pm = True
+                    If UserForm2.pr_pm_CB.Value Or pm Then
+                        tweight = Round_w(weight_pm * k_zap_total, n_round_w) * qty
+                    Else
+                        If zap_only_mp Then
+                            tweight = Round_w(weight_pm, n_round_w) * qty
+                        Else
+                            tweight = Round_w(weight_pm * k_zap_total, n_round_w) * qty
+                        End If
+                    End If
                 Case t_izd
                     qty = array_in(i, col_qty)
                     If (qty = 0) Or IsEmpty(qty) Then qty = 1
@@ -2349,6 +2400,11 @@ Function ExportAttribut(ByVal nm As String) As Boolean
     col = max_col_man
     spec = Data_out.Range(Data_out.Cells(1, 1), Data_out.Cells(n_row, max_col_man))
     block_data = ArraySelectParam_2(spec, "АВТОКАД_?", col_man_naen)
+    If IsEmpty(block_data) Then
+        MsgBox ("Данные для выгрузки отсутвуют")
+        ExportAttribut = False
+        Exit Function
+    End If
     For i = 1 To UBound(block_data, 1)
         If InStr(block_data(i, col_man_subpos), "!") = 0 And InStr(block_data(i, col_man_pos), "!") = 0 Then
             arr = Split(block_data(i, col_man_naen), "_")
@@ -2360,12 +2416,10 @@ Function ExportAttribut(ByVal nm As String) As Boolean
     For Each subpos In subpos_arr
         If InStr(subpos, "!") = 0 Then
             block_data_subpos = ArraySelectParam_2(block_data, subpos, col_man_subpos)
-            coll = GetListFile(subpos + ".txt")
+            coll = GetListFile(subpos + "_autocad.txt")
             For i = 1 To UBound(coll, 1)
-                snm = coll(i, 1)
-                If coll(i, 1) = subpos Then
-                    tdate = FileDateTime(coll(i, 2))
-                    short_fname = coll(i, 1)
+                snm = Split(coll(i, 1), "_")(0)
+                If snm = subpos Then
                     out_data_sheet = ReadFile(coll(i, 1) + ".txt", 1, vbTab, vbNewLine)
                     out_data_raw = ArrayCombine(out_data_raw, out_data_sheet)
                 End If
@@ -2411,7 +2465,6 @@ Function ExportAttribut(ByVal nm As String) As Boolean
     Next
     ExportAttribut = True
 End Function
-
 Function ExportSetPageBreaks(ByRef Sh As Variant, ByVal h_list As Double, Optional ByVal n_first As Integer, Optional ByVal page_delim As String) As Boolean
     h_sheet = GetHeightSheet(Sh)
     If IsMissing(page_delim) Or Len(page_delim) < 2 Then
@@ -2643,7 +2696,7 @@ Function FormatFont(ByVal Data_out As Range, ByVal n_row As Integer, ByVal n_col
         Data_out.FormatConditions(1).Font.Bold = True
     Next
     
-    arr_underline = type_el_name.items
+    arr_underline = type_el_name.Items
     For Each txt In arr_underline
         Data_out.FormatConditions.Add Type:=xlTextString, String:=txt, TextOperator:=xlContains
         Data_out.FormatConditions(Data_out.FormatConditions.Count).SetFirstPriority
@@ -3165,7 +3218,7 @@ Function FormatSpec_AS(ByVal Data_out As Range, ByVal n_row As Integer, ByVal n_
                 End If
                 Range(Cells(i, 1), Cells(i, n_qty)).Merge
             End If
-            If IsNumeric(Application.Match(Cells(i, n_naen), type_el_name.items, 0)) Then
+            If IsNumeric(Application.Match(Cells(i, n_naen), type_el_name.Items, 0)) Then
                 Cells(i, 1).Value = Cells(i, n_naen).Value
                 Range(Cells(i, 1), Cells(i, n_qty)).Merge
             End If
@@ -3205,7 +3258,7 @@ Function FormatSpec_AS(ByVal Data_out As Range, ByVal n_row As Integer, ByVal n_
         dblPoints = Application.CentimetersToPoints(1)
         r = FormatFont(Data_out, n_row, n_col)
         For i = 2 To n_row
-            If Not IsNumeric(Application.Match(Cells(i, 1), type_el_name.items, 0)) Then
+            If Not IsNumeric(Application.Match(Cells(i, 1), type_el_name.Items, 0)) Then
                 hh = Range(Cells(i, 1), Cells(i, n_qty)).MergeCells
                 If hh Then
                     Range(Data_out.Cells(i, 1), Cells(i, n_qty)).Font.Bold = True
@@ -3251,14 +3304,14 @@ Function FormatSpec_ASGR(ByVal Data_out As Range, ByVal n_row As Integer, ByVal 
             For j = 2 To n_col
                 If Len(Data_out.Cells(i, j)) > 0 Then flag = 0
             Next j
-            If IsNumeric(Application.Match(Cells(i, 3), type_el_name.items, 0)) Then
+            If IsNumeric(Application.Match(Cells(i, 3), type_el_name.Items, 0)) Then
                 Cells(i, 1).Value = Cells(i, 3).Value
                 Range(Cells(i, 1), Cells(i, 3)).Merge
                 flag = 0
             End If
             If flag = 1 Then
                 Range(Data_out.Cells(i, 1), Cells(i, 3)).Merge
-                If Not (IsNumeric(Application.Match(Cells(i, 1), type_el_name.items, 0))) Then Range(Data_out.Cells(i, 1), Cells(i, 3)).Font.Bold = True
+                If Not (IsNumeric(Application.Match(Cells(i, 1), type_el_name.Items, 0))) Then Range(Data_out.Cells(i, 1), Cells(i, 3)).Font.Bold = True
             End If
         Next i
         For i = 1 To 3
@@ -5085,6 +5138,7 @@ Function DataReadAutoArm_2way(ByVal subpos As String) As Variant
     out_data_up(1, col_man_pos) = "!!!"
     out_data_up(1, col_man_obozn) = "'" + Str(tdate)
     out_data_up(1, col_man_naen) = "АВТОКАД_" + short_fname
+
     n_row_out = 0
     For i = 2 To n_row
         pos = out_data_raw(i, col_acad_pos)
@@ -5128,13 +5182,21 @@ Function ManualAddAuto(ByVal nm As String) As Boolean
         If Len(Trim(subpos)) > 0 And InStr(subpos, "Марка") = 0 Then
             out_data = DataReadAutoArm_2way(subpos) 'Ищем файлы с извлечением данных и сводим их в массив
             If Not IsEmpty(out_data) Then
+                'Если позиции в извелчении не заданы - поищем их в существующем массиве
+                block_data = ArraySelectParam_2(spec, "АВТОКАД_?", col_man_naen)
+                If Not IsEmpty(block_data) Then
+                    For i = 1 To UBound(out_data, 1)
+                        If out_data(i, col_man_pos) = Empty Or out_data(i, col_man_pos) = "" Then
+                            old_data = ArraySelectParam_2(block_data, out_data(i, col_man_naen), col_man_naen)
+                            If Not IsEmpty(old_data) Then out_data(i, col_man_pos) = old_data(1, col_man_pos)
+                        End If
+                    Next i
+                End If
                 'Проходим по таблице удаляем строки со старым извлечением данных
                 For i = 1 To n_row
                     If Not IsError(spec(i, col_man_subpos)) And Not IsError(spec(i, col_man_naen)) Then
                         If spec(i, col_man_subpos) = subpos And InStr(spec(i, col_man_naen), "ВТОКАД_") > 0 Then Data_out.Rows(i).ClearContents
                         If InStr(spec(i, col_man_naen), "АВТОКАД_Извлечение данных") > 0 Then Data_out.Rows(i).ClearContents
-                    Else
-                        hh = 1
                     End If
                 Next i
                 arm_data.Item(subpos) = out_data
@@ -5165,7 +5227,6 @@ Function ManualAddAuto(ByVal nm As String) As Boolean
     Data_out.Cells(n_row_end, col_man_naen) = "АВТОКАД_Извлечение данных"
     ManualAddAuto = True
 End Function
-
 Function SheetAddTxt() As Boolean
     coll = GetListFile(nm + ".txt")
     If IsEmpty(coll) Then
@@ -6593,15 +6654,15 @@ Function ManualType(ByVal row As Variant) As Integer
     isSPos = ((subpos = pos) And Not IsEmpty(subpos) And Not isSys)
     isArm = ((Not IsEmpty(Length) Or Not IsEmpty(diametr) Or Not IsEmpty(klass)) And Not isSys)
     isProkat = ((Not IsEmpty(pr_length) Or Not IsEmpty(pr_gost_pr) Or Not IsEmpty(pr_prof) Or Not IsEmpty(pr_prof)) And Not isSys)
-    isMat = ((InStr(prim, "кв.м.") > 0 Or InStr(prim, "куб.м.") > 0 Or InStr(naen, "Бетон") > 0) And Not isSys)
-    isEr = ((isSPos And isArm) Or (isSPos And isProkat) Or (isSPos And isMat) Or (isArm And isProkat) Or (isArm And isMat) Or (isProkat And isMat)) 'Проверим - не подходит ли элемент к нескольким типам
+    ismat = ((InStr(prim, "кв.м.") > 0 Or InStr(prim, "куб.м.") > 0 Or InStr(naen, "Бетон") > 0) And Not isSys)
+    isEr = ((isSPos And isArm) Or (isSPos And isProkat) Or (isSPos And ismat) Or (isArm And isProkat) Or (isArm And ismat) Or (isProkat And ismat)) 'Проверим - не подходит ли элемент к нескольким типам
     
     If Not isSys And tempt < 3 Then type_el = -2
     If isSys Then type_el = t_sys
     If isSPos Then type_el = t_subpos
     If isArm Then type_el = t_arm
     If isProkat Then type_el = t_prokat
-    If isMat Then type_el = t_mat
+    If ismat Then type_el = t_mat
     If isEr Then type_el = t_error
     
     ManualType = type_el
@@ -6719,6 +6780,7 @@ Function ReadPrSortament()
     'Сначала - металл
     SortamentPath = SetPath()
     file = SortamentPath & "Сортаменты.txt"
+    If Not CBool(Len(Dir$(file))) Then r = Download_Sortament()
     f_list_sort = ReadTxt(file, 1, vbTab, vbNewLine, True)
     f_list_file = ArrayCol(f_list_sort, 3)
     f_list_gost = ArrayCol(f_list_sort, 2)
@@ -6730,6 +6792,7 @@ Function ReadPrSortament()
         Sh.Cells(1, n_col - 1) = file
         If Dir(SortamentPath & file & ".txt") = "" Then
             MsgBox ("Файл не найден " + file)
+            r = Download_Sortament()
             Exit Function
         End If
         f_prof = ReadTxt(SortamentPath & file & ".txt", 1, vbTab, vbNewLine, True)
@@ -7088,6 +7151,7 @@ Function SheetImport(ByVal nm As String) As Boolean
 End Function
 
 Function SheetActivate(ByVal sheetn As String)
+    If ModeType() = True Then Exit Function
     r = INISet()
     If sheetn = inx_name Then
         r = OutPrepare()
@@ -7545,10 +7609,11 @@ End Function
 
 Function SpecArm(ByVal arm As Variant, ByVal n_arm As Integer, ByVal type_spec As Integer, ByVal nSubPos As Integer) As Variant
     Dim pos_out
+    n_txt = ",**"
     If UserForm2.qtyOneSubpos_CB.Value Then
-        n_txt = vbLf & "(" & nSubPos & " шт.)"
+        If nSubPos > 1 Then n_txt = vbLf & "(" & nSubPos & " шт.)"
     Else
-        n_txt = "," & vbLf & "на все"
+        If nSubPos > 1 Then n_txt = "," & vbLf & "на все"
     End If
     If UserForm2.show_qty_spec.Value Then n_txt = "" & ",**"
     un_chsum_arm = ArrayUniqValColumn(arm, col_chksum)
@@ -7592,10 +7657,9 @@ Function SpecArm(ByVal arm As Variant, ByVal n_arm As Integer, ByVal type_spec A
                 fon = arm(j, col_fon)
                 mp = arm(j, col_mp)
                 gnut = arm(j, col_gnut)
-                prim = "": If arm(j, col_gnut) And Not UserForm2.arm_pm_CB.Value Then prim = "*"
+                prim = " ": If arm(j, col_gnut) And Not UserForm2.arm_pm_CB.Value Then prim = "*"
                 qty = arm(j, col_qty)
                 n_el = qty / nSubPos
-'If k_zap_total > 1 Then n_el = (qty / nSubPos) + Round((k_zap_total - 1) * (qty / nSubPos), 0)
                 length_pos = arm(j, col_length) / 1000
                 Select Case type_spec
                 Case 1
@@ -7607,14 +7671,18 @@ Function SpecArm(ByVal arm As Variant, ByVal n_arm As Integer, ByVal type_spec A
                     End If
                     If fon Or UserForm2.arm_pm_CB.Value Then
                         l_pos = Round_w(length_pos * k_zap_total, n_round_l) * n_el
-                        If prim = "п.м." Then prim = ""
+                        If prim = "п.м." Then prim = " "
                         pos_out(i, 3) = symb_diam & diametr & " " & klass & " L= п.м." & prim
                         pos_out(i, 4) = pos_out(i, 4) + l_pos
                         pos_out(i, 5) = weight_pm
                     Else
                         pos_out(i, 3) = symb_diam & diametr & " " & klass & " L=" & length_pos * 1000 & "мм." & prim
                         pos_out(i, 4) = pos_out(i, 4) + n_el
-                        pos_out(i, 5) = Round_w(weight_pm * length_pos * k_zap_total, n_round_w)
+                        If zap_only_mp Then
+                            pos_out(i, 5) = Round_w(weight_pm * length_pos, n_round_w)
+                        Else
+                            pos_out(i, 5) = Round_w(weight_pm * length_pos * k_zap_total, n_round_w)
+                        End If
                     End If
                 Case Else
                     If (UserForm2.keep_pos_CB.Value And UserForm2.arm_pm_CB.Value) Or Not (UserForm2.arm_pm_CB.Value) Then
@@ -7625,15 +7693,30 @@ Function SpecArm(ByVal arm As Variant, ByVal n_arm As Integer, ByVal type_spec A
                     pos_out(i, 2) = GetGOSTForKlass(klass)
                     If fon Or UserForm2.arm_pm_CB.Value Then
                         l_pos = Round_w(length_pos * k_zap_total, n_round_l) * n_el
-                        pos_out(i, 3) = symb_diam & diametr & " " & klass & " L= п.м." & prim
+                        pos_out(i, 3) = symb_diam & diametr & " " & klass & " L= п.м."
                         pos_out(i, 4) = pos_out(i, 4) + l_pos
                         pos_out(i, 5) = weight_pm
-                        If show_sum_prim Then pos_out(i, 6) = pos_out(i, 6) + (l_pos * weight_pm)
+                        If show_sum_prim Then
+                            pos_out(i, 6) = pos_out(i, 6) + (l_pos * weight_pm)
+                            pos_out(i, 3) = pos_out(i, 3) & prim
+                        Else
+                            pos_out(i, 6) = prim
+                        End If
                     Else
-                        pos_out(i, 3) = symb_diam & diametr & " " & klass & " L=" & length_pos * 1000 & "мм." & prim
+                        pos_out(i, 3) = symb_diam & diametr & " " & klass & " L=" & length_pos * 1000 & "мм."
                         pos_out(i, 4) = pos_out(i, 4) + n_el
-                        pos_out(i, 5) = Round_w(weight_pm * length_pos * k_zap_total, n_round_w)
-                        If show_sum_prim Then pos_out(i, 6) = pos_out(i, 6) + n_el * pos_out(i, 5)
+                        'Запас для одиночных элементов применяется только если это включено в setting
+                        If zap_only_mp Then
+                            pos_out(i, 5) = Round_w(weight_pm * length_pos, n_round_w)
+                        Else
+                            pos_out(i, 5) = Round_w(weight_pm * length_pos * k_zap_total, n_round_w)
+                        End If
+                        If show_sum_prim Then
+                            pos_out(i, 3) = pos_out(i, 3) & prim
+                            pos_out(i, 6) = pos_out(i, 6) + n_el * pos_out(i, 5)
+                        Else
+                            pos_out(i, 6) = prim
+                        End If
                     End If
                 End Select
             End If
@@ -7715,10 +7798,11 @@ Function SpecGetType(ByVal nm As String) As Integer
 End Function
 
 Function SpecIzd(ByVal izd As Variant, ByVal n_izd As Integer, ByVal type_spec As Integer, ByVal nSubPos As Integer) As Variant
+    n_txt = ",**"
     If UserForm2.qtyOneSubpos_CB.Value Then
-        n_txt = vbLf & "(" & nSubPos & " шт.)"
+        If nSubPos > 1 Then n_txt = vbLf & "(" & nSubPos & " шт.)"
     Else
-        n_txt = "," & vbLf & "на все"
+        If nSubPos > 1 Then n_txt = "," & vbLf & "на все"
         nSubPos = 1
     End If
     If UserForm2.show_qty_spec.Value Then n_txt = "" & ",**"
@@ -7747,7 +7831,14 @@ Function SpecIzd(ByVal izd As Variant, ByVal n_izd As Integer, ByVal type_spec A
             If current_chksum = un_chsum_izd(i) Then
                 qty = izd(j, col_qty)
                 n_el = qty / nSubPos
-                If k_zap_total > 1 Then n_el = (qty / nSubPos) + Round((k_zap_total - 1) * (qty / nSubPos), 0)
+                'Запас для одиночных элементов применяется только если это включено в setting
+                If k_zap_total > 1 Then
+                    If zap_only_mp Then
+                        If izd(j, col_m_edizm) = "п.м." Then n_el = (qty / nSubPos) + Round((k_zap_total - 1) * (qty / nSubPos), 0)
+                    Else
+                        n_el = (qty / nSubPos) + Round((k_zap_total - 1) * (qty / nSubPos), 0)
+                    End If
+                End If
                 subpos = izd(j, col_sub_pos)
                 pos = izd(j, col_pos)
                 If IsNumeric(izd(j, col_m_weight)) Then
@@ -7814,10 +7905,11 @@ Function SpecIzd(ByVal izd As Variant, ByVal n_izd As Integer, ByVal type_spec A
 End Function
 
 Function SpecMaterial(ByVal mat As Variant, ByVal n_mat As Integer, ByVal type_spec As Integer, ByVal nSubPos As Integer) As Variant
+    n_txt = ",**"
     If UserForm2.qtyOneSubpos_CB.Value Then
-        n_txt = vbLf & "(" & nSubPos & " шт.)"
+        If nSubPos > 1 Then n_txt = vbLf & "(" & nSubPos & " шт.)"
     Else
-        n_txt = "," & vbLf & "на все"
+        If nSubPos > 1 Then n_txt = "," & vbLf & "на все"
         nSubPos = 1
     End If
     If UserForm2.show_qty_spec.Value Then n_txt = ",**"
@@ -7908,14 +8000,22 @@ Function SpecOneSubpos(ByVal all_data As Variant, ByVal subpos As String, ByVal 
                     If UserForm2.qtyOneFloor_CB.Value Then
                         pos_naen(n_n, 6) = nSubPos
                     Else
-                        pos_naen(n_n, 1) = pos_naen(n_n, 1) & ", на 1 шт. (всего " & nSubPos & " шт.)"
+                        If nSubPos > 1 Then
+                            pos_naen(n_n, 1) = pos_naen(n_n, 1) & ", на 1 шт. (всего " & nSubPos & " шт.)"
+                        Else
+                            pos_naen(n_n, 1) = pos_naen(n_n, 1) & ",**"
+                        End If
                     End If
                 Else
                     pos_naen(n_n, 1) = fin_str & naen
                     If UserForm2.qtyOneFloor_CB.Value Then
                         pos_naen(n_n, 6) = -1
                     Else
-                        pos_naen(n_n, 1) = pos_naen(n_n, 1) & ", на все"
+                        If nSubPos > 1 Then
+                            pos_naen(n_n, 1) = pos_naen(n_n, 1) & ", на все"
+                        Else
+                            pos_naen(n_n, 1) = pos_naen(n_n, 1) & ",**"
+                        End If
                     End If
                 End If
                 If UserForm2.show_qty_spec.Value Then
@@ -7928,7 +8028,7 @@ Function SpecOneSubpos(ByVal all_data As Variant, ByVal subpos As String, ByVal 
                 End If
             End If
         Else
-            pos_naen(n_n, 1) = fin_str & " Прочие элементы "
+            pos_naen(n_n, 1) = fin_str & " Прочие элементы,**"
         End If
         sb_naen = pos_naen(n_n, 1)
         pos_out = ArrayCombine(pos_out, pos_naen)
@@ -8193,7 +8293,12 @@ Function SpecProkat(ByVal prokat As Variant, ByVal n_prokat As Integer, ByVal ty
                 If UserForm2.pr_pm_CB.Value Or pm Then
                     we = Round(Round_w(we * k_zap_total, n_round_w) / L, n_round_w)
                 Else
-                    we = Round_w(we * k_zap_total, n_round_w)
+                    'Запас для одиночных элементов применяется только если это включено в setting
+                    If zap_only_mp Then
+                        we = Round_w(we, n_round_w)
+                    Else
+                        we = Round_w(we * k_zap_total, n_round_w)
+                    End If
                 End If
                 gost = prokat(j, col_pr_gost_prof)
                 If Len(swap_gost.Item(gost)) > 0 Then gost = swap_gost.Item(gost)
@@ -8911,11 +9016,11 @@ Function Spec_AS(ByRef all_data As Variant, ByVal type_spec As Integer) As Varia
                         pos_out(i, end_col) = Trim(ConvNum2Txt(Round_w(pos_out(i, end_col), n_round_w)) & " кг.")
                         If Left(pos_out(i, end_col), 1) = "." Then pos_out(i, end_col) = "0" + pos_out(i, end_col)
                     Else
-                        If Not (IsNumeric(Application.Match(pos_out(i, 3), type_el_name.items, 0))) Then pos_out(i, end_col) = "-"
+                        If Not (IsNumeric(Application.Match(pos_out(i, 3), type_el_name.Items, 0))) Then pos_out(i, end_col) = "-"
                     End If
                 End If
                 For kk = 4 To end_col
-                    If (pos_out(i, kk) = "" Or pos_out(i, kk) = " " Or pos_out(i, kk) = 0) And Not (IsNumeric(Application.Match(pos_out(i, 3), type_el_name.items, 0))) Then pos_out(i, kk) = "-"
+                    If (pos_out(i, kk) = "" Or pos_out(i, kk) = " " Or pos_out(i, kk) = 0) And Not (IsNumeric(Application.Match(pos_out(i, 3), type_el_name.Items, 0))) Then pos_out(i, kk) = "-"
                 Next kk
             End If
             pos_out(i, 1) = Replace(pos_out(i, 1), fin_str, "")
@@ -8925,12 +9030,14 @@ Function Spec_AS(ByRef all_data As Variant, ByVal type_spec As Integer) As Varia
             n_col_naen = 2
             n_col_pos = 2
         End If
-        For i = 2 To UBound(pos_out, 1)
-            If (Right(Trim(UCase(pos_out(i, n_col_naen))), 1) = "*") Then
-                pos_out(i, n_col_naen) = Left(pos_out(i, n_col_naen), Len(pos_out(i, n_col_naen)) - 1)
-                pos_out(i, 1) = pos_out(i, 1) & "*"
-            End If
-        Next i
+        If show_sum_prim Then
+            For i = 2 To UBound(pos_out, 1)
+                If (Right(Trim(UCase(pos_out(i, n_col_naen))), 1) = "*") Then
+                    pos_out(i, n_col_naen) = Left(pos_out(i, n_col_naen), Len(pos_out(i, n_col_naen)) - 1)
+                    pos_out(i, 1) = pos_out(i, 1) & "*"
+                End If
+            Next i
+        End If
     End If
     If UserForm2.ignore_subpos_CB.Value = True And UserForm2.show_type_CB = False Then
         istart = 2
@@ -9558,7 +9665,7 @@ Function Spec_KZH(ByRef all_data As Variant) As Variant
         End If
         If UserForm2.show_qty_spec.Value Then n_txt = "" & ",**"
         pos_out(k, 1) = n_txt
-        If subpos = "-" Then pos_out(k, 1) = "Прочие"
+        If subpos = "-" Then pos_out(k, 1) = "Прочие,**"""
         weight_index.Item("row" & subpos) = k
         If is_bet = True Then
             n_conc_end_col = 0
@@ -9626,12 +9733,16 @@ Function Spec_KZH(ByRef all_data As Variant) As Variant
                     qty = arm_arr(i)(j, col_qty)
                     If (qty = 0) Or IsEmpty(qty) Then qty = 1
                     fon = arm_arr(i)(j, col_fon)
-'If k_zap_total > 1 Then qty = qty + Round((k_zap_total - 1) * qty, 0)
                     If fon Then
                         length_pos = Round_w(length_pos * k_zap_total, n_round_l)
                         w_pos = length_pos * weight_pm * qty / nSubPos
                     Else
-                        w_pos = Round_w(weight_pm * length_pos * k_zap_total, n_round_w) * qty / nSubPos
+                        'Запас для одиночных элементов применяется только если это включено в setting
+                        If zap_only_mp Then
+                            w_pos = Round_w(weight_pm * length_pos, n_round_w) * qty / nSubPos
+                        Else
+                            w_pos = Round_w(weight_pm * length_pos * k_zap_total, n_round_w) * qty / nSubPos
+                        End If
                     End If
                     tkeyd = "Арматура" & n_type & klass & gost & symb_diam & diametr
                     tkesum_1 = "Арматура" & n_type & klass & gost & "Всего"
@@ -9856,6 +9967,7 @@ Function Spec_Select(ByVal lastfilespec As String, ByVal suffix As String, Optio
     pos_out_all = Empty
     msg_zap_mat = ""
     If ignore_zap_material Then msg_zap_mat = vbLf & "Запас на раскрой материала не учитывается"
+    If zap_only_mp Then msg_zap_mat = vbLf & vbLf & "!!! Запас применяется только к элементам, выводимым в п.м. (арматуре, прокату, изделиям) и материалам !!!"
     Dim pos_zag()
     Select Case type_spec
         Case 1, 2, 3, 13
@@ -10147,6 +10259,10 @@ Function Spec_CONC(ByRef all_data As Variant) As Boolean
             spec_subpos = SpecMaterial(all_bet_subpos, n_mat, 2, nSubPos)
             For j = 1 To UBound(spec_subpos, 1)
                 bet = spec_subpos(j, 3)
+                If InStr(bet, "(") > 0 And InStr(bet, ")") > 0 And clear_bet_name Then
+                    str_to_del = Mid(bet, InStr(bet, "("), InStr(bet, ")"))
+                    bet = Trim(Replace(bet, str_to_del, ""))
+                End If
                 qty = Round_w(spec_subpos(j, 4), n_round_wkzh)
                 concrsubpos.Item(subpos & "_" & bet & "_qty") = qty
                 concrsubpos.Item(subpos & "_bet_qty") = concrsubpos.Item(subpos & "_bet_qty") + qty
