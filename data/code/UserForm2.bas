@@ -109,7 +109,7 @@ Private Sub ClearSheetButton_Click()
     If UserForm2.bysybpos_CB.Value Then type_out(5) = 13
     If UserForm2.byved_CB.Value Then type_out(6) = 11
     If UserForm2.bypol_CB.Value Then type_out(7) = 13
-    tdel = ""
+    tdel = vbNullString
     If UserForm2.ob_CB.Value Then tdel = tdel + "_об, "
     If UserForm2.obsh_CB.Value Then tdel = tdel + "общестрой, "
     If UserForm2.groub_CB.Value Then tdel = tdel + "_гр, "
@@ -117,9 +117,9 @@ Private Sub ClearSheetButton_Click()
     If UserForm2.bysybpos_CB.Value Then tdel = tdel + "_грс, "
     If UserForm2.byved_CB.Value Then tdel = tdel + "_вед, "
     If UserForm2.bypol_CB.Value Then tdel = tdel + "_экспл, "
-    r = LogWrite("Очистка листов", "", 1)
+    r = LogWrite("Очистка листов", vbNullString, 1)
     r = SheetClear(type_out)
-    r = LogWrite("Удалено " & r & " листов", "", 1)
+    r = LogWrite("Удалено " & r & " листов", vbNullString, 1)
     r = SheetIndex()
     r = OutEnded()
 End Sub
@@ -128,9 +128,9 @@ Private Sub ClearAllButton_Click()
     r = OutPrepare()
     Dim type_out: ReDim type_out(1)
     type_out(1) = -1
-    r = LogWrite("Очистка ВСЕХ листов", "", 1)
+    r = LogWrite("Очистка ВСЕХ листов", vbNullString, 1)
     r = SheetClear(type_out)
-    r = LogWrite("Удалено " & r & " листов", "", 1)
+    r = LogWrite("Удалено " & r & " листов", vbNullString, 1)
     r = SheetIndex()
     r = OutEnded()
 End Sub
@@ -188,7 +188,7 @@ Private Sub CopyGromButton_Click()
                 fname = TmpPath + Trim(Str(Round(Rnd(100) * 1000, 0)) + FnameInLoop)
                 FileCopy fileToOpen(n), TmpPath + FnameInLoop
                 Name TmpPath + FnameInLoop As fname
-                If SheetImport(fname) Then r = LogWrite(FnameInLoop, "", "Импорт книги закончен")
+                If SheetImport(fname) Then r = LogWrite(FnameInLoop, vbNullString, "Импорт книги закончен")
             End If
         Next n
         If CreateObject("Scripting.FileSystemObject").FolderExists(TmpPath) Then Shell "cmd /c rd /S/Q """ & TmpPath & """"
@@ -290,7 +290,7 @@ End Sub
 Private Sub CommandButtonAS_Click()
     r = OutPrepare()
     sNameSheet = lastfilespec
-    r = Spec_Select(lastfilespec, "")
+    r = Spec_Select(lastfilespec, vbNullString)
     r = OutEnded()
 End Sub
 
@@ -339,7 +339,7 @@ End Sub
 Private Sub CommandButtonUpdate_Click()
     r = OutPrepare()
     sNameSheet = ThisWorkbook.ActiveSheet.Name
-    r = Spec_Select(sNameSheet, "")
+    r = Spec_Select(sNameSheet, vbNullString)
     r = OutEnded()
 End Sub
 
@@ -483,7 +483,7 @@ Sub remat()
         r = ReList(ListBoxName, listadd)
         lastfileadd = listadd(1)
     Else
-        lastfileadd = ""
+        lastfileadd = vbNullString
     End If
     lastfile = ThisWorkbook.ActiveSheet.Name
     lastfilespec = ThisWorkbook.ActiveSheet.Name
@@ -548,7 +548,7 @@ Function ReadConstr()
                             If Not IsEmpty(valc) And Not IsError(valc) Then
                                 tarr(irow - istart + 1, icol) = valc
                             Else
-                                tarr(irow - istart + 1, icol) = ""
+                                tarr(irow - istart + 1, icol) = vbNullString
                             End If
                         Next
                     Next
@@ -568,3 +568,4 @@ Function ReadConstr()
         r = OutEnded()
     End If
 End Function
+

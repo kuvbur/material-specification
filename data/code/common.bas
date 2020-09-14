@@ -5,10 +5,10 @@ Option Base 1
 Public Const common_version As String = "3.97"
 Public Const Pi As Double = 3.141592653589
 Public ank_data As Variant
-Public Function GetLeghtByID(id As String, table As Range, n_col_id As Integer, n_col_l As Integer) As Variant
+Public Function GetLeghtByID(id As String, table As Range, n_col_id As Long, n_col_l As Long) As Variant
     GetLeghtByID = Сумма_ПоИД(id, table, n_col_id, n_col_l)
 End Function
-Public Function Сумма_ПоИД(id As String, table As Range, n_col_id As Integer, n_col_l As Integer) As Variant
+Public Function Сумма_ПоИД(id As String, table As Range, n_col_id As Long, n_col_l As Long) As Variant
 Attribute Сумма_ПоИД.VB_Description = "Суммирует элементов с одинаковым ID из таблицы. Ввод в формате ID, Таблица, Номер столбца ID, Номер столбца суммируемой величины"
     'Сумма значений заданного столбца для заданного ID
     Sum_l = 0
@@ -22,7 +22,7 @@ Attribute Сумма_ПоИД.VB_Description = "Суммирует элементов с одинаковым ID из та
     Сумма_ПоИД = Sum_l
 End Function
 
-Public Function Макс_ПоИД(id As String, table As Range, n_col_id As Integer, n_col_l As Integer) As Variant
+Public Function Макс_ПоИД(id As String, table As Range, n_col_id As Long, n_col_l As Long) As Variant
     'Выбор максимального значения из таблицы по заданному ID (макс. высота стен, макс. площадь и т.д.)
     max_l = 0
     id = Trim(id)
@@ -37,7 +37,7 @@ Public Function Макс_ПоИД(id As String, table As Range, n_col_id As Integer, n_c
     Макс_ПоИД = max_l
 End Function
 
-Public Function Мин_ПоИД(id As String, table As Range, n_col_id As Integer, n_col_l As Integer) As Variant
+Public Function Мин_ПоИД(id As String, table As Range, n_col_id As Long, n_col_l As Long) As Variant
     'Выбор минимального значения из таблицы по заданному ID (мин. высота стен, мин. площадь и т.д.)
     min_l = Макс_ПоИД(id, table, n_col_id, n_col_l)
     id = Trim(id)
@@ -52,7 +52,7 @@ Public Function Мин_ПоИД(id As String, table As Range, n_col_id As Integer, n_co
     Мин_ПоИД = min_l
 End Function
 
-Public Function SetPlast_T(diam As Integer) As String
+Public Function SetPlast_T(diam As Long) As String
     Select Case diam
         Case 16
             SetPlast_T = "-- 8"
@@ -94,7 +94,7 @@ Private Function set_ank_data()
     ank_data.Item("нахл_двойная") = 2
 End Function
 
-Private Function get_lo_arm(ByVal diam As Integer, ByVal class As String, beton As String) As Double
+Private Function get_lo_arm(ByVal diam As Long, ByVal class As String, beton As String) As Double
     set_ank_data
     beton = GetClassBeton(beton)
     Rs = ank_data.Item(class)
@@ -106,7 +106,7 @@ Private Function get_lo_arm(ByVal diam As Integer, ByVal class As String, beton 
     get_lo_arm = lo
 End Function
 
-Public Function Арм_Анкеровка(ByVal diam As Integer, ByVal class As String, ByVal beton As String, _
+Public Function Арм_Анкеровка(ByVal diam As Long, ByVal class As String, ByVal beton As String, _
                             Optional ByVal kseism As Double = 1, _
                             Optional ByVal type_arm As String = "растянутая", _
                             Optional ByVal type_out As String = "L") As Variant
@@ -150,7 +150,7 @@ Public Function Арм_Округление(ByVal L As Long, Optional ByVal krat As String = 
     Арм_Округление = lout
 End Function
 
-Public Function Арм_Нахлёст(ByVal diam As Integer, ByVal class As String, ByVal beton As String, _
+Public Function Арм_Нахлёст(ByVal diam As Long, ByVal class As String, ByVal beton As String, _
                             Optional ByVal kseism As Double = 1, _
                             Optional ByVal type_arm As String = "растянутая", _
                             Optional ByVal type_out As String = "L") As Variant
@@ -181,7 +181,7 @@ Public Function Арм_Нахлёст(ByVal diam As Integer, ByVal class As String, ByVal 
     End Select
 End Function
 
-Public Function Арм_МинРадиус(ByVal diam As Integer, ByVal class As String) As Double
+Public Function Арм_МинРадиус(ByVal diam As Long, ByVal class As String) As Double
     d_opr = 0
     If class = "A-I(A240)" Or class = "Вр-I" Then
         If diam < 20 Then
@@ -201,7 +201,7 @@ Public Function Арм_МинРадиус(ByVal diam As Integer, ByVal class As String) As D
     Арм_МинРадиус = r_opr + r_arm
 End Function
 
-Public Function Арм_Элемент_П(ByVal L As Variant, ByVal H As Variant, ByVal diam As Integer, ByVal class As String, Optional ByVal Lniz As Integer = 0, Optional ByVal diam_osn As Integer = 0) As Double
+Public Function Арм_Элемент_П(ByVal L As Variant, ByVal H As Variant, ByVal diam As Long, ByVal class As String, Optional ByVal Lniz As Long = 0, Optional ByVal diam_osn As Long = 0) As Double
     If Lniz = 0 Then Lniz = L
     agib = 90
     r_min = Арм_МинРадиус(diam, class)
@@ -219,7 +219,7 @@ Public Function Арм_Элемент_П(ByVal L As Variant, ByVal H As Variant, ByVal diam
     Арм_Элемент_П = lout
 End Function
 
-Public Function Арм_Элемент_Г(ByVal L As Variant, ByVal H As Variant, ByVal diam As Integer, ByVal class As String, Optional ByVal diam_osn As Integer = 0) As Double
+Public Function Арм_Элемент_Г(ByVal L As Variant, ByVal H As Variant, ByVal diam As Long, ByVal class As String, Optional ByVal diam_osn As Long = 0) As Double
     agib = 90
     r_min = Арм_МинРадиус(diam, class)
     r_osn = diam_osn / 2 + diam / 2
@@ -236,7 +236,7 @@ Public Function Арм_Элемент_Г(ByVal L As Variant, ByVal H As Variant, ByVal diam
     Арм_Элемент_Г = lout
 End Function
 
-Public Function Арм_Элемент_Хомут(ByVal L As Integer, ByVal H As Integer, ByVal diam_osn As Integer, ByVal diam As Integer, ByVal class As String) As Double
+Public Function Арм_Элемент_Хомут(ByVal L As Long, ByVal H As Long, ByVal diam_osn As Long, ByVal diam As Long, ByVal class As String) As Double
     r_min = Арм_МинРадиус(diam, class)
     r_osn = diam_osn / 2 + diam / 2
     'Диаметр гиба - не менее минимального
@@ -263,7 +263,7 @@ Public Function Арм_Элемент_Хомут(ByVal L As Integer, ByVal H As Integer, ByVal 
     Арм_Элемент_Хомут = lout
 End Function
 
-Public Function Арм_Элемент_Шпилька(ByVal L As Integer, ByVal diam_osn As Integer, ByVal diam As Integer, ByVal class As String) As Double
+Public Function Арм_Элемент_Шпилька(ByVal L As Long, ByVal diam_osn As Long, ByVal diam As Long, ByVal class As String) As Double
     r_min = Арм_МинРадиус(diam, class)
     r_osn = diam_osn / 2 + diam / 2
     'Диаметр гиба - не менее минимального
@@ -295,17 +295,17 @@ Public Function Арм_Длина_ПМ(ByVal L As Variant, ByVal lnahl As Variant, Optiona
     Арм_Длина_ПМ = lout
 End Function
 
-Public Function Арм_ПоПлощади(S As Variant, shag As Variant, ByVal lnahl As Integer, Optional ByVal led As Integer = 11700) As Long
+Public Function Арм_ПоПлощади(S As Variant, shag As Variant, ByVal lnahl As Long, Optional ByVal led As Long = 11700) As Long
     L = Sqr(S) + (S / shag)
     lout = Арм_Длина_ПМ(L, lnahl, led)
     Арм_ПоПлощади = lout
 End Function
 
-Public Function Арм_ОдинСлойПоПлощади(S As Variant, shag As Variant, ByVal lnahl As Integer, Optional ByVal led As Integer = 11700) As Long
+Public Function Арм_ОдинСлойПоПлощади(S As Variant, shag As Variant, ByVal lnahl As Long, Optional ByVal led As Long = 11700) As Long
     Арм_ОдинСлойПоПлощади = Арм_ПоПлощади(S, shag, lnahl, led)
 End Function
 
-Public Function SetPlast_Razm(diam As Integer) As String
+Public Function SetPlast_Razm(diam As Long) As String
     Select Case diam
         Case 16
             SetPlast_Razm = "100*100"
@@ -315,6 +315,3 @@ Public Function SetPlast_Razm(diam As Integer) As String
             SetPlast_Razm = "150*150"
     End Select
 End Function
-
-
-

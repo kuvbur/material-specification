@@ -8,7 +8,7 @@ Function CheckVersion()
         Debug_mode = False
         r = ExportAllMod()
         change_log = DownloadMod("changelog" & ".txt")
-        msg_upd = ""
+        msg_upd = vbNullString
         common_git = DownloadMod("common" & ".bas")
         common_local = ConvTxtNum(common_version)
         If common_git > common_local Then msg_upd = msg_upd & "Загружена новая версия модуля common -" & CStr(common_git) & vbNewLine
@@ -95,7 +95,7 @@ Function ExportAllMod() As Boolean
         MkDir (UserForm2.CodePath)
     End If
     pathtmp = "old\"
-    If Debug_mode Then pathtmp = ""
+    If Debug_mode Then pathtmp = vbNullString
     r = ExportMod("UserForm2", pathtmp, UserForm2.form_ver.Caption)
     r = ExportMod("calc", pathtmp, macro_version)
     r = ExportMod("common", pathtmp, common_version)
@@ -204,10 +204,10 @@ Function CreateFolders() As Boolean
     End If
 End Function
 
-Function ExportMod(ByVal namemod As String, Optional ByVal pathtmp As String = "", Optional ByVal in_ver As String = "") As Boolean
-        tdate = ""
+Function ExportMod(ByVal namemod As String, Optional ByVal pathtmp As String = vbNullString, Optional ByVal in_ver As String = vbNullString) As Boolean
+        tdate = vbNullString
         If pathtmp = "old\" Then
-            tdate = "_" & CStr(in_ver) & "_" & Replace(Right(Str(DatePart("yyyy", Now)), 2) & Str(DatePart("m", Now)) & Str(DatePart("d", Now)), " ", "")
+            tdate = "_" & CStr(in_ver) & "_" & Replace(Right(Str(DatePart("yyyy", Now)), 2) & Str(DatePart("m", Now)) & Str(DatePart("d", Now)), " ", vbNullString)
             If Not CreateObject("Scripting.FileSystemObject").FolderExists(UserForm2.CodePath & pathtmp) Then
                 MkDir (UserForm2.CodePath & pathtmp)
             End If
@@ -216,7 +216,7 @@ Function ExportMod(ByVal namemod As String, Optional ByVal pathtmp As String = "
         ThisWorkbook.VBProject.VBComponents.Item(namemod).Export UserForm2.CodePath & pathtmp & namemod & tdate & ".bas"
 End Function
 
-Function IsModFileEx(ByVal namemod As String, Optional ByVal pathtmp As String = "") As Boolean
+Function IsModFileEx(ByVal namemod As String, Optional ByVal pathtmp As String = vbNullString) As Boolean
     On Error Resume Next
     IsModFileEx = CBool(Len(Dir$(UserForm2.CodePath & pathtmp & namemod & ".bas")))
 End Function
@@ -249,3 +249,4 @@ Function ConvTxtNum(ByVal x As Variant) As Variant
     End If
     ConvTxtNum = out
 End Function
+
