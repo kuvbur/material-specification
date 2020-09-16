@@ -1,7 +1,7 @@
 Attribute VB_Name = "calc"
 Option Compare Text
 Option Base 1
-Public Const macro_version As String = "3.91"
+Public Const macro_version As String = "3.92"
 '-------------------------------------------------------
 'Типы элементов (столбец col_type_el)
 Public Const t_arm As Long = 10
@@ -2304,7 +2304,7 @@ Function DataWeightSubpos(ByVal array_in As Variant, ByVal floor_txt As String) 
                     If Not IsNumeric(array_in(i, col_m_weight)) Then
                         tweight = 0
                     Else
-                        tweight = Round_w(array_in(i, col_m_weight) * k_zap_total, n_round_w) * qty
+                        tweight = Round_w(array_in(i, col_m_weight), n_round_w) * qty
                     End If
             End Select
             If tweight Then dweight.Item(subpos) = dweight.Item(subpos) + tweight
@@ -5638,9 +5638,9 @@ Function ManualCheck(nm) As Boolean
                         r = ManualCeilAlert(Data_out.Cells(i, col_man_length), "Подозрительно малая длина.")
                         n_err = n_err + 1
                     End If
-                    If InStr(naen, "жатая") > 0 Then ank_subpos.Item(subpos & pos & "тип") = "сжатая"
-                    If InStr(naen, "астянутая") > 0 Then ank_subpos.Item(subpos & pos & "тип") = "растянутая"
-                    If InStr(naen, "войная") > 0 Then ank_subpos.Item(subpos & pos & "тип") = "двойная"
+                    If InStr(naen, "жатая") > 0 Then ank_subpos.Item(subpos & pos & CStr(i) & "тип") = "сжатая"
+                    If InStr(naen, "астянутая") > 0 Then ank_subpos.Item(subpos & pos & CStr(i) & "тип") = "растянутая"
+                    If InStr(naen, "войная") > 0 Then ank_subpos.Item(subpos & pos & CStr(i) & "тип") = "двойная"
                     If InStr(Data_out.Cells(i, col_man_length).Formula, "Арм_ПоПлощади") > 0 Or InStr(Data_out.Cells(i, col_man_length).Formula, "Арм_ОдинСлойПоПлощади") > 0 Then
                         r = ManualCeilAlert(Data_out.Cells(i, col_man_length), "Длина ОДНОГО слоя, всё должно быть в мм", "info")
                         r = ManualCeilAlert(Data_out.Cells(i, col_man_qty), "Кол-во слоёв", "info")
@@ -5828,7 +5828,7 @@ Function ManualCheck(nm) As Boolean
                 kseism = 1
                 If ank_subpos.exists(subpos & "_kseism") Then kseism = 1.3
                 type_arm = "растянутая"
-                If ank_subpos.exists(subpos & pos & "тип") Then type_arm = ank_subpos.Item(subpos & pos & "тип")
+                If ank_subpos.exists(subpos & pos & CStr(i) & "тип") Then type_arm = ank_subpos.Item(subpos & pos & CStr(i) & "тип")
                 type_out = "L"
                 l_ank = Арм_Анкеровка(diametr, klass, beton, kseism, type_arm, type_out)
                 l_nahl = Арм_Нахлёст(diametr, klass, beton, kseism, type_arm, type_out)
