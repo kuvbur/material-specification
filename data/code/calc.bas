@@ -1,7 +1,7 @@
 Attribute VB_Name = "calc"
 Option Compare Text
 Option Base 1
-Public Const macro_version As String = "3.93"
+Public Const macro_version As String = "3.94"
 '-------------------------------------------------------
 'Типы элементов (столбец col_type_el)
 Public Const t_arm As Long = 10
@@ -2024,6 +2024,7 @@ Function DataNameSubpos(ByVal sub_pos_arr As Variant) As Object
 End Function
 
 Function DataRead(ByVal nm As String) As Variant
+    r = SetWorkbook()
     errread = 0
     If InStr(nm, "_") > 0 Then
         nsfile = Split(nm, "_")(0)
@@ -2044,7 +2045,13 @@ Function DataRead(ByVal nm As String) As Variant
             If IsEmpty(file) Then
                 'Если файла нет - поищем листы с суффиксом "_спец"
                 nsht = nsfile & "_спец"
-                listsheet = GetListOfSheet(ThisWorkbook)
+                listsheet = GetListOfSheet(wbk)
+                For i = 1 To UBound(listsheet)
+                    If listsheet(i) <> Trim(listsheet(i)) Then
+                        wbk.Sheets(listsheet(i)).Name = Trim(listsheet(i))
+                        listsheet(i) = Trim(listsheet(i))
+                    End If
+                Next i
                 sheet = ArraySelectParam(listsheet, nsht, 1)
                 If IsEmpty(sheet) Then
                     'Нет ни файла, ни листа.
@@ -9818,6 +9825,7 @@ Function Spec_KZH(ByRef all_data As Variant) As Variant
     If show_bet_wkzh Then
         is_bet = Spec_CONC(all_data)
     End If
+    floor_txt = "all_floor"
     Set name_subpos = pos_data.Item(floor_txt).Item("name") 'Словарь с именами сборок
     un_child = ArraySort(pos_data.Item(floor_txt).Item("child").Keys())
     un_parent = ArraySort(pos_data.Item(floor_txt).Item("parent").Keys())
@@ -12667,5 +12675,4 @@ Function VedSplitFile(ByVal lastfilespec As String)
     split_data = ArrayRedim(split_data, n_row)
     VedSplitFile = split_data
 End Function
-
 
