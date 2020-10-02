@@ -2,7 +2,7 @@ Attribute VB_Name = "common"
 Option Compare Text
 Option Base 1
 
-Public Const common_version As String = "3.97"
+Public Const common_version As String = "3.98"
 Public Const Pi As Double = 3.141592653589
 Public ank_data As Variant
 Public Function GetLeghtByID(id As String, table As Range, n_col_id As Long, n_col_l As Long) As Variant
@@ -288,6 +288,10 @@ Public Function Арм_Элемент_Шпилька(ByVal L As Long, ByVal diam_osn As Long, ByV
 End Function
 
 Public Function Арм_Длина_ПМ(ByVal L As Variant, ByVal lnahl As Variant, Optional ByVal led As Variant = 11700) As Long
+    If L <= led Then
+        Арм_Длина_ПМ = L
+        Exit Function
+    End If
     n_nahl = Round(L / led)
     If n_nahl * led < L Then n_nahl = n_nahl + 1
     lout = L + lnahl * n_nahl

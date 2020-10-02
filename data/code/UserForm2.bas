@@ -16,7 +16,7 @@ Attribute VB_Exposed = False
 Option Compare Text
 Option Base 1
 
-Const form_version As String = "3.28"
+Const form_version As String = "3.29"
 Public CodePath, MaterialPath, SortamentPath As String
 Public lastsheet, lastconstrtype, lastconstr, lastfile, lastfilespec, lastfileadd, materialbook_index, name_izd As Variant
 
@@ -77,6 +77,18 @@ Private Sub PosSubposButton_Click()
         End If
         r = OutEnded()
     End If
+End Sub
+
+Private Sub Raskroy_Button_Click()
+    r = OutPrepare()
+    nm = ThisWorkbook.ActiveSheet.Name
+    type_spec = SpecGetType(nm)
+    If type_spec <> 3 Or type_spec <> 7 Then
+        If InStr(nm, "_") > 0 Then nm = Split(nm, "_")(0)
+    End If
+    suffix = "_раскр"
+    r = Spec_Select(nm, suffix)
+    r = OutEnded()
 End Sub
 
 Private Sub ReloadTXTButton_Click()
@@ -175,7 +187,7 @@ Private Sub CommandButtonShowS_Click()
 End Sub
 
 Private Sub CopyGromButton_Click()
-    ChDrive Left(ThisWorkbook.path, 1)
+    If Left(ThisWorkbook.path, 2) <> "\\" Then ChDrive Left(ThisWorkbook.path, 1)
     ChDir ThisWorkbook.path
     TmpPath = ThisWorkbook.path + "\tmpimport\"
     fileToOpen = Application.GetOpenFilename("XLSM Files (*.xlsm),*.xlsm,XLS Files (*.xls),*.xls,CSV Files (*.csv),*.csv,TXT Files (*.txt),*.txt", Title:="Выбор файлов для импорта", MultiSelect:=True)
@@ -477,7 +489,7 @@ Sub remat()
             Next i
         End If
     Next objWh
-    listadd = ArraySort(name_izd.keys())
+    listadd = ArraySort(name_izd.Keys())
     r = ReList(ListBoxFileSpec, listspec)
     If Not IsEmpty(listadd) Then
         r = ReList(ListBoxName, listadd)
