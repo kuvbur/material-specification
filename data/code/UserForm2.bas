@@ -13,10 +13,13 @@ Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
 Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
+
+
 Option Compare Text
 Option Base 1
 
-Const form_version As String = "3.29"
+Const form_version As String = "4.01"
+Const form1_version As String = "4.01"
 Public CodePath, MaterialPath, SortamentPath As String
 Public lastsheet, lastconstrtype, lastconstr, lastfile, lastfilespec, lastfileadd, materialbook_index, name_izd As Variant
 
@@ -44,6 +47,7 @@ Private Sub AllPosButton_Click()
         End If
         r = OutEnded()
     End If
+    r = print_functime()
 End Sub
 
 Private Sub CommandButtonExportData_Click()
@@ -56,6 +60,7 @@ Private Sub CommandButtonExportData_Click()
         If Not (quiet) Then MsgBox ("Перейдите на лист _спец и повторите")
     End If
     r = OutEnded()
+    r = print_functime()
 End Sub
 
 Private Sub HelpButton_Click()
@@ -77,6 +82,7 @@ Private Sub PosSubposButton_Click()
         End If
         r = OutEnded()
     End If
+    r = print_functime()
 End Sub
 
 Private Sub Raskroy_Button_Click()
@@ -96,6 +102,7 @@ Private Sub ReloadTXTButton_Click()
     r = OutPrepare()
     rv = SheetAddTxt()
     r = OutEnded()
+    r = print_functime()
 End Sub
 
 Private Sub UndoPosButton_Click()
@@ -159,6 +166,7 @@ Private Sub CommandButtonIns_Click()
     arr2paste = materialbook_index.Item(lastconstrtype & "_" & lastconstr)
     r = ManualPaste2Sheet(arr2paste)
     r = OutEnded()
+    r = print_functime()
 End Sub
 
 Private Sub CommandButtonOTD_Click()
@@ -187,7 +195,7 @@ Private Sub CommandButtonShowS_Click()
 End Sub
 
 Private Sub CopyGromButton_Click()
-    If Left(ThisWorkbook.path, 2) <> "\\" Then ChDrive Left(ThisWorkbook.path, 1)
+    If Left$(ThisWorkbook.path, 2) <> "\\" Then ChDrive Left$(ThisWorkbook.path, 1)
     ChDir ThisWorkbook.path
     TmpPath = ThisWorkbook.path + "\tmpimport\"
     fileToOpen = Application.GetOpenFilename("XLSM Files (*.xlsm),*.xlsm,XLS Files (*.xls),*.xls,CSV Files (*.csv),*.csv,TXT Files (*.txt),*.txt", Title:="Выбор файлов для импорта", MultiSelect:=True)
@@ -196,8 +204,8 @@ Private Sub CopyGromButton_Click()
         If Not CreateObject("Scripting.FileSystemObject").FolderExists(TmpPath) Then MkDir (TmpPath)
         For n = LBound(fileToOpen) To UBound(fileToOpen)
             If ThisWorkbook.FullName <> fileToOpen(n) Then
-                FnameInLoop = Right(fileToOpen(n), Len(fileToOpen(n)) - InStrRev(fileToOpen(n), Application.PathSeparator, , 1))
-                fname = TmpPath + Trim(Str(Round(Rnd(100) * 1000, 0)) + FnameInLoop)
+                FnameInLoop = Right$(fileToOpen(n), Len(fileToOpen(n)) - InStrRev(fileToOpen(n), Application.PathSeparator, , 1))
+                fname = TmpPath + Trim$(str(Round(Rnd(100) * 1000, 0)) + FnameInLoop)
                 FileCopy fileToOpen(n), TmpPath + FnameInLoop
                 Name TmpPath + FnameInLoop As fname
                 If SheetImport(fname) Then r = LogWrite(FnameInLoop, vbNullString, "Импорт книги закончен")
@@ -207,6 +215,7 @@ Private Sub CopyGromButton_Click()
         r = SheetIndex()
         r = OutEnded()
     End If
+    r = print_functime()
 End Sub
 
 Private Sub dischargeButton_Click()
@@ -223,6 +232,7 @@ End Sub
 
 Private Sub getizdButton_Click()
     r = ManualSpec_NewSubpos()
+    r = print_functime()
 End Sub
 
 Private Sub ManualBatchButton_Click()
@@ -233,10 +243,12 @@ Private Sub ManualBatchButton_Click()
     If UserForm2.vedkzh_CB.Value Then type_out(4) = "_кж"
     If UserForm2.bysybpos_CB.Value Then type_out(5) = "_грс"
     r = ManualSpec_batch(type_out)
+    r = print_functime()
 End Sub
 
 Private Sub MergeManualButton_Click()
     r = ManualSpec_Merge()
+    r = print_functime()
 End Sub
 
 Private Sub ReSortamentButton_Click()
@@ -248,6 +260,7 @@ Private Sub ReSortamentButton_Click()
     Sheets(nm).Visible = False
     r = OutEnded()
     MsgBox ("Сортаменты обновлёны")
+    r = print_functime()
 End Sub
 
 Private Sub use_tmp_CB_Click()
@@ -276,8 +289,10 @@ Private Sub UserForm_Initialize()
     Else
         If use_tmp_CB.Value Then Set materialbook_index = ReadConstr()
         r = INISet()
-        If check_version Then r = CheckVersion()
         FormRebild
+        If check_version Then r = CheckVersion()
+        r = set_sheet(vbNullString)
+        If mem_option Then r = OptionSheetSet(lastfilespec)
     End If
 End Sub
 
@@ -297,11 +312,11 @@ Private Sub CommandButtonAdd2Man_Click()
     r = OutPrepare()
     r = ManualPasteIzd2Sheet(name_izd.Item(lastfileadd))
     r = OutEnded()
+    r = print_functime()
 End Sub
 
 Private Sub CommandButtonAS_Click()
     r = OutPrepare()
-    sNameSheet = lastfilespec
     r = Spec_Select(lastfilespec, vbNullString)
     r = OutEnded()
 End Sub
@@ -311,6 +326,7 @@ Private Sub CommandButtonExport_Click()
     nm = ThisWorkbook.ActiveSheet.Name
     r = ExportSheet(nm)
     r = OutEnded()
+    r = print_functime()
 End Sub
 
 Private Sub CommandButtonGR_Click()
@@ -339,6 +355,7 @@ Private Sub CommandButtonManPrep_Click()
     nm = Application.ThisWorkbook.ActiveSheet.Name
     r = ManualCheck(nm)
     r = OutEnded()
+    r = print_functime()
 End Sub
 
 Private Sub CommandButtonOBSH_Click()
@@ -360,6 +377,7 @@ Private Sub FormatButton_Click()
     sNameSheet = ThisWorkbook.ActiveSheet.Name
     r = FormatTable(sNameSheet)
     r = OutEnded()
+    r = print_functime()
 End Sub
 
 Sub FormRebild()
@@ -367,16 +385,66 @@ Sub FormRebild()
     calc_ver.Caption = macro_version
     com_ver.Caption = common_version
     form_ver.Caption = form_version
-    symb_diam = ChrW(8960)
+    form1_ver.Caption = form1_version
+    symb_diam = ChrW$(8960)
     remat
 End Sub
+
+Function set_sheet(ByVal sheetn As String) As Boolean
+    If Len(sheetn) = 0 Then sheetn = Trim$(ThisWorkbook.ActiveSheet.Name)
+    flag_set = False
+    For i = 0 To UserForm2.ListBoxFileSpec.ListCount - 1
+        If UserForm2.ListBoxFileSpec.Column(0, i) = sheetn Then
+            i = UserForm2.ListBoxFileSpec.ListCount - 1
+            flag_set = True
+        End If
+    Next i
+    sheetn_mun = sheetn
+    If InStr(sheetn, "_") > 0 Then sheetn_mun = Split(sheetn, "_")(0)
+    If flag_set = False Then
+        sheetn_mun_ = sheetn_mun + "_спец"
+        For i = 0 To UserForm2.ListBoxFileSpec.ListCount - 1
+            If UserForm2.ListBoxFileSpec.Column(0, i) = sheetn_mun_ Then
+                i = UserForm2.ListBoxFileSpec.ListCount - 1
+                sheetn = sheetn_mun_
+                flag_set = True
+            End If
+        Next i
+    End If
+    If flag_set = False Then
+        For i = 0 To UserForm2.ListBoxFileSpec.ListCount - 1
+            If InStr(UserForm2.ListBoxFileSpec.Column(0, i), sheetn_mun) > 0 Then
+                i = UserForm2.ListBoxFileSpec.ListCount - 1
+                sheetn = sheetn_mun
+                flag_set = True
+            End If
+        Next i
+    End If
+    set_sheet = False
+    If flag_set = True Then
+        not_same_list = Not (lastfilespec = ListBoxFileSpec.Value)
+        not_same_val = Not (sheetn = ListBoxFileSpec.Value)
+        not_same_sheetn = Not (sheetn = lastfilespec)
+        is_emty_last = (IsEmpty(lastfilespec) Or Len(lastfilespec) = 0)
+        If not_same_list Or not_same_sheetn Or not_same_val Or is_emty_last Then
+            ListBoxFileSpec.Value = sheetn
+            lastfilespec = sheetn
+        End If
+    Else
+        ListBoxFileSpec.Value = lastfilespec
+    End If
+End Function
 
 Private Sub HideButton_Click()
     r = SheetHideAll()
 End Sub
 
 Private Sub ListBoxFileSpec_Click()
-    lastfilespec = ListBoxFileSpec.Value
+    lastfilespec_new = ListBoxFileSpec.Value
+    If lastfilespec <> lastfilespec_new And SpecGetType(lastfilespec_new) > 0 And Len(lastfilespec_new) > 0 And mem_option Then
+        r = OptionSheetSet(lastfilespec_new)
+    End If
+    If Len(lastfilespec_new) > 0 Then lastfilespec = lastfilespec_new
 End Sub
 
 Private Sub ListBoxName_Click()
@@ -419,16 +487,8 @@ Function ReList(ByRef objListBox As Variant, ByRef arr As Variant) As _
     End If
 End Function
 
-Sub remat()
-    If use_tmp_CB.Value Then
-        lastconstrtype = materialbook_index.Item("sheet_list")(1)
-        r = ReList(ListBoxTypeIns, materialbook_index.Item("sheet_list"))
-        lastconstr = materialbook_index.Item(lastconstrtype & "constr")(1)
-        r = ReList(ListBoxNaenIns, materialbook_index.Item(lastconstrtype & "constr"))
-    End If
-    listFile = GetListFile("*.txt")
+Function update_list_spec() As Variant
     Dim listspec: ReDim listspec(1): n_man = 0
-    Dim listadd: ReDim listadd(1): n_add = 0
     listsheet = GetListOfSheet(ThisWorkbook)
     For Each sheet In listsheet
         type_spec = SpecGetType(sheet)
@@ -437,12 +497,8 @@ Sub remat()
             ReDim Preserve listspec(n_man)
             listspec(n_man) = sheet
         End If
-        If type_spec = 9 Then
-            n_add = n_add + 1
-            ReDim Preserve listadd(n_add)
-            listadd(n_add) = sheet
-        End If
     Next
+    listFile = GetListFile("*.txt")
     If Not IsEmpty(listFile) Then
         Dim add_spec(): ReDim add_spec(UBound(listFile, 1)): n_add = 0
         For i = 1 To UBound(listFile, 1)
@@ -452,6 +508,11 @@ Sub remat()
             If tf_name = "Отметки_перемычек" Then flag_add = 0
             If tf_name = "Типы_полов" Then flag_add = 0
             If InStr(tf_name, "_сист") > 0 Then flag_add = 0
+            If InStr(tf_name, "_мат") > 0 Then flag_add = 0
+            If InStr(tf_name, "_поз") > 0 Then flag_add = 0
+            If SheetExist(tf_name + "_спец") Then
+                flag_add = 0
+            End If
             If flag_add = 1 Then
                 type_spec = SpecGetType(tf_name)
                 If type_spec <> 7 And type_spec <> 2 And type_spec <> 3 Then flag_add = 0
@@ -469,6 +530,12 @@ Sub remat()
     End If
     If n_add > 0 Then ReDim Preserve add_spec(n_add)
     listspec = ArrayUniqValColumn(ArrayCombine(listspec, add_spec), 1)
+    If Not IsEmpty(listspec) Then r = ReList(ListBoxFileSpec, listspec)
+    update_list_spec = listspec
+End Function
+
+Function update_list_add() As Variant
+    Dim listadd: ReDim listadd(1): n_add = 0
     Set name_izd = CreateObject("Scripting.Dictionary")
     Dim adress_array: ReDim adress_array(4)
     For Each objWh In ThisWorkbook.Worksheets
@@ -480,7 +547,7 @@ Sub remat()
             For i = 3 To n_izd_row
                 subpos = spec_izd(i, col_man_subpos)
                 pos = spec_izd(i, col_man_pos)
-                If name_izd.exists(subpos) = False And subpos = pos And Len(subpos) > 1 Then
+                If name_izd.Exists(subpos) = False And subpos = pos And Len(subpos) > 1 Then
                     For jj = 1 To 4
                         adress_array(jj) = "=" + objWh.Name + "!" + spec_izd_sheet.Cells(i, jj).Address()
                     Next jj
@@ -489,17 +556,33 @@ Sub remat()
             Next i
         End If
     Next objWh
-    listadd = ArraySort(name_izd.Keys())
-    r = ReList(ListBoxFileSpec, listspec)
+    listadd = ArraySort(name_izd.keys())
+    If Not IsEmpty(listadd) Then r = ReList(ListBoxName, listadd)
+    update_list_add = listadd
+End Function
+
+Sub remat()
+    If use_tmp_CB.Value Then
+        lastconstrtype = materialbook_index.Item("sheet_list")(1)
+        r = ReList(ListBoxTypeIns, materialbook_index.Item("sheet_list"))
+        lastconstr = materialbook_index.Item(lastconstrtype & "constr")(1)
+        r = ReList(ListBoxNaenIns, materialbook_index.Item(lastconstrtype & "constr"))
+    End If
+    listadd = update_list_add()
+    listspec = update_list_spec()
     If Not IsEmpty(listadd) Then
-        r = ReList(ListBoxName, listadd)
-        lastfileadd = listadd(1)
+        If lastfileadd = vbNullString Then lastfileadd = listadd(1)
     Else
         lastfileadd = vbNullString
     End If
-    lastfile = ThisWorkbook.ActiveSheet.Name
-    lastfilespec = ThisWorkbook.ActiveSheet.Name
+    
+    If Len(lastfilespec) > 0 And calc.ArrayHasElement(listspec, lastfilespec) Then
+        ListBoxFileSpec.Value = lastfilespec
+    Else
+        r = set_sheet(vbNullString)
+    End If
 End Sub
+
 
 Private Sub SaveCodeButton_Click()
     r = ExportAllMod()
@@ -526,7 +609,7 @@ Function ReadConstr()
         Set materialbook = GetObject(MaterialPath & "constr.xlsm")
         Set constr_index = CreateObject("Scripting.Dictionary")
         constr_index.comparemode = 1
-        listsheet = GetListOfSheet(materialbook)
+'        listsheet = GetListOfSheet(materialbook)
         constr_index.Item("sheet_list") = listsheet
         Dim constr_list: ReDim constr_list(1)
         Dim tarr: ReDim tarr(1, max_col_man)
@@ -580,4 +663,5 @@ Function ReadConstr()
         r = OutEnded()
     End If
 End Function
+
 

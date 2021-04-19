@@ -2,19 +2,20 @@ Attribute VB_Name = "common"
 Option Compare Text
 Option Base 1
 
-Public Const common_version As String = "3.98"
+Public Const common_version As String = "4.01"
 Public Const Pi As Double = 3.141592653589
 Public ank_data As Variant
 Public Function GetLeghtByID(id As String, table As Range, n_col_id As Long, n_col_l As Long) As Variant
     GetLeghtByID = Сумма_ПоИД(id, table, n_col_id, n_col_l)
 End Function
+'@Description "Суммирует элементов с одинаковым ID из таблицы. Ввод в формате ID, Таблица, Номер столбца ID, Номер столбца суммируемой величины"
 Public Function Сумма_ПоИД(id As String, table As Range, n_col_id As Long, n_col_l As Long) As Variant
 Attribute Сумма_ПоИД.VB_Description = "Суммирует элементов с одинаковым ID из таблицы. Ввод в формате ID, Таблица, Номер столбца ID, Номер столбца суммируемой величины"
     'Сумма значений заданного столбца для заданного ID
     Sum_l = 0
-    id = Trim(id)
+    id = Trim$(id)
     For i = 1 To table.Rows.Count
-        If Trim(table(i, n_col_id)) = id Then
+        If Trim$(table(i, n_col_id)) = id Then
             ll = table(i, n_col_l)
             If IsNumeric(ll) Then Sum_l = Sum_l + ll
         End If
@@ -25,9 +26,9 @@ End Function
 Public Function Макс_ПоИД(id As String, table As Range, n_col_id As Long, n_col_l As Long) As Variant
     'Выбор максимального значения из таблицы по заданному ID (макс. высота стен, макс. площадь и т.д.)
     max_l = 0
-    id = Trim(id)
+    id = Trim$(id)
     For i = 1 To table.Rows.Count
-        If Trim(table(i, n_col_id)) = id Then
+        If Trim$(table(i, n_col_id)) = id Then
             ll = table(i, n_col_l)
             If IsNumeric(ll) Then
                 If ll > max_l Then max_l = ll
@@ -40,9 +41,9 @@ End Function
 Public Function Мин_ПоИД(id As String, table As Range, n_col_id As Long, n_col_l As Long) As Variant
     'Выбор минимального значения из таблицы по заданному ID (мин. высота стен, мин. площадь и т.д.)
     min_l = Макс_ПоИД(id, table, n_col_id, n_col_l)
-    id = Trim(id)
+    id = Trim$(id)
     For i = 1 To table.Rows.Count
-        If Trim(table(i, n_col_id)) = id Then
+        If Trim$(table(i, n_col_id)) = id Then
             ll = table(i, n_col_l)
             If IsNumeric(ll) Then
                 If ll < min_l Then min_l = ll
@@ -132,8 +133,8 @@ Public Function Арм_Анкеровка(ByVal diam As Long, ByVal class As String, ByVal b
         Case "D"
             Арм_Анкеровка = Round((lout / diam), 2) & "d"
     End Select
-    If Not ank_data.exists(class) Then Арм_Анкеровка = "ОШИБКА КЛАССА"
-    If Not ank_data.exists(beton) Then Арм_Анкеровка = "ОШИБКА БЕТОНА"
+    If Not ank_data.Exists(class) Then Арм_Анкеровка = "ОШИБКА КЛАССА"
+    If Not ank_data.Exists(beton) Then Арм_Анкеровка = "ОШИБКА БЕТОНА"
 End Function
 
 Public Function Арм_Округление(ByVal L As Long, Optional ByVal krat As String = "10мм") As Long
