@@ -13,6 +13,7 @@ Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
 Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
+
 Const form1_version As String = "4.01"
 Public form1_sh_name As String
 Private Sub CommandButton1_Click()

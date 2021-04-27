@@ -2,7 +2,7 @@ Attribute VB_Name = "update"
 Option Compare Text
 Option Base 1
 
-Public Const update_version As String = "4.01"
+Public Const update_version As String = "4.02"
 Function CheckVersion()
     If Ping() And check_version Then
         Debug_mode = False
@@ -18,12 +18,12 @@ Function CheckVersion()
         If calc_git > calc_local And Not IsEmpty(calc_local) And Not IsEmpty(calc_git) Then msg_upd = msg_upd & "Загружена новая версия модуля calc -" & CStr(calc_git / 100) & vbNewLine
         
         r = DownloadMod("UserForm2.frx")
-        form_git = DownloadMod("UserForm2" & ".bas")
+        form_git = DownloadMod("UserForm2" & ".frm")
         form_local = ConvTxt2Ver(UserForm2.form_ver.Caption)
         If form_git > form_local And Not IsEmpty(form_local) And Not IsEmpty(form_git) Then msg_upd = msg_upd & "Загружена новая версия формы -" & CStr(form_git / 100) & vbNewLine
         
         r = DownloadMod("UserForm1.frx")
-        form1_git = DownloadMod("UserForm1" & ".bas")
+        form1_git = DownloadMod("UserForm1" & ".frm")
         form1_local = ConvTxt2Ver(UserForm2.form1_ver.Caption)
         If form1_git > form1_local And Not IsEmpty(form1_local) And Not IsEmpty(form1_git) Then msg_upd = msg_upd & "Загружена новая версия формы 2 -" & CStr(form_git / 100) & vbNewLine
 
@@ -73,14 +73,14 @@ Function DownloadMod(ByVal namemod As String) As Variant
         oStream.SaveToFile gitdir & "/" & namemod, 2
         oStream.Close
     End If
-    If InStr(namemod, ".bas") > 0 Or InStr(namemod, ".txt") > 0 Then
+    If InStr(namemod, ".bas") > 0 Or InStr(namemod, ".txt") > 0 Or InStr(namemod, ".frm") > 0 Then
         On Error Resume Next
         Set FSO = CreateObject("scripting.filesystemobject")
         Set ts = FSO.OpenTextFile(gitdir & "/" & namemod, 1, True): txt$ = ts.ReadAll: ts.Close
         Set ts = Nothing: Set FSO = Nothing
         txt = Trim$(txt): Err.Clear
     End If
-    If InStr(namemod, ".bas") > 0 Then
+    If InStr(namemod, ".bas") > 0 Or InStr(namemod, ".frm") > 0 Then
         seach_txt = "version As String ="
         For Each tRows In Split(txt, vbNewLine)
             If InStr(tRows, seach_txt) Then
@@ -106,7 +106,7 @@ Function ExportAllMod() As Boolean
     pathtmp = "old\"
     If Debug_mode Then pathtmp = vbNullString
     r = ExportMod("UserForm2", pathtmp, UserForm2.form_ver.Caption)
-    r = ExportMod("UserForm1", pathtmp, UserForm2.form_ver.Caption)
+    r = ExportMod("UserForm1", pathtmp, UserForm2.form1_ver.Caption)
     r = ExportMod("calc", pathtmp, macro_version)
     r = ExportMod("common", pathtmp, common_version)
     r = ExportMod("update", pathtmp, update_version)
@@ -230,7 +230,10 @@ Function ExportMod(ByVal namemod As String, Optional ByVal pathtmp As String = v
             End If
         End If
         On Error Resume Next
-        ThisWorkbook.VBProject.VBComponents.Item(namemod).Export UserForm2.CodePath & pathtmp & namemod & tdate & ".bas"
+        suffix = ".bas"
+        If InStr(namemod, "form") > 0 Then suffix = ".frm"
+        path = UserForm2.CodePath & pathtmp & namemod & tdate & suffix
+        ThisWorkbook.VBProject.VBComponents.Item(namemod).Export path
 End Function
 
 Function IsModFileEx(ByVal namemod As String, Optional ByVal pathtmp As String = vbNullString) As Boolean
