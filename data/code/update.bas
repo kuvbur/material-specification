@@ -5,7 +5,6 @@ Option Base 1
 Public Const update_version As String = "4.02"
 Function CheckVersion()
     If Ping() And check_version Then
-        Debug_mode = False
         r = ExportAllMod()
         change_log = DownloadMod("changelog" & ".txt")
         msg_upd = vbNullString

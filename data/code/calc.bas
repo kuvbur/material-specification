@@ -1,7 +1,7 @@
 Attribute VB_Name = "calc"
 Option Compare Text
 Option Base 1
-Public Const macro_version As String = "4.02"
+Public Const macro_version As String = "4.03"
 '-------------------------------------------------------
 'Типы элементов (столбец col_type_el)
 Public Const t_arm As Long = 10
@@ -251,6 +251,7 @@ Public check_version As Boolean 'Проверять версию при загрузке
 Public lenght_ed_arm As Long 'Максимальная длина стержня арматуры
 Public hard_round_km As Boolean
 
+Public checktxt_on_load As Boolean 'Проверка текстовых файлов при подгрузке
 Public clear_bet_name As Boolean 'Удаляем пояснения к марке бетона, сдаланные в скобках
 Public zap_only_mp As Boolean 'Запас только для п.м арматуры и материала
 Public functime_data As Variant
@@ -258,6 +259,13 @@ Public log_sheet As Variant
 Public this_sheet_option As Variant 'хранилище значений форм
 Public set_sheet_option As Variant 'хранилище значений листа
 Public spec_type_suffix As Variant
+Public defult_values_ini As Variant 'Значения по умолчанию
+
+
+Function dprint(ByVal msg As String, Optional ByVal type_msg As Integer = 0)
+    If type_msg = 1 Then msg = "ERROR      !!!!! " & msg
+    If Debug_mode Then Debug.Print msg
+End Function
 
 Function functime(ByVal namefunc As String, ByVal tfunctime As Double) As Double
     If IsEmpty(functime_data) Then
@@ -284,144 +292,105 @@ Function print_functime()
             arr(n, 3) = Round(functime_data.Item(varKey)(1), 4)
         Next
         arr = ArraySort(arr, 3)
-        Debug.Print "---------- Общее время -------------"
+        r = dprint("---------- Общее время -------------")
         For i = 1 To n
-            If arr(i, 3) > 0 Then Debug.Print arr(i, 1) & " x " & arr(i, 2) & " - " & arr(i, 3)
+            If arr(i, 3) > 0 Then dprint (arr(i, 1) & " x " & arr(i, 2) & " - " & arr(i, 3))
         Next i
-        Debug.Print "------------------------------------"
+        r = dprint("------------------------------------")
         functime_data.RemoveAll
     Else
-        Debug.Print "Таймеров нет"
+        r = dprint("Таймеров нет")
     End If
 End Function
 
 Function INISet()
     mtype = ModeType()
     If mtype Then Exit Function
+    Set defult_values_ini = CreateObject("Scripting.Dictionary")
+    defult_values_ini.Item("type_okrugl") = 1
+    defult_values_ini.Item("n_round_l") = 2
+    defult_values_ini.Item("n_round_w") = 2
+    defult_values_ini.Item("n_round_wkzh") = 1
+    defult_values_ini.Item("n_round_mat") = 1
+    defult_values_ini.Item("ignore_pos") = "!!"
+    defult_values_ini.Item("subpos_delim") = "'"
+    defult_values_ini.Item("n_round_area") = 1
+    defult_values_ini.Item("hole_in_zone") = False
+    defult_values_ini.Item("isErrorNoFin") = True
+    defult_values_ini.Item("delim_zone_fin") = False
+    defult_values_ini.Item("izd_sheet_name") = "Изделия"
+    defult_values_ini.Item("inx_name") = "|Содержание|"
+    defult_values_ini.Item("mem_option") = True
+    defult_values_ini.Item("inx_on_new") = True
+    defult_values_ini.Item("check_on_active") = True
+    defult_values_ini.Item("def_decode") = False
+    defult_values_ini.Item("Debug_mode") = False
+    defult_values_ini.Item("check_version") = True
+    defult_values_ini.Item("del_dor_perim") = False
+    defult_values_ini.Item("type_perim") = 1
+    defult_values_ini.Item("del_freelen_perim") = False
+    defult_values_ini.Item("add_holes_perim") = False
+    defult_values_ini.Item("show_mat_area") = True
+    defult_values_ini.Item("show_surf_area") = True
+    defult_values_ini.Item("show_perim") = True
+    defult_values_ini.Item("zonenum_pot") = False
+    defult_values_ini.Item("delim_by_sheet") = False
+    defult_values_ini.Item("sum_row_wkzh") = True
+    defult_values_ini.Item("show_bet_wkzh") = False
+    defult_values_ini.Item("delim_group_ved") = False
+    defult_values_ini.Item("show_sum_prim") = True
+    defult_values_ini.Item("lenght_ed_arm") = 11700
+    defult_values_ini.Item("hard_round_km") = True
+    defult_values_ini.Item("ignore_zap_material") = False
+    defult_values_ini.Item("clear_bet_name") = False
+    defult_values_ini.Item("zap_only_mp") = False
+    defult_values_ini.Item("checktxt_on_load") = False
     sIniFile = UserForm2.CodePath & "setting.ini"
     If Not CBool(Len(Dir$(sIniFile))) Then r = Download_Settings()
     If CBool(Len(Dir$(sIniFile))) Then
-        error_ini = vbNullString
         aIniLines = INIReadFile(sIniFile)    'Read the file into memory
-        type_okrugl = INIReadKeyVal("РАСЧЁТЫ", "type_okrugl")
-        n_round_l = INIReadKeyVal("РАСЧЁТЫ", "n_round_l")
-        n_round_w = INIReadKeyVal("РАСЧЁТЫ", "n_round_w")
-        n_round_wkzh = INIReadKeyVal("РАСЧЁТЫ", "n_round_wkzh")
-        n_round_mat = INIReadKeyVal("РАСЧЁТЫ", "n_round_mat")
-        ignore_pos = INIReadKeyVal("РАСЧЁТЫ", "ignore_pos")
-        subpos_delim = INIReadKeyVal("РАСЧЁТЫ", "subpos_delim")
-        n_round_area = INIReadKeyVal("ОТДЕЛКА", "n_round_area")
-        hole_in_zone = INIReadKeyVal("ОТДЕЛКА", "hole_in_zone")
-        isErrorNoFin = INIReadKeyVal("ОТДЕЛКА", "isErrorNoFin")
-        delim_zone_fin = INIReadKeyVal("ОТДЕЛКА", "delim_zone_fin")
-        izd_sheet_name = INIReadKeyVal("ЛИСТЫ", "izd_sheet_name")
-        inx_name = INIReadKeyVal("ЛИСТЫ", "inx_name")
-        mem_option = INIReadKeyVal("ЛИСТЫ", "mem_option")
-        inx_on_new = INIReadKeyVal("ЛИСТЫ", "inx_on_new")
-        check_on_active = INIReadKeyVal("ЛИСТЫ", "check_on_active")
-        def_decode = INIReadKeyVal("ЛИСТЫ", "def_decode")
-        Debug_mode = INIReadKeyVal("DEBUG", "Debug_mode")
-        check_version = INIReadKeyVal("DEBUG", "check_version")
-        del_dor_perim = INIReadKeyVal("ОТДЕЛКА", "del_dor_perim")
-        type_perim = INIReadKeyVal("ОТДЕЛКА", "type_perim")
-        del_freelen_perim = INIReadKeyVal("ОТДЕЛКА", "del_freelen_perim")
-        add_holes_perim = INIReadKeyVal("ОТДЕЛКА", "add_holes_perim")
-        show_mat_area = INIReadKeyVal("ОТДЕЛКА", "show_mat_area")
-        show_surf_area = INIReadKeyVal("ОТДЕЛКА", "show_surf_area")
-        show_perim = INIReadKeyVal("ОТДЕЛКА", "show_perim")
-        zonenum_pot = INIReadKeyVal("ОТДЕЛКА", "zonenum_pot")
-        delim_by_sheet = INIReadKeyVal("ОТДЕЛКА", "delim_by_sheet")
-        sum_row_wkzh = INIReadKeyVal("ЛИСТЫ", "sum_row_wkzh")
-        show_bet_wkzh = INIReadKeyVal("ЛИСТЫ", "show_bet_wkzh")
-        delim_group_ved = INIReadKeyVal("ЛИСТЫ", "delim_group_ved")
-        show_sum_prim = INIReadKeyVal("ЛИСТЫ", "show_sum_prim")
-        lenght_ed_arm = INIReadKeyVal("РАСЧЁТЫ", "lenght_ed_arm")
-        hard_round_km = INIReadKeyVal("РАСЧЁТЫ", "hard_round_km")
-        ignore_zap_material = INIReadKeyVal("РАСЧЁТЫ", "ignore_zap_material")
-        clear_bet_name = INIReadKeyVal("РАСЧЁТЫ", "clear_bet_name")
-        zap_only_mp = INIReadKeyVal("РАСЧЁТЫ", "zap_only_mp")
-        If Len(error_ini) > 1 Then MsgBox error_ini, vbCritical
-        flag = False
     Else
-        flag = True
+        aIniLines = Empty
     End If
-    '-----Значения по умолчанию-----------------------------
-    If IsEmpty(type_okrugl) Or flag Then type_okrugl = 1
-    If IsEmpty(n_round_l) Or flag Then n_round_l = 2
-    If IsEmpty(n_round_w) Or flag Then n_round_w = 2
-    If IsEmpty(n_round_wkzh) Or flag Then n_round_wkzh = 1
-    If IsEmpty(n_round_mat) Or flag Then n_round_mat = 1
-    If IsEmpty(n_round_area) Or flag Then n_round_area = 1
-    If IsEmpty(ignore_pos) Or flag Then ignore_pos = "!!"
-    If IsEmpty(subpos_delim) Or flag Then subpos_delim = "'"
-    If IsEmpty(izd_sheet_name) Or flag Then izd_sheet_name = "Изделия"
-    If IsEmpty(inx_name) Or flag Then inx_name = "|Содержание|"
-    If IsEmpty(isErrorNoFin Or flag) Then isErrorNoFin = True
-    If IsEmpty(hole_in_zone) Or flag Then hole_in_zone = False
-    If IsEmpty(mem_option) Or flag Then mem_option = True
-    If IsEmpty(inx_on_new) Or flag Then inx_on_new = True
-    If IsEmpty(check_on_active) Or flag Then check_on_active = True
-    If IsEmpty(def_decode) Or flag Then def_decode = False
-    If IsEmpty(check_version) Or flag Then check_version = True
-    If IsEmpty(del_dor_perim) Or flag Then del_dor_perim = False
-    If IsEmpty(type_perim) Or flag Then type_perim = 1
-    If IsEmpty(del_freelen_perim) Or flag Then del_freelen_perim = False
-    If IsEmpty(add_holes_perim) Or flag Then add_holes_perim = False
-    If IsEmpty(show_mat_area) Or flag Then show_mat_area = True
-    If IsEmpty(show_surf_area) Or flag Then show_surf_area = True
-    If IsEmpty(show_perim) Or flag Then show_perim = True
-    If IsEmpty(zonenum_pot) Or flag Then zonenum_pot = False
-    If IsEmpty(delim_by_sheet) Or flag Then delim_by_sheet = False
-    If IsEmpty(sum_row_wkzh) Or flag Then sum_row_wkzh = True
-    If IsEmpty(show_bet_wkzh) Or flag Then show_bet_wkzh = False
-    If IsEmpty(delim_group_ved) Or flag Then delim_group_ved = False
-    If IsEmpty(show_sum_prim) Or flag Then show_sum_prim = True
-    If IsEmpty(lenght_ed_arm) Or flag Then lenght_ed_arm = 11700
-    If IsEmpty(hard_round_km) Or flag Then hard_round_km = True
-    If IsEmpty(delim_zone_fin) Or flag Then delim_zone_fin = False
-    If IsEmpty(ignore_zap_material) Or flag Then ignore_zap_material = False
-    If IsEmpty(clear_bet_name) Or flag Then clear_bet_name = False
-    If IsEmpty(zap_only_mp) Or flag Then zap_only_mp = False
-    '----Запись умолчаний, если файл не найден
-    If flag Then
-        t = INIWriteKeyVal("РАСЧЁТЫ", "type_okrugl", type_okrugl)
-        t = INIWriteKeyVal("РАСЧЁТЫ", "n_round_l", n_round_l)
-        t = INIWriteKeyVal("РАСЧЁТЫ", "n_round_w", n_round_w)
-        t = INIWriteKeyVal("РАСЧЁТЫ", "n_round_wkzh", n_round_wkzh)
-        t = INIWriteKeyVal("РАСЧЁТЫ", "ignore_pos", ignore_pos)
-        t = INIWriteKeyVal("РАСЧЁТЫ", "subpos_delim", subpos_delim)
-        t = INIWriteKeyVal("ОТДЕЛКА", "n_round_area", n_round_area)
-        t = INIWriteKeyVal("ОТДЕЛКА", "hole_in_zone", hole_in_zone)
-        t = INIWriteKeyVal("ОТДЕЛКА", "isErrorNoFin", isErrorNoFin)
-        t = INIWriteKeyVal("ЛИСТЫ", "izd_sheet_name", izd_sheet_name)
-        t = INIWriteKeyVal("ЛИСТЫ", "inx_name", inx_name)
-        t = INIWriteKeyVal("ЛИСТЫ", "mem_option", mem_option)
-        t = INIWriteKeyVal("ЛИСТЫ", "inx_on_new", inx_on_new)
-        t = INIWriteKeyVal("ЛИСТЫ", "check_on_active", check_on_active)
-        t = INIWriteKeyVal("ЛИСТЫ", "def_decode", def_decode)
-        t = INIWriteKeyVal("DEBUG", "Debug_mode", False)
-        t = INIWriteKeyVal("DEBUG", "check_version", True)
-        t = INIWriteKeyVal("ОТДЕЛКА", "del_dor_perim", False)
-        t = INIWriteKeyVal("ОТДЕЛКА", "type_perim", 1)
-        t = INIWriteKeyVal("ОТДЕЛКА", "del_freelen_perim", False)
-        t = INIWriteKeyVal("ОТДЕЛКА", "add_holes_perim", False)
-        t = INIWriteKeyVal("ОТДЕЛКА", "show_mat_area", True)
-        t = INIWriteKeyVal("ОТДЕЛКА", "show_surf_area", True)
-        t = INIWriteKeyVal("ОТДЕЛКА", "show_perim", True)
-        t = INIWriteKeyVal("ОТДЕЛКА", "zonenum_pot", False)
-        t = INIWriteKeyVal("ОТДЕЛКА", "delim_by_sheet", False)
-        t = INIWriteKeyVal("ОТДЕЛКА", "delim_zone_fin", False)
-        t = INIWriteKeyVal("ЛИСТЫ", "sum_row_wkzh", True)
-        t = INIWriteKeyVal("ЛИСТЫ", "show_bet_wkzh", True)
-        t = INIWriteKeyVal("ЛИСТЫ", "show_sum_prim", True)
-        t = INIWriteKeyVal("ЛИСТЫ", "delim_group_ved", False)
-        t = INIWriteKeyVal("РАСЧЁТЫ", "lenght_ed_arm", 11700)
-        t = INIWriteKeyVal("РАСЧЁТЫ", "hard_round_km", True)
-        t = INIWriteKeyVal("РАСЧЁТЫ", "ignore_zap_material", False)
-        t = INIWriteKeyVal("РАСЧЁТЫ", "clear_bet_name", False)
-        t = INIWriteKeyVal("РАСЧЁТЫ", "zap_only_mp", False)
-        t = INIWriteKeyVal("РАСЧЁТЫ", "n_round_mat", n_round_mat)
-    End If
+    error_ini = vbNullString
+    type_okrugl = INIReadKeyVal("РАСЧЁТЫ", "type_okrugl")
+    n_round_l = INIReadKeyVal("РАСЧЁТЫ", "n_round_l")
+    n_round_w = INIReadKeyVal("РАСЧЁТЫ", "n_round_w")
+    n_round_wkzh = INIReadKeyVal("РАСЧЁТЫ", "n_round_wkzh")
+    n_round_mat = INIReadKeyVal("РАСЧЁТЫ", "n_round_mat")
+    ignore_pos = INIReadKeyVal("РАСЧЁТЫ", "ignore_pos")
+    subpos_delim = INIReadKeyVal("РАСЧЁТЫ", "subpos_delim")
+    n_round_area = INIReadKeyVal("ОТДЕЛКА", "n_round_area")
+    hole_in_zone = INIReadKeyVal("ОТДЕЛКА", "hole_in_zone")
+    isErrorNoFin = INIReadKeyVal("ОТДЕЛКА", "isErrorNoFin")
+    delim_zone_fin = INIReadKeyVal("ОТДЕЛКА", "delim_zone_fin")
+    izd_sheet_name = INIReadKeyVal("ЛИСТЫ", "izd_sheet_name")
+    inx_name = INIReadKeyVal("ЛИСТЫ", "inx_name")
+    mem_option = INIReadKeyVal("ЛИСТЫ", "mem_option")
+    inx_on_new = INIReadKeyVal("ЛИСТЫ", "inx_on_new")
+    check_on_active = INIReadKeyVal("ЛИСТЫ", "check_on_active")
+    def_decode = INIReadKeyVal("ЛИСТЫ", "def_decode")
+    Debug_mode = INIReadKeyVal("DEBUG", "Debug_mode")
+    check_version = INIReadKeyVal("DEBUG", "check_version")
+    del_dor_perim = INIReadKeyVal("ОТДЕЛКА", "del_dor_perim")
+    type_perim = INIReadKeyVal("ОТДЕЛКА", "type_perim")
+    del_freelen_perim = INIReadKeyVal("ОТДЕЛКА", "del_freelen_perim")
+    add_holes_perim = INIReadKeyVal("ОТДЕЛКА", "add_holes_perim")
+    show_mat_area = INIReadKeyVal("ОТДЕЛКА", "show_mat_area")
+    show_surf_area = INIReadKeyVal("ОТДЕЛКА", "show_surf_area")
+    show_perim = INIReadKeyVal("ОТДЕЛКА", "show_perim")
+    zonenum_pot = INIReadKeyVal("ОТДЕЛКА", "zonenum_pot")
+    delim_by_sheet = INIReadKeyVal("ОТДЕЛКА", "delim_by_sheet")
+    sum_row_wkzh = INIReadKeyVal("ЛИСТЫ", "sum_row_wkzh")
+    show_bet_wkzh = INIReadKeyVal("ЛИСТЫ", "show_bet_wkzh")
+    delim_group_ved = INIReadKeyVal("ЛИСТЫ", "delim_group_ved")
+    show_sum_prim = INIReadKeyVal("ЛИСТЫ", "show_sum_prim")
+    lenght_ed_arm = INIReadKeyVal("РАСЧЁТЫ", "lenght_ed_arm")
+    hard_round_km = INIReadKeyVal("РАСЧЁТЫ", "hard_round_km")
+    ignore_zap_material = INIReadKeyVal("РАСЧЁТЫ", "ignore_zap_material")
+    clear_bet_name = INIReadKeyVal("РАСЧЁТЫ", "clear_bet_name")
+    zap_only_mp = INIReadKeyVal("РАСЧЁТЫ", "zap_only_mp")
+    checktxt_on_load = INIReadKeyVal("ЛИСТЫ", "checktxt_on_load")
     izd_sheet_name = izd_sheet_name + "_спец.И"
     '----Принудительное включение
     delim_by_sheet = True
@@ -468,10 +437,21 @@ Function INISet()
 End Function
 
 Function INIReadKeyVal(ByVal sSection As String, ByVal sKey As String) As Variant
+    If IsEmpty(aIniLines) Then
+        If defult_values_ini.Exists(sKey) Then
+            tval = defult_values_ini.Item(sKey)
+            t = INIWriteKeyVal(sSection, sKey, tval)
+            INIReadKeyVal = tval
+        Else
+            error_ini = error_ini & "Значение по умолчанию не задано " & sKey & vbLf
+            r = dprint(error_ini, 1)
+            INIReadKeyVal = Empty
+        End If
+    End If
     bSectionExists = False
     bKeyExists = False
     tval = Empty
-    For i = 0 To UBound(aIniLines)
+    For i = LBound(aIniLines) To UBound(aIniLines)
         sLine = aIniLines(i)
         If bSectionExists = True And Left$(sLine, 1) = "[" And Right$(sLine, 1) = "]" Then
             Exit For    'Start of a new section
@@ -495,7 +475,15 @@ Function INIReadKeyVal(ByVal sSection As String, ByVal sKey As String) As Varian
             If bSectionExists = False Then error_ini = error_ini & "Не найден раздел " & sSection & vbLf
             If bKeyExists = False Then error_ini = error_ini & "Не найден параметр " & sKey & vbLf
         End If
-        INIReadKeyVal = Empty
+        If defult_values_ini.Exists(sKey) Then
+            tval = defult_values_ini.Item(sKey)
+            t = INIWriteKeyVal(sSection, sKey, tval)
+            INIReadKeyVal = tval
+        Else
+            error_ini = error_ini & "Значение по умолчанию не задано " & sKey & vbLf
+            INIReadKeyVal = Empty
+        End If
+        r = dprint(error_ini, 1)
     Else
         If InStr(tval, "#") > 0 Then tval = Trim$(Split(tval, "#")(0))
         INIReadKeyVal = tval
@@ -507,46 +495,27 @@ Function INIWriteKeyVal(ByVal sSection As String, ByVal sKey As String, ByVal sV
     sIniFileContent = vbNullString
     bSectionExists = False
     bKeyExists = False
-    sIniFileContent = INIReadFile(sIniFile)    'Read the file into memory
-    aIniLines = Split(sIniFileContent, vbCrLf)    'Break the content into individual lines
+    aIniLines = INIReadFile(sIniFile)    'Read the file into memory
     sIniFileContent = vbNullString    'Reset it
-    For i = 0 To UBound(aIniLines)    'Loop through each line
+    sIniFileContent_before = vbNullString
+    sIniFileContent_after = vbNullString
+    For i = LBound(aIniLines) To UBound(aIniLines)    'Loop through each line
         sNewLine = vbNullString
         sLine = Trim$(aIniLines(i))
-        If sLine = "[" & sSection & "]" Then
-            bSectionExists = True
-            bInSection = True
-        End If
-        If bInSection = True Then
-            If sLine <> "[" & sSection & "]" _
-               And Left$(sLine, 1) = "[" And Right$(sLine, 1) = "]" Then
-                'Our section exists, but the key wasn't found, so append it
-                bInSection = False    ' we're switching section
-            End If
-            If Len(sLine) > Len(sKey) Then
-                If Left$(sLine, Len(sKey) + 1) = sKey & "=" Then
-                    sNewLine = sKey & "=" & sValue
-                    bKeyExists = True
-                    bKeyAdded = True
-                End If
-            End If
-        End If
-        If Len(sIniFileContent) > 0 Then sIniFileContent = sIniFileContent & vbCrLf
-        If sNewLine = vbNullString Then
-            sIniFileContent = sIniFileContent & sLine
+        If bSectionExists Then
+            sIniFileContent_after = sIniFileContent_after & sLine & vbCrLf
         Else
-            sIniFileContent = sIniFileContent & sNewLine
+            sIniFileContent_before = sIniFileContent_before & sLine & vbCrLf
         End If
+        If sLine = "[" & sSection & "]" Then bSectionExists = True
     Next i
-    'if not found, add it to the end
-    If bSectionExists = False Then
-        If Len(sIniFileContent) > 0 Then sIniFileContent = sIniFileContent & vbCrLf
-        sIniFileContent = sIniFileContent & "[" & sSection & "]"
+    sNewSection = "[" & sSection & "]" & vbCrLf
+    sNewValue = sKey & "=" & sValue & " # Значение по умолчанию" & vbCrLf
+    If bSectionExists Then
+        sIniFileContent = sIniFileContent_before & sNewValue & sIniFileContent_after
+    Else
+        sIniFileContent = sIniFileContent_before & sNewSection & sNewValue
     End If
-    If bKeyAdded = False Then
-        sIniFileContent = sIniFileContent & vbCrLf & sKey & "=" & sValue
-    End If
-    'Write to the ini file the new content
     r = ExportSaveTXTfile(sIniFile, sIniFileContent)
     Ini_WriteKeyVal = True
 End Function
@@ -1160,7 +1129,7 @@ tfunctime = Timer
     Next
     If n_row_out <> n_row Then
         array_out = array_in
-        Debug.Print "Ошибка сортировки"
+        r = dprint("Ошибка сортировки", 1)
     End If
 ''   при ошибках - вернуть как было
 '    If n_col1 > n_col Or n_col2 > n_col Then
@@ -1882,7 +1851,7 @@ Function DataAddNullSubpos(ByVal array_in As Variant) As Variant
     'TODO переделать под новую систему
     'Если в массиве есть элементы, состоящие в сборках, но маркировки сборок (t_subpos) нет - добавляет строки маркировок сборок
     If IsEmpty(array_in) Then
-        DataAddNullSubpos = Empty
+        DataAddNullSubpos = Array(Empty, Empty)
         Exit Function
     End If
 Dim tfunctime As Double
@@ -1891,6 +1860,10 @@ tfunctime = Timer
     Dim out_subpos
     Set name_subpos = DataNameSubpos(exist_subpos) 'Получим для них имена
     arr_subpos = ArrayUniqValColumn(array_in, col_sub_pos)
+    If IsEmpty(arr_subpos) Then
+        DataAddNullSubpos = Array(Empty, Empty)
+        Exit Function
+    End If
     add_txt = Empty
     For Each current_subpos In arr_subpos
         If current_subpos <> "-" Then
@@ -2054,6 +2027,7 @@ tfunctime = Timer
             End If
             If type_el <> t_arm And type_el <> t_prokat Then array_in(i, col_m_obozn) = CheckGost(array_in(i, col_m_obozn))
             If type_el = t_mat Then
+' TODO дописать в архи деление материалов по типам конструкций
                 obozn = array_in(i, col_m_obozn)
                 type_konstr = GetZoneParam(array_in(i, col_param), "tk")
                 If Not IsEmpty(type_konstr) Then
@@ -2392,7 +2366,8 @@ tfunctime = Timer
         spec_version = 3
     End If
     out_data_mat = Empty
-    If StrComp(nsfile, "Сводная") <> 0 Then out_data_mat = DataReadAutoMat(nsfile)
+    un_subpos = ArrayUniqValColumn(out_data, col_sub_pos)
+    If StrComp(nsfile, "Сводная") <> 0 Then out_data_mat = DataReadAutoMat(nsfile, un_subpos)
     If Not IsEmpty(out_data_mat) Then out_data = ArrayCombine(out_data, out_data_mat)
     If Not IsEmpty(out_data_auto) And isReadFromSheet And StrComp(nsfile, "Сводная") <> 0 Then
         spec_version = DataGetVersion(out_data_auto)
@@ -2441,6 +2416,7 @@ tfunctime = Timer
     floor_txt = "all_floor"
     add_subpos_txt = vbNullString
     add_subpos = DataAddNullSubpos(out_data) 'Добавляем объявления сборок для всех элементов
+    
     add_subpos_txt = add_subpos_txt + ";" + add_subpos(2)
     If Not IsEmpty(add_subpos(1)) Then out_data = ArrayCombine(add_subpos(1), out_data)
     out_data = DataSumByControlSum(out_data) 'Объединяем все позиции с одинаковой контрольной суммой
@@ -5563,7 +5539,7 @@ tfunctime = Timer
 tfunctime = functime("LogWrite", tfunctime)
 End Function
 
-Function DataReadAutoMat(ByVal nm As String) As Variant
+Function DataReadAutoMat(ByVal nm As String, ByRef un_subpos As Variant) As Variant
     '-------------------------------------------------------
     'Описание файла ИК архикада с компонентами
     col_archimat_marka = 1 'Полный ID
@@ -5579,28 +5555,84 @@ Function DataReadAutoMat(ByVal nm As String) As Variant
     col_archimat_floor = 11 'Имя собственного этажа
     max_archimat_acad = 11
     eps_mat = 0.000001
+Dim tfunctime As Double
+tfunctime = Timer
     If InStr(nm, "_") > 0 Then nm = Split(nm, "_")(0)
-    coll = GetListFile(nm + "_мат.txt")
+    nm = LCase(nm)
+    out_data_raw = Empty
+    del_no_subpos = False 'Удалять материалы, для которых не задана сборка
+    'Выберем все файлы с окончанием "_мат"
+    coll = GetListFile("*_мат.txt")
     If IsEmpty(coll) Then
         DataReadAutoMat = Empty
         Exit Function
     End If
-    out_data_raw = Empty
+    
+    ' Сначала поищем по имени листа
     For i = 1 To UBound(coll, 1)
         snm = ThisWorkbook.path & "\import\" & coll(i, 1)
-        If coll(i, 1) = nm + "_мат" Then
+        If LCase(coll(i, 1)) = nm + "_мат" Then
             tdate = FileDateTime(coll(i, 2))
             short_fname = coll(i, 1)
             out_data_sheet = ReadTxt(snm + ".txt", 1, vbTab, vbNewLine, False)
             out_data_raw = ArrayCombine(out_data_raw, out_data_sheet)
         End If
     Next i
+    ' Затем поищем по содержанию имени листа
+    If IsEmpty(out_data_raw) Then
+        del_no_subpos = True
+        nm_ = Trim(nm)
+        For i = 1 To UBound(coll, 1)
+            snm = ThisWorkbook.path & "\import\" & coll(i, 1)
+            If InStr(LCase(coll(i, 1)), nm_) > 0 Then
+                tdate = FileDateTime(coll(i, 2))
+                short_fname = coll(i, 1)
+                out_data_sheet = ReadTxt(snm + ".txt", 1, vbTab, vbNewLine, False)
+                out_data_raw = ArrayCombine(out_data_raw, out_data_sheet)
+            End If
+        Next i
+    End If
+    
+    ' Теперь отрежем цифры в листе и повторим
+    If IsEmpty(out_data_raw) Then
+        For k = 0 To 9
+            nm_ = Replace(nm_, CStr(k), "")
+        Next k
+        For i = 1 To UBound(coll, 1)
+            snm = ThisWorkbook.path & "\import\" & coll(i, 1)
+            If InStr(LCase(coll(i, 1)), nm_) > 0 Then
+                tdate = FileDateTime(coll(i, 2))
+                short_fname = coll(i, 1)
+                out_data_sheet = ReadTxt(snm + ".txt", 1, vbTab, vbNewLine, False)
+                out_data_raw = ArrayCombine(out_data_raw, out_data_sheet)
+            End If
+        Next i
+    End If
+    
+    ' Ну и просто поищем по раздела - АР, КЖ, КМ
+    If IsEmpty(out_data_raw) Then
+        For i = 1 To UBound(coll, 1)
+            snm = ThisWorkbook.path & "\import\" & coll(i, 1)
+            If LCase(coll(i, 1)) = "кж_мат" Or LCase(coll(i, 1)) = "кр_мат" Or LCase(coll(i, 1)) = "ар_мат" Or LCase(coll(i, 1)) = "ас_мат" Then
+                tdate = FileDateTime(coll(i, 2))
+                short_fname = coll(i, 1)
+                out_data_sheet = ReadTxt(snm + ".txt", 1, vbTab, vbNewLine, False)
+                out_data_raw = ArrayCombine(out_data_raw, out_data_sheet)
+            End If
+        Next i
+    End If
+
     If IsEmpty(out_data_raw) Then
         DataReadAutoMat = Empty
         Exit Function
     End If
-Dim tfunctime As Double
-tfunctime = Timer
+    
+    'Поставим все позиуии использованных сборок в нижний регистр
+    If del_no_subpos Then
+        For i = LBound(un_subpos) To UBound(un_subpos)
+            un_subpos(i) = Trim(LCase(un_subpos(i)))
+        Next i
+    End If
     n_row = UBound(out_data_raw, 1)
     Dim out_data: ReDim out_data(n_row, max_col)
     n_row_out = 0
@@ -5626,32 +5658,42 @@ tfunctime = Timer
         End If
     Next i
     For i = 1 To n_row
+        marka = Trim(CStr(out_data_raw(i, col_archimat_marka)))
+        sub_pos = Trim(CStr(out_data_raw(i, col_archimat_sub_pos)))
+        pos = Trim(CStr(out_data_raw(i, col_archimat_pos)))
+        If pos = sub_pos Then pos = ""
+        If pos = "---" Then pos = ""
+        If sub_pos = "---" Then sub_pos = ""
+        If marka = "---" Then marka = ""
+        tfloor = CStr(out_data_raw(i, col_archimat_floor))
+        tarea = ConvTxt2Num(out_data_raw(i, col_archimat_area))
+        tthickness = ConvTxt2Num(out_data_raw(i, col_archimat_thickness))
+        thickness_in_param = 0
+        tvolume = ConvTxt2Num(out_data_raw(i, col_archimat_volume))
+        tnaen = Trim(CStr(out_data_raw(i, col_archimat_naen)))
+        tedizm = Trim(CStr(out_data_raw(i, col_archimat_edizm)))
         flag_add = 1
-        tarea = out_data_raw(i, col_archimat_area)
-        tthickness = out_data_raw(i, col_archimat_thickness)
-        tvolume = out_data_raw(i, col_archimat_volume)
-        tnaen = out_data_raw(i, col_archimat_naen)
-        tedizm = out_data_raw(i, col_archimat_edizm)
-        If Not IsNumeric(tthickness) And thickness_mat.Exists(tnaen) Then
-            tthickness = thickness_mat.Item(tnaen)
-        End If
         kzap_mat = 1
         trate = 0
         trate_edizm = vbNullString
         trate_edizm_raw = vbNullString
         trate_edizm_fist = vbNullString
+        tprim = vbNullString
         edizm = "куб.м."
-        tedizm = Replace(LCase$(tedizm), " ", vbNullString)
-        If InStr(tedizm, "=") > 0 Then
+        If InStr(tedizm, "=") > 0 And flag_add Then
             'Смотрим - что за параметры прилетели
             arr = Split(tedizm, ";")
             For Each tel In arr
                 arr2 = Split(tel, "=")
-                name_param = Replace(arr2(0), ",", vbNullString)
+                tvalue = Trim$(arr2(1))
+                name_param = Trim$(LCase$(arr2(0)))
+                If InStr(name_param, "прим") > 0 Then tprim = tvalue
+                tvalue = Replace(LCase$(tvalue), " ", vbNullString)
+                name_param = Replace(LCase$(name_param), " ", vbNullString)
+                name_param = Replace(name_param, ",", vbNullString)
                 name_param = Replace(name_param, ".", vbNullString)
                 name_param = Replace(name_param, "\", vbNullString)
                 name_param = Replace(name_param, "/", vbNullString)
-                tvalue = arr2(1)
                 If InStr(name_param, "кзап") > 0 Then
                     kzap_mat = ConvTxt2Num(tvalue)
                     If IsNumeric(kzap_mat) Then
@@ -5684,9 +5726,34 @@ tfunctime = Timer
                         End If
                     End If
                 End If
-                kk = 1
+                If InStr(name_param, "t") > 0 Or InStr(name_param, "толщ") > 0 Then
+                    'Толщина нам нужна в мм. По умолчанию, если ничего не задано, предполагаем что это мм.
+                    edizm_thickness_in_param = 1
+                    If InStr(tvalue, "мм") > 0 Then
+                        edizm_thickness_in_param = 1
+                    Else
+                        If InStr(tvalue, "см") > 0 Then
+                            edizm_thickness_in_param = 10
+                        Else
+                            If InStr(tvalue, "м") > 0 Then
+                                edizm_thickness_in_param = 1000
+                            Else
+                                ' Если ничего не подошло
+                                edizm_thickness_in_param = 1
+                            End If
+                        End If
+                    End If
+                    tvalue = Replace(tvalue, "м", vbNullString)
+                    tvalue = Replace(tvalue, "c", vbNullString)
+                    tvalue = ConvTxt2Num(tvalue)
+                    If IsNumeric(tvalue) Then thickness_in_param = tvalue * edizm_thickness_in_param
+                End If
             Next
         End If
+        ' Если тощина не определена - посмотрим что прописано в параметрах материала
+        If Not IsNumeric(tthickness) And thickness_in_param > 0 Then tthickness = thickness_in_param
+        ' Если тощина не определена - попробуем поискать среди встречавшихся ранее слоёв с тем же наименованием
+        If Not IsNumeric(tthickness) And thickness_mat.Exists(tnaen) Then tthickness = thickness_mat.Item(tnaen)
         'Очистим от скверны
         edizm_purge = Replace(edizm, " ", vbNullString)
         edizm_purge = Replace(edizm_purge, ",", vbNullString)
@@ -5743,11 +5810,12 @@ tfunctime = Timer
             tnaen = Replace(tnaen, "/n", " ")
             tnaen = Replace(tnaen, "( ", "(")
             tnaen = Replace(tnaen, " )", ")")
-            tdensity = out_data_raw(i, col_archimat_density)
+            tdensity = CStr(out_data_raw(i, col_archimat_density))
             If InStr(tdensity, "кг") > 0 Then
                 tdensity = ConvTxt2Num(Split(tdensity, "кг")(0))
                 If Not IsNumeric(tdensity) Then tdensity = -1
-                k = 1
+            Else
+                tdensity = -1
             End If
             'Выделяем ГОСТ, ТУ, СТО для графы Обозначение
             obozn = " "
@@ -5843,14 +5911,22 @@ tfunctime = Timer
                     qty = Round_w(trate * tqty * kzap_mat, 0)
                     Weight = tdensity * tvolume
             End Select
+            If Len(tprim) > 0 Then naen = naen + ", " + tprim
         Else
             flag_add = 0
         End If
+        'Если прочитали из файла с именем, отличным от имяни листа - то берём только материалы со сборок, встречающихся на листе.
+        If del_no_subpos Then
+            'Берём только элементы, для которых задана сборка
+            If Len(sub_pos) > 0 Then
+                'Выделяем среди них только элементы, расположенные в использованных на листе сборках
+                is_subpose_use = ArrayHasElement(un_subpos, LCase(sub_pos))
+                If Not is_subpose_use Then flag_add = 0
+            Else
+                flag_add = 0
+            End If
+        End If
         If flag_add = 1 Then
-            marka = out_data_raw(i, col_archimat_marka)
-            sub_pos = out_data_raw(i, col_archimat_sub_pos)
-            pos = out_data_raw(i, col_archimat_pos)
-            tfloor = out_data_raw(i, col_archimat_floor)
             n_row_out = n_row_out + 1
             out_data(n_row_out, col_marka) = marka
             out_data(n_row_out, col_sub_pos) = sub_pos
@@ -5862,6 +5938,9 @@ tfunctime = Timer
             out_data(n_row_out, col_m_obozn) = obozn
             out_data(n_row_out, col_m_naen) = naen
             out_data(n_row_out, col_m_weight) = Weight
+            If Weight > 0 Then
+            hh = 1
+            End If
             out_data(n_row_out, col_m_edizm) = edizm
         End If
     Next i
@@ -6027,8 +6106,8 @@ tfunctime = Timer
     data_arm.comparemode = 1
     n_row_out = 0
     For i = 2 To n_row
-        Handle = out_data_raw(i, col_acad_handle)
-        blockname = out_data_raw(i, col_acad_blockname)
+        Handle = CStr(out_data_raw(i, col_acad_handle))
+        blockname = CStr(out_data_raw(i, col_acad_blockname))
         If InStr(out_data_raw(i, col_acad_pos), "@") Then
             arr_pos = Split(out_data_raw(i, col_acad_pos), "@")
             arr_qty = Split(out_data_raw(i, col_acad_qty), "@")
@@ -6070,8 +6149,8 @@ tfunctime = Timer
                 Else
                     klass = def_klass
                 End If
-                Handle = out_data_raw(i, col_acad_handle) + "_" + CStr(k + 1)
-                blockname = out_data_raw(i, col_acad_blockname) + "_" + CStr(k + 1)
+                Handle = CStr(out_data_raw(i, col_acad_handle)) + "_" + CStr(k + 1)
+                blockname = CStr(out_data_raw(i, col_acad_blockname)) + "_" + CStr(k + 1)
             Else
                 pos = out_data_raw(i, col_acad_pos)
                 qty = out_data_raw(i, col_acad_qty)
@@ -6240,6 +6319,7 @@ Function ManualAddAuto(ByVal nm As String) As Boolean
     data_out.Cells(n_row_end, col_man_naen) = "АВТОКАД_Извлечение данных"
     ManualAddAuto = True
 End Function
+
 Function SheetAddTxt() As Boolean
     coll = GetListFile(nm + ".txt")
     If IsEmpty(coll) Then
@@ -6340,7 +6420,6 @@ Function SheetAddTxt() As Boolean
                             jj = 1
                         Next k
                     Next j
-
                     add_flag = True
                 End If
             End If
@@ -6348,6 +6427,7 @@ Function SheetAddTxt() As Boolean
             r = SheetNew(sheet_name)
             Set Sh = wbk.Sheets(sheet_name)
             Sh.Range(Sh.Cells(1, 1), Sh.Cells(n_row, n_col)) = data_txt
+            If checktxt_on_load Then r = ManualCheck_txt(Sh.Range(Sh.Cells(1, 1), Sh.Cells(n_row, n_col)))
             If add_flag Then
                 For j = 1 To n_row_add
                     For k = n_col + 1 To n_col_sh
@@ -6549,16 +6629,36 @@ Function ManualCheck_txt(ByVal data_out As Range) As Boolean
     spec = data_out
     n_row = UBound(spec, 1)
     n_col = UBound(spec, 2)
+    If n_row < 3 Then Exit Function
     n_col_area = 0
     n_col_volume = 0
     n_col_thicknes = 0
+    
+    koeff_edizm_area = 1
+    koeff_edizm_thicknes = 1000
+    koeff_edizm_volume = 1
     For i = 1 To 3
         For j = 1 To n_col
             If Len(spec(i, j)) > 3 Then
                 tval = Trim$(LCase$(spec(i, j)))
-                If InStr(tval, "толщина") > 0 Then n_col_thicknes = j
-                If InStr(tval, "площадь") > 0 Then n_col_area = j
-                If InStr(tval, "объем") > 0 Or InStr(tval, "объём") > 0 Then n_col_volume = j
+                If InStr(tval, "толщина") > 0 Then
+                    n_col_thicknes = j
+                    If InStr(tval, "мм") > 0 Then
+                        koeff_edizm_thicknes = 1000
+                    Else
+                        If InStr(tval, "cм") > 0 Then
+                            koeff_edizm_thicknes = 100
+                        Else
+                            If InStr(tval, "м") > 0 Then koeff_edizm_thicknes = 1
+                        End If
+                    End If
+                End If
+                If InStr(tval, "площадь") > 0 Then
+                    n_col_area = j
+                End If
+                If InStr(tval, "объем") > 0 Or InStr(tval, "объём") > 0 Then
+                    n_col_volume = j
+                End If
                 If n_col_area > 0 And n_col_volume > 0 And n_col_thicknes > 0 Then
                     i = 3
                     j = n_col
@@ -6566,7 +6666,7 @@ Function ManualCheck_txt(ByVal data_out As Range) As Boolean
             End If
         Next j
     Next i
-    If n_col_area = 0 Or n_col_volume = 0 Or n_col_thicknes = 0 Then Exit Function
+    
     For i = 3 To n_row
         For j = 1 To n_col
             If data_out.Cells(i, j).HasFormula = True Then
@@ -6579,43 +6679,45 @@ Function ManualCheck_txt(ByVal data_out As Range) As Boolean
                 End With
             End If
         Next j
+    Next i
+    If n_col_area = 0 Or n_col_volume = 0 Or n_col_thicknes = 0 Then Exit Function
+    For i = 3 To n_row
         flag = 0
         thicknes = ConvTxt2Num(spec(i, n_col_thicknes))
         volume = ConvTxt2Num(spec(i, n_col_volume))
         area = ConvTxt2Num(spec(i, n_col_area))
+        
         If IsNumeric(thicknes) Then
+            thicknes = thicknes / koeff_edizm_thicknes
             If thicknes <= 0 Then thicknes = vbNullString
         End If
         If IsNumeric(volume) Then
+            volume = volume / koeff_edizm_volume
             If volume <= 0 Then volume = vbNullString
         End If
         If IsNumeric(area) Then
+            area = area / koeff_edizm_area
             If area <= 0 Then area = vbNullString
         End If
         If IsNumeric(thicknes) Then
-            thicknes = thicknes / 1000
             If Not IsNumeric(volume) Or Not IsNumeric(area) Then
-                volume_adress = data_out.Cells(i, n_col_volume).Address()
-                area_adress = data_out.Cells(i, n_col_area).Address()
-                thicknes_adress = "(" + data_out.Cells(i, n_col_thicknes).Address() + "/1000)"
                 If Not IsNumeric(volume) And IsNumeric(area) Then
-                    data_out.Cells(i, n_col_volume).Formula = "=" + area_adress + "*" + thicknes_adress
+                    newval = (area * thicknes) * koeff_edizm_volume
                     flag = n_col_volume
                 End If
                 If Not IsNumeric(area) And IsNumeric(volume) Then
-                    data_out.Cells(i, n_col_area).Formula = "=" + volume_adress + "/" + thicknes_adress
+                    newval = (volume / thicknes) * koeff_edizm_area
                     flag = n_col_area
                 End If
             End If
         Else
             If IsNumeric(volume) Or IsNumeric(area) Then
-                volume_adress = data_out.Cells(i, n_col_volume).Address()
-                area_adress = data_out.Cells(i, n_col_area).Address()
-                data_out.Cells(i, n_col_thicknes).FormulaLocal = "=округлвверх(" & volume_adress & "/" & area_adress & ";3)*1000"
+                newval = (volume / area) * koeff_edizm_thicknes
                 flag = n_col_thicknes
             End If
         End If
         If flag > 0 Then
+            data_out.Cells(i, flag).FormulaLocal = "=" + CStr(newval)
             With data_out.Cells(i, flag).Interior
                 .Pattern = xlSolid
                 .PatternColorIndex = xlAutomatic
@@ -7792,7 +7894,7 @@ End Function
 
 Function Sheet2Dict(ByRef sheet_data As Variant, ByRef objWh As Worksheet) As Long
     nm$ = objWh.Name
-    If mem_option And Left(nm) <> "|" And Left(nm) <> "!" Then
+    If mem_option And Left(nm$, 1) <> "|" And Left(nm$, 1) <> "!" Then
         Set sheet_option_param_tmp = OptionSheetGet(nm)
         If sheet_option_param_tmp.Item("defult") = True Then MsgBox ("Для спецификации " & nm & " не найдены сохранённые параметры. Можно задать их  при ручнов выводе или на листе с содержанием.")
         Set this_sheet_option = sheet_option_param_tmp
@@ -7801,7 +7903,8 @@ Function Sheet2Dict(ByRef sheet_data As Variant, ByRef objWh As Worksheet) As Lo
     If (type_spec = 7 Or type_spec = 15) And StrComp(nm$, "Сводная_спец") <> 0 Then
         n_row = SheetGetSize(objWh)(1)
         sheet_data.Item(nm$) = objWh.Range(objWh.Cells(3, 1), objWh.Cells(n_row, max_col_man))
-        out_mat = DataReadAutoMat(nm$)
+        un_subpos = ArrayUniqValColumn(ReadPos(nm$), col_sub_pos)
+        out_mat = DataReadAutoMat(nm$, un_subpos)
         n_mat = 0
         If Not IsEmpty(out_mat) Then
             n_mat = UBound(out_mat, 1) + 1
@@ -8094,6 +8197,7 @@ tfunctime = functime("ReadMetall", tfunctime)
 End Function
 
 Function ReadPos(ByVal lastfileadd As String) As Variant
+    r = SetWorkbook()
     Set add_sheet = wbk.Sheets(lastfileadd)
     sheet_size = SheetGetSize(add_sheet)
     istart = 2

@@ -2,7 +2,7 @@
 *.zip
 *.bak
 *.dwl
-
+desktop.ini
 ~$*.*
 data/code/old/*
 
