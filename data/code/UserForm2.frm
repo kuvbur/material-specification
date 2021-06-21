@@ -17,7 +17,7 @@ Attribute VB_Exposed = False
 Option Compare Text
 Option Base 1
 
-Const form_version As String = "4.02"
+Const form_version As String = "4.03"
 Const form1_version As String = "4.01"
 Public CodePath, MaterialPath, SortamentPath As String
 Public lastsheet, lastconstrtype, lastconstr, lastfile, lastfilespec, lastfileadd, materialbook_index, name_izd As Variant
@@ -527,8 +527,11 @@ Function update_list_spec() As Variant
             End If
         Next i
     End If
-    If n_add > 0 Then ReDim Preserve add_spec(n_add)
-    listspec = ArrayUniqValColumn(ArrayCombine(listspec, add_spec), 1)
+    If n_add > 0 Then
+        ReDim Preserve add_spec(n_add)
+        listspec = ArrayCombine(listspec, add_spec)
+    End If
+    listspec = ArrayUniqValColumn(listspec, 1)
     If Not IsEmpty(listspec) Then r = ReList(ListBoxFileSpec, listspec)
     update_list_spec = listspec
 End Function

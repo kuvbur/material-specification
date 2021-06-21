@@ -3152,7 +3152,7 @@ tfunctime = Timer
         data_out.FormatConditions(1).Font.Bold = True
     Next
     
-    arr_underline = type_el_name.Items
+    arr_underline = type_el_name.items
     For Each txt In arr_underline
         data_out.FormatConditions.Add Type:=xlTextString, String:=txt, TextOperator:=xlContains
         data_out.FormatConditions(data_out.FormatConditions.Count).SetFirstPriority
@@ -3674,7 +3674,7 @@ Function FormatSpec_AS(ByVal data_out As Range, ByVal n_row As Long, ByVal n_col
             End If
             data_out.Range(data_out.Cells(i, 1), data_out.Cells(i, n_qty)).Merge
         End If
-        If IsNumeric(Application.Match(data_out.Cells(i, n_naen), type_el_name.Items, 0)) Then
+        If IsNumeric(Application.Match(data_out.Cells(i, n_naen), type_el_name.items, 0)) Then
             data_out.Cells(i, 1).Value = data_out.Cells(i, n_naen).Value
             data_out.Range(data_out.Cells(i, 1), data_out.Cells(i, n_qty)).Merge
         End If
@@ -3698,7 +3698,7 @@ Function FormatSpec_AS(ByVal data_out As Range, ByVal n_row As Long, ByVal n_col
     dblPoints = Application.CentimetersToPoints(1)
     r = FormatFont(data_out.Range(data_out.Cells(start_row, 1), data_out.Cells(n_row, n_col)), n_row, n_col)
     For i = start_row + 1 To n_row
-        If Not IsNumeric(Application.Match(data_out.Cells(i, 1), type_el_name.Items, 0)) Then
+        If Not IsNumeric(Application.Match(data_out.Cells(i, 1), type_el_name.items, 0)) Then
             If data_out.Range(data_out.Cells(i, 1), data_out.Cells(i, n_qty)).MergeCells Then
                 data_out.Range(data_out.Cells(i, 1), data_out.Cells(i, n_qty)).Font.Bold = True
             End If
@@ -3747,14 +3747,14 @@ Function FormatSpec_ASGR(ByVal data_out As Range, ByVal n_row As Long, ByVal n_c
             tcval = Trim$(tcval)
             If Len(tcval) > 0 Then flag = 0
         Next j
-        If IsNumeric(Application.Match(Cells(i, 3), type_el_name.Items, 0)) Then
+        If IsNumeric(Application.Match(Cells(i, 3), type_el_name.items, 0)) Then
             Cells(i, 1).Value = Cells(i, 3).Value
             Range(Cells(i, 1), Cells(i, 3)).Merge
             flag = 0
         End If
         If flag = 1 Then
             Range(data_out.Cells(i, 1), Cells(i, n_col)).Merge
-            If Not (IsNumeric(Application.Match(Cells(i, 1), type_el_name.Items, 0))) Then Range(data_out.Cells(i, 1), Cells(i, n_col)).Font.Bold = True
+            If Not (IsNumeric(Application.Match(Cells(i, 1), type_el_name.items, 0))) Then Range(data_out.Cells(i, 1), Cells(i, n_col)).Font.Bold = True
         End If
     Next i
     For i = 1 To 3
@@ -10726,11 +10726,11 @@ Function Spec_AS(ByRef all_data As Variant, ByVal type_spec As Long) As Variant
                         pos_out(i, end_col) = Trim$(ConvNum2Txt(Round_w(pos_out(i, end_col), n_round_w)) & " êã.")
                         If Left$(pos_out(i, end_col), 1) = "." Then pos_out(i, end_col) = "0" + pos_out(i, end_col)
                     Else
-                        If Not (IsNumeric(Application.Match(pos_out(i, 3), type_el_name.Items, 0))) Then pos_out(i, end_col) = "'"
+                        If Not (IsNumeric(Application.Match(pos_out(i, 3), type_el_name.items, 0))) Then pos_out(i, end_col) = "'"
                     End If
                 End If
                 For kk = 4 To end_col
-                    If (Len(pos_out(i, kk)) = 0 Or pos_out(i, kk) = " " Or pos_out(i, kk) = 0) And Not (IsNumeric(Application.Match(pos_out(i, 3), type_el_name.Items, 0))) Then pos_out(i, kk) = "-"
+                    If (Len(pos_out(i, kk)) = 0 Or pos_out(i, kk) = " " Or pos_out(i, kk) = 0) And Not (IsNumeric(Application.Match(pos_out(i, 3), type_el_name.items, 0))) Then pos_out(i, kk) = "-"
                 Next kk
             End If
             If InStr(pos_out(i, 1), fin_str) > 0 Then

@@ -2,38 +2,55 @@ Attribute VB_Name = "update"
 Option Compare Text
 Option Base 1
 
-Public Const update_version As String = "4.02"
-Function CheckVersion()
-    If Ping() And check_version Then
-        r = ExportAllMod()
-        change_log = DownloadMod("changelog" & ".txt")
-        msg_upd = vbNullString
-        common_git = DownloadMod("common" & ".bas")
-        common_local = ConvTxt2Ver(common_version)
-        If common_git > common_local And Not IsEmpty(common_local) And Not IsEmpty(common_git) Then msg_upd = msg_upd & "Загружена новая версия модуля common -" & CStr(common_git / 100) & vbNewLine
-        
-        calc_git = DownloadMod("calc" & ".bas")
-        calc_local = ConvTxt2Ver(macro_version)
-        If calc_git > calc_local And Not IsEmpty(calc_local) And Not IsEmpty(calc_git) Then msg_upd = msg_upd & "Загружена новая версия модуля calc -" & CStr(calc_git / 100) & vbNewLine
-        
-        r = DownloadMod("UserForm2.frx")
-        form_git = DownloadMod("UserForm2" & ".frm")
-        form_local = ConvTxt2Ver(UserForm2.form_ver.Caption)
-        If form_git > form_local And Not IsEmpty(form_local) And Not IsEmpty(form_git) Then msg_upd = msg_upd & "Загружена новая версия формы -" & CStr(form_git / 100) & vbNewLine
-        
-        r = DownloadMod("UserForm1.frx")
-        form1_git = DownloadMod("UserForm1" & ".frm")
-        form1_local = ConvTxt2Ver(UserForm2.form1_ver.Caption)
-        If form1_git > form1_local And Not IsEmpty(form1_local) And Not IsEmpty(form1_git) Then msg_upd = msg_upd & "Загружена новая версия формы 2 -" & CStr(form_git / 100) & vbNewLine
+Public Const update_version As String = "4.03"
 
-        update_git = DownloadMod("update" & ".bas")
-        update_local = ConvTxt2Ver(update_version)
-        If update_git > update_local And Not IsEmpty(update_local) And Not IsEmpty(update_git) Then msg_upd = msg_upd & "Загружена новая версия модуля update -" & CStr(update_git / 100) & vbNewLine
-        If Len(msg_upd) > 1 Then
-            msg_upd = msg_upd & vbNewLine & change_log & vbNewLine & "Открыть справку с инструкцией?"
-            intMessage = MsgBox(msg_upd, vbYesNo, "Доступно обновление")
-            Set objShell = CreateObject("Wscript.Shell")
-            If intMessage = vbYes Then objShell.Run ("https://docs.google.com/document/d/1bedvuS3quC37ivwVWzWDyfZSt_zxFPhGAQAQ38g3Ubo/edit#bookmark=id.5awyi0cjwmrs")
+Public code_path As String
+Public sortament_path As String
+Public material_path As String
+
+Function CheckVersion()
+    r = set_path()
+    If Not check_version Then check_version = read_ini_param("check_version")
+    If Not Debug_mode Then Debug_mode = read_ini_param("Debug_mode")
+    If InStr(code_path, "material-specification") <= 0 Then Debug_mode = False
+    If Ping() And check_version Then
+        If Download_Code() Then
+            change_log = DownloadMod("changelog" & ".txt")
+            common_local = 0
+            calc_local = 0
+            form1_local = 0
+            form_local = 0
+            update_local = 0
+            
+            msg_upd = vbNullString
+            common_git = DownloadMod("common" & ".bas")
+            If IsModEx("common") Then common_local = ConvTxt2Ver(common_version)
+            If common_git > common_local And Not IsEmpty(common_local) And Not IsEmpty(common_git) Then msg_upd = msg_upd & "Загружена новая версия модуля common -" & CStr(common_git / 100) & vbNewLine
+
+            calc_git = DownloadMod("calc" & ".bas")
+            If IsModEx("calc") Then calc_local = ConvTxt2Ver(macro_version)
+            If calc_git > calc_local And Not IsEmpty(calc_local) And Not IsEmpty(calc_git) Then msg_upd = msg_upd & "Загружена новая версия модуля calc -" & CStr(calc_git / 100) & vbNewLine
+            
+            r = DownloadMod("UserForm2.frx")
+            form_git = DownloadMod("UserForm2" & ".frm")
+            If IsModEx("UserForm2") Then form_local = ConvTxt2Ver(UserForm2.form_ver.Caption)
+            If form_git > form_local And Not IsEmpty(form_local) And Not IsEmpty(form_git) Then msg_upd = msg_upd & "Загружена новая версия формы -" & CStr(form_git / 100) & vbNewLine
+            
+            r = DownloadMod("UserForm1.frx")
+            form1_git = DownloadMod("UserForm1" & ".frm")
+            If IsModEx("UserForm2") And IsModEx("UserForm1") Then form1_local = ConvTxt2Ver(UserForm2.form1_ver.Caption)
+            If form1_git > form1_local And Not IsEmpty(form1_local) And Not IsEmpty(form1_git) Then msg_upd = msg_upd & "Загружена новая версия формы 2 -" & CStr(form_git / 100) & vbNewLine
+    
+            update_git = DownloadMod("update" & ".bas")
+            update_local = ConvTxt2Ver(update_version)
+            If update_git > update_local And Not IsEmpty(update_local) And Not IsEmpty(update_git) Then msg_upd = msg_upd & "Загружена новая версия модуля update -" & CStr(update_git / 100) & vbNewLine
+            If Len(msg_upd) > 1 Then
+                r = ExportAllMod()
+                msg_upd = msg_upd & vbNewLine & change_log & vbNewLine & "Открыть справку с инструкцией?"
+                intMessage = MsgBox(msg_upd, vbYesNo, "Доступно обновление")
+                Set objShell = CreateObject("Wscript.Shell")
+                If intMessage = vbYes Then objShell.Run ("https://docs.google.com/document/d/1bedvuS3quC37ivwVWzWDyfZSt_zxFPhGAQAQ38g3Ubo/edit#bookmark=id.5awyi0cjwmrs")
+            End If
         End If
     End If
 End Function
@@ -51,27 +68,45 @@ Function Ping() As Boolean
     Next
 End Function
 
+Function set_path() As Boolean
+    If IsModEx("UserForm2") Then
+        code_path = UserForm2.CodePath
+        sortament_path = UserForm2.SortamentPath
+        material_path = UserForm2.MaterialPath
+    Else
+        code_path = ThisWorkbook.path & "\data\code\"
+        sortament_path = ThisWorkbook.path & "\data\sort\"
+        material_path = ThisWorkbook.path & "\data\mat\"
+    End If
+End Function
+
+Function read_ini_param(ByVal paramname As String) As Boolean
+    sIniFile = code_path & "setting.ini"
+    If Not CBool(Len(Dir$(sIniFile))) Then r = Download_Settings()
+    If CBool(Len(Dir$(sIniFile))) Then
+        On Error Resume Next
+        Set FSO = CreateObject("scripting.filesystemobject")
+        Set ts = FSO.OpenTextFile(sIniFile, 1, True): txt$ = ts.ReadAll: ts.Close
+        Set ts = Nothing: Set FSO = Nothing
+        txt = Trim$(txt): Err.Clear
+        If InStr(txt, paramname) Then
+            k = Split(txt, paramname)(1)
+            k = Split(k, vbNewLine)(0)
+            If InStr(k, "#") > 0 Then k = Split(k, "#")(0)
+            k = Trim(LCase(k))
+            If InStr(k, "true") > 0 Then
+                read_ini_param = True
+            Else
+                read_ini_param = False
+            End If
+        End If
+    Else
+        read_ini_param = False
+    End If
+End Function
+
 Function DownloadMod(ByVal namemod As String) As Variant
-    Dim gitdir As String
-    gitdir = UserForm2.CodePath & "from_git"
-    If Not CreateObject("Scripting.FileSystemObject").FolderExists(gitdir) Then
-        MkDir (gitdir)
-    End If
-    Dim myURL As String
-    myURL = "https://raw.githubusercontent.com/kuvbur/material-specification/master/data/code/" & namemod
-    Dim WinHttpReq As Object
-    Set WinHttpReq = CreateObject("Microsoft.XMLHTTP")
-    WinHttpReq.Open "GET", myURL, False
-    WinHttpReq.send
-    myURL = WinHttpReq.responseBody
-    If WinHttpReq.Status = 200 Then
-        Set oStream = CreateObject("ADODB.Stream")
-        oStream.Open
-        oStream.Type = 1
-        oStream.Write WinHttpReq.responseBody
-        oStream.SaveToFile gitdir & "/" & namemod, 2
-        oStream.Close
-    End If
+    gitdir = code_path & "from_git"
     If InStr(namemod, ".bas") > 0 Or InStr(namemod, ".txt") > 0 Or InStr(namemod, ".frm") > 0 Then
         On Error Resume Next
         Set FSO = CreateObject("scripting.filesystemobject")
@@ -99,16 +134,13 @@ Function DownloadMod(ByVal namemod As String) As Variant
 End Function
 
 Function ExportAllMod() As Boolean
-    If Not CreateObject("Scripting.FileSystemObject").FolderExists(UserForm2.CodePath) Then
-        MkDir (UserForm2.CodePath)
-    End If
     pathtmp = "old\"
     If Debug_mode Then pathtmp = vbNullString
-    r = ExportMod("UserForm2", pathtmp, UserForm2.form_ver.Caption)
-    r = ExportMod("UserForm1", pathtmp, UserForm2.form1_ver.Caption)
-    r = ExportMod("calc", pathtmp, macro_version)
-    r = ExportMod("common", pathtmp, common_version)
-    r = ExportMod("update", pathtmp, update_version)
+    If IsModEx("UserForm2") Then r = ExportMod("UserForm2", pathtmp, UserForm2.form_ver.Caption)
+    If IsModEx("UserForm1") And IsModEx("UserForm2") Then r = ExportMod("UserForm1", pathtmp, UserForm2.form1_ver.Caption)
+    If IsModEx("calc") Then r = ExportMod("calc", pathtmp, macro_version)
+    If IsModEx("common") Then r = ExportMod("common", pathtmp, common_version)
+    If IsModEx("update") Then r = ExportMod("update", pathtmp, update_version)
 End Function
 
 Function NameAllMod() As Boolean
@@ -123,9 +155,10 @@ Function NameAllMod() As Boolean
 End Function
 
 Function ModeType() As Boolean
-    ismat = CreateObject("Scripting.FileSystemObject").FolderExists(UserForm2.MaterialPath)
-    issort = CreateObject("Scripting.FileSystemObject").FolderExists(UserForm2.SortamentPath)
-    iscode = CreateObject("Scripting.FileSystemObject").FolderExists(UserForm2.CodePath)
+    r = set_path()
+    ismat = CreateObject("Scripting.FileSystemObject").FolderExists(material_path)
+    issort = CreateObject("Scripting.FileSystemObject").FolderExists(sortament_path)
+    iscode = CreateObject("Scripting.FileSystemObject").FolderExists(code_path)
     If ismat And issort And iscode Then
         read_only_mode = False
     Else
@@ -135,6 +168,7 @@ Function ModeType() As Boolean
 End Function
 
 Function Download_Sortament() As Boolean
+    r = set_path()
     myURL = "https://raw.githubusercontent.com/kuvbur/material-specification/master/data/sort.zip"
     Dim WinHttpReq As Object
     Set WinHttpReq = CreateObject("Microsoft.XMLHTTP")
@@ -145,8 +179,8 @@ Function Download_Sortament() As Boolean
         If Not CreateObject("Scripting.FileSystemObject").FolderExists(ThisWorkbook.path & "\data") Then
             MkDir (ThisWorkbook.path & "\data")
         End If
-        If Not CreateObject("Scripting.FileSystemObject").FolderExists(UserForm2.SortamentPath) Then
-            MkDir (UserForm2.SortamentPath)
+        If Not CreateObject("Scripting.FileSystemObject").FolderExists(sortament_path) Then
+            MkDir (sortament_path)
         End If
         Set oStream = CreateObject("ADODB.Stream")
         oStream.Open
@@ -155,12 +189,64 @@ Function Download_Sortament() As Boolean
         oStream.SaveToFile ThisWorkbook.path & "\data\sort.zip", 2
         oStream.Close
         Set oApp = CreateObject("Shell.Application")
-        For Each it In oApp.Namespace(ThisWorkbook.path & "\data\sort.zip").Items: DoEvents: DoEvents: Next
-        oApp.Namespace(ThisWorkbook.path & "\data").CopyHere oApp.Namespace(ThisWorkbook.path & "\data\sort.zip").Items
+        For Each it In oApp.Namespace(ThisWorkbook.path & "\data\sort.zip").items: DoEvents: DoEvents: Next
+        oApp.Namespace(ThisWorkbook.path & "\data").CopyHere oApp.Namespace(ThisWorkbook.path & "\data\sort.zip").items
         Download_Sortament = True
     Else
         Download_Sortament = False
     End If
+End Function
+
+Function Download_Code() As Boolean
+    If Not CreateObject("Scripting.FileSystemObject").FolderExists(ThisWorkbook.path & "\data") Then
+        On Error Resume Next
+        MkDir (ThisWorkbook.path & "\data")
+    End If
+    If Not CreateObject("Scripting.FileSystemObject").FolderExists(code_path) Then
+        On Error Resume Next
+        MkDir (code_path)
+    End If
+    If Not CreateObject("Scripting.FileSystemObject").FolderExists(code_path & "\from_git") Then
+        On Error Resume Next
+        MkDir (code_path & "\from_git")
+    End If
+    code_filepath = ThisWorkbook.path & "\data\code"
+    myURL = "https://raw.githubusercontent.com/kuvbur/material-specification/master/data/code/from_git.zip"
+    Dim WinHttpReq As Object
+    Set WinHttpReq = CreateObject("Microsoft.XMLHTTP")
+    WinHttpReq.Open "GET", myURL, False
+    WinHttpReq.send
+    myURL = WinHttpReq.responseBody
+    If WinHttpReq.Status = 200 Then
+        r = Delete_file(code_filepath & "\from_git.zip")
+        r = Delete_file(code_filepath & "\from_git" & "\calc.bas")
+        r = Delete_file(code_filepath & "\from_git" & "\update.bas")
+        r = Delete_file(code_filepath & "\from_git" & "\common.bas")
+        r = Delete_file(code_filepath & "\from_git" & "\changelog.txt")
+        r = Delete_file(code_filepath & "\from_git" & "\UserForm1.frm")
+        r = Delete_file(code_filepath & "\from_git" & "\UserForm1.frx")
+        r = Delete_file(code_filepath & "\from_git" & "\UserForm1.bas")
+        r = Delete_file(code_filepath & "\from_git" & "\UserForm2.frm")
+        r = Delete_file(code_filepath & "\from_git" & "\UserForm2.frx")
+        r = Delete_file(code_filepath & "\from_git" & "\UserForm2.bas")
+        Set oStream = CreateObject("ADODB.Stream")
+        oStream.Open
+        oStream.Type = 1
+        oStream.Write WinHttpReq.responseBody
+        oStream.SaveToFile code_filepath & "\from_git.zip", 2
+        oStream.Close
+        Set oApp = CreateObject("Shell.Application")
+        For Each it In oApp.Namespace(code_filepath & "\from_git.zip").items: DoEvents: DoEvents: Next
+        oApp.Namespace(code_filepath & "\from_git").CopyHere oApp.Namespace(code_filepath & "\from_git.zip").items
+        Download_Code = True
+    Else
+        Download_Code = False
+    End If
+End Function
+
+Function Delete_file(ByVal filepath As String) As Boolean
+    On Error Resume Next
+    If Dir(filepath) <> "" Then Kill filepath
 End Function
 
 Function Download_Settings() As Boolean
@@ -173,8 +259,8 @@ Function Download_Settings() As Boolean
         If Not CreateObject("Scripting.FileSystemObject").FolderExists(ThisWorkbook.path & "\data") Then
             MkDir (ThisWorkbook.path & "\data")
         End If
-        If Not CreateObject("Scripting.FileSystemObject").FolderExists(UserForm2.CodePath) Then
-            MkDir (UserForm2.CodePath)
+        If Not CreateObject("Scripting.FileSystemObject").FolderExists(code_path) Then
+            MkDir (code_path)
         End If
         Set oStream = CreateObject("ADODB.Stream")
         oStream.Open
@@ -189,6 +275,7 @@ Function Download_Settings() As Boolean
 End Function
 
 Function CreateFolders() As Boolean
+    r = set_path()
     If Not CreateObject("Scripting.FileSystemObject").FolderExists(ThisWorkbook.path & "\import") Then
         On Error Resume Next
         MkDir (ThisWorkbook.path & "\import")
@@ -201,17 +288,17 @@ Function CreateFolders() As Boolean
         On Error Resume Next
         MkDir (ThisWorkbook.path & "\data")
     End If
-    If Not CreateObject("Scripting.FileSystemObject").FolderExists(UserForm2.CodePath) Then
+    If Not CreateObject("Scripting.FileSystemObject").FolderExists(code_path) Then
         On Error Resume Next
-        MkDir (UserForm2.CodePath)
+        MkDir (code_path)
     End If
-    If Not CreateObject("Scripting.FileSystemObject").FolderExists(UserForm2.SortamentPath) Then
+    If Not CreateObject("Scripting.FileSystemObject").FolderExists(sortament_path) Then
         On Error Resume Next
-        MkDir (UserForm2.SortamentPath)
+        MkDir (sortament_path)
     End If
-    If Not CreateObject("Scripting.FileSystemObject").FolderExists(UserForm2.MaterialPath) Then
+    If Not CreateObject("Scripting.FileSystemObject").FolderExists(material_path) Then
         On Error Resume Next
-        MkDir (UserForm2.MaterialPath)
+        MkDir (material_path)
     End If
     If Download_Sortament() And Download_Settings() Then
         CreateFolders = True
@@ -224,20 +311,20 @@ Function ExportMod(ByVal namemod As String, Optional ByVal pathtmp As String = v
         tdate = vbNullString
         If pathtmp = "old\" Then
             tdate = "_" & CStr(in_ver) & "_" & Replace(Right$(str(DatePart("yyyy", Now)), 2) & str(DatePart("m", Now)) & str(DatePart("d", Now)), " ", vbNullString)
-            If Not CreateObject("Scripting.FileSystemObject").FolderExists(UserForm2.CodePath & pathtmp) Then
-                MkDir (UserForm2.CodePath & pathtmp)
+            If Not CreateObject("Scripting.FileSystemObject").FolderExists(code_path & pathtmp) Then
+                MkDir (code_path & pathtmp)
             End If
         End If
         On Error Resume Next
         suffix = ".bas"
         If InStr(namemod, "form") > 0 Then suffix = ".frm"
-        path = UserForm2.CodePath & pathtmp & namemod & tdate & suffix
+        path = code_path & pathtmp & namemod & tdate & suffix
         ThisWorkbook.VBProject.VBComponents.Item(namemod).Export path
 End Function
 
 Function IsModFileEx(ByVal namemod As String, Optional ByVal pathtmp As String = vbNullString) As Boolean
     On Error Resume Next
-    IsModFileEx = CBool(Len(Dir$(UserForm2.CodePath & pathtmp & namemod & ".bas")))
+    IsModFileEx = CBool(Len(Dir$(code_path & pathtmp & namemod & ".bas")))
 End Function
 
 Function IsModEx(ByVal namemod As String) As Boolean
