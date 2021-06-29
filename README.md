@@ -28,3 +28,4 @@
 * [Справка](https://docs.google.com/document/d/1bedvuS3quC37ivwVWzWDyfZSt_zxFPhGAQAQ38g3Ubo/edit?usp=sharing) - GoogleDoc, можно комментировать
 * [Youtube](https://www.youtube.com/c/kuvbur) - Канал с примерами использования
 * [Блог](http://kuvbur.blogspot.com) - Описание обновлений, ссылки на библиотеки
+* [Чат в Телеграмм] (https://t.me/archicad_excel) - Чат с оповещениями и оперативной помощью
