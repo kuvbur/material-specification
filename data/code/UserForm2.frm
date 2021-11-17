@@ -507,7 +507,7 @@ Function update_list_spec() As Variant
             If tf_name = "Отметки_перемычек" Then flag_add = 0
             If tf_name = "Типы_полов" Then flag_add = 0
             If InStr(tf_name, "_сист") > 0 Then flag_add = 0
-            If InStr(tf_name, "_мат") > 0 Then flag_add = 0
+            'If InStr(tf_name, "_мат") > 0 Then flag_add = 0
             If InStr(tf_name, "_поз") > 0 Then flag_add = 0
             If SheetExist(tf_name + "_спец") Then
                 flag_add = 0

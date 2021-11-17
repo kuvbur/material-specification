@@ -2,13 +2,69 @@ Attribute VB_Name = "update"
 Option Compare Text
 Option Base 1
 
-Public Const update_version As String = "4.03"
+Public Const update_version As String = "4.04"
 
 Public code_path As String
 Public sortament_path As String
 Public material_path As String
 
+Sub УдалитьКод()
+    intMessage = MsgBox("Удалить код?", vbYesNo, "Удалить код?")
+    If intMessage = vbYes Then
+        msg_upd = DeleteMod("common") & DeleteMod("calc") & DeleteMod("UserForm2") & DeleteMod("UserForm1")
+        If Len(msg_upd) < 1 Then
+            msg_upd = "Удаление не удалось (или удалять нечего). Попробуйте вручную."
+        Else
+            msg_upd = msg_upd + vbNewLine + "Теперь выберите ЗагрузитьКод"
+        End If
+        MsgBox (msg_upd)
+    End If
+End Sub
+
+Sub ЗагрузитьКод()
+    msg_upd = has_update()
+    intMessage = MsgBox("Обновить код?", vbYesNo, "Доступно обновление")
+    If intMessage = vbYes Then
+        msg_upd = LoadMod("common") & LoadMod("calc") & LoadMod("UserForm2") & LoadMod("UserForm1")
+        If Len(msg_upd) < 1 Then msg_upd = "Сначала нужно удалить существующий код."
+        MsgBox (msg_upd)
+    End If
+End Sub
+
+Function DeleteMod(ByVal namemod As String) As String
+    If IsModEx(namemod) Then
+        Call Application.Wait(DateAdd("s", 1, Now))
+        ThisWorkbook.VBProject.VBComponents.Remove ThisWorkbook.VBProject.VBComponents(namemod)
+        DeleteMod = "модуль " + namemod + " удалён" + vbNewLine
+    Else
+        DeleteMod = ""
+    End If
+End Function
+
+Function LoadMod(ByVal namemod As String) As String
+    If IsModFileEx(namemod, "from_git\") And Not IsModEx(namemod) Then
+        suffix = ".bas"
+        If InStr(namemod, "form") > 0 Then suffix = ".frm"
+        ThisWorkbook.VBProject.VBComponents.Import code_path & "from_git\" & namemod & suffix
+        LoadMod = "модуль " + namemod + " загружен" + vbNewLine
+    Else
+        LoadMod = ""
+    End If
+End Function
+
 Function CheckVersion()
+    msg_upd = has_update()
+    If Len(msg_upd) > 1 Then
+        r = ExportAllMod()
+        msg_upd = msg_upd & vbNewLine & change_log & vbNewLine & "Открыть справку с инструкцией?"
+        intMessage = MsgBox(msg_upd, vbYesNo, "Доступно обновление")
+        Set objShell = CreateObject("Wscript.Shell")
+        If intMessage = vbYes Then objShell.Run ("https://docs.google.com/document/d/1bedvuS3quC37ivwVWzWDyfZSt_zxFPhGAQAQ38g3Ubo/edit#bookmark=id.5awyi0cjwmrs")
+    End If
+End Function
+
+Function has_update() As String
+    has_update = ""
     r = set_path()
     If Not check_version Then check_version = read_ini_param("check_version")
     If Not Debug_mode Then Debug_mode = read_ini_param("Debug_mode")
@@ -44,13 +100,7 @@ Function CheckVersion()
             update_git = DownloadMod("update" & ".bas")
             update_local = ConvTxt2Ver(update_version)
             If update_git > update_local And Not IsEmpty(update_local) And Not IsEmpty(update_git) Then msg_upd = msg_upd & "Загружена новая версия модуля update -" & CStr(update_git / 100) & vbNewLine
-            If Len(msg_upd) > 1 Then
-                r = ExportAllMod()
-                msg_upd = msg_upd & vbNewLine & change_log & vbNewLine & "Открыть справку с инструкцией?"
-                intMessage = MsgBox(msg_upd, vbYesNo, "Доступно обновление")
-                Set objShell = CreateObject("Wscript.Shell")
-                If intMessage = vbYes Then objShell.Run ("https://docs.google.com/document/d/1bedvuS3quC37ivwVWzWDyfZSt_zxFPhGAQAQ38g3Ubo/edit#bookmark=id.5awyi0cjwmrs")
-            End If
+            has_update = msg_upd
         End If
     End If
 End Function
@@ -141,17 +191,6 @@ Function ExportAllMod() As Boolean
     If IsModEx("calc") Then r = ExportMod("calc", pathtmp, macro_version)
     If IsModEx("common") Then r = ExportMod("common", pathtmp, common_version)
     If IsModEx("update") Then r = ExportMod("update", pathtmp, update_version)
-End Function
-
-Function NameAllMod() As Boolean
-    Application.ScreenUpdating = False
-    Application.EnableEvents = False
-    r = CheckName("UserForm2")
-    r = CheckName("UserForm1")
-    r = CheckName("calc")
-    r = CheckName("common")
-    Application.EnableEvents = True
-    Application.ScreenUpdating = True
 End Function
 
 Function ModeType() As Boolean
@@ -324,7 +363,9 @@ End Function
 
 Function IsModFileEx(ByVal namemod As String, Optional ByVal pathtmp As String = vbNullString) As Boolean
     On Error Resume Next
-    IsModFileEx = CBool(Len(Dir$(code_path & pathtmp & namemod & ".bas")))
+    suffix = ".bas"
+    If InStr(namemod, "form") > 0 Then suffix = ".frm"
+    IsModFileEx = CBool(Len(Dir$(code_path & pathtmp & namemod & suffix)))
 End Function
 
 Function IsModEx(ByVal namemod As String) As Boolean

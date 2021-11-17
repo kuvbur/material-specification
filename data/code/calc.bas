@@ -1,7 +1,7 @@
 Attribute VB_Name = "calc"
 Option Compare Text
 Option Base 1
-Public Const macro_version As String = "4.03"
+Public Const macro_version As String = "4.05"
 '-------------------------------------------------------
 'Типы элементов (столбец col_type_el)
 Public Const t_arm As Long = 10
@@ -2325,6 +2325,9 @@ tfunctime = Timer
         nsfile = nm
     End If
     out_data_auto = DataReadFile(nsfile)
+    out_data_mat = Empty
+    un_subpos = ArrayUniqValColumn(out_data, col_sub_pos)
+    If StrComp(nsfile, "Сводная") <> 0 Then out_data_mat = DataReadAutoMat(nsfile, un_subpos)
     type_spec = SpecGetType(nm)
     isReadFromSheet = False
     Select Case type_spec
@@ -2340,7 +2343,7 @@ tfunctime = Timer
             For i = 1 To UBound(listsheet)
                 If nsht = Trim$(listsheet(i)) Then sheet = nsht
             Next i
-            If IsEmpty(sheet) And IsEmpty(out_data_auto) Then
+            If IsEmpty(sheet) And IsEmpty(out_data_auto) And IsEmpty(out_data_mat) Then
                 'Нет ни файла, ни листа.
                 errread = 1
             End If
@@ -2355,20 +2358,14 @@ tfunctime = Timer
     End Select
     If Not IsEmpty(out_data) And errread = 0 Then
         spec_version = DataGetVersion(out_data)
-        If spec_version > 1 Then
-            out_data = DataConvertVersion(out_data)
-        Else
-            'Отключаем неиспользуемое
-            this_sheet_option.Item("qty_one_floor") = False
-        End If
+        If spec_version > 1 Then out_data = DataConvertVersion(out_data)
         If DataIsShort(out_data) And isReadFromSheet = False Then out_data = DataShort(out_data)
     Else
         spec_version = 3
     End If
-    out_data_mat = Empty
-    un_subpos = ArrayUniqValColumn(out_data, col_sub_pos)
-    If StrComp(nsfile, "Сводная") <> 0 Then out_data_mat = DataReadAutoMat(nsfile, un_subpos)
-    If Not IsEmpty(out_data_mat) Then out_data = ArrayCombine(out_data, out_data_mat)
+    If Not IsEmpty(out_data_mat) Then
+        out_data = ArrayCombine(out_data, out_data_mat)
+    End If
     If Not IsEmpty(out_data_auto) And isReadFromSheet And StrComp(nsfile, "Сводная") <> 0 Then
         spec_version = DataGetVersion(out_data_auto)
         If spec_version > 1 Then
@@ -2472,13 +2469,13 @@ tfunctime = Timer
             End If
         Next inxfloor
     End If
-    add_subpos_txt = Trim(add_subpos_txt)
-    If Len(add_subpos_txt) > 2 Then
-        add_subpos_txt = Split(add_subpos_txt, ";")
-        add_subpos_txt = ArrayUniqValColumn(add_subpos_txt)
-        add_subpos_txt = Join(add_subpos_txt, vbCrLf)
-        MsgBox ("Добавлена недостающая маркировка сборок " & vbCrLf & add_subpos_txt)
-    End If
+'    add_subpos_txt = Trim(add_subpos_txt)
+'    If Len(add_subpos_txt) > 2 Then
+'        add_subpos_txt = Split(add_subpos_txt, ";")
+'        add_subpos_txt = ArrayUniqValColumn(add_subpos_txt)
+'        add_subpos_txt = Join(add_subpos_txt, vbCrLf)
+'        MsgBox ("Добавлена недостающая маркировка сборок " & vbCrLf & add_subpos_txt)
+'    End If
     DataPrepare = out_data
 tfunctime = functime("DataPrepare", tfunctime)
 End Function
@@ -4480,10 +4477,45 @@ Function FormatSpec_Ved(ByVal data_out As Range, ByVal n_row As Long, ByVal n_co
             temp_1 = temp_2
             If n_end > n_start Then
                 Range(data_out.Cells(n_start, 1), data_out.Cells(n_end, 1)).Merge
-                If zonenum_pot = False Then Range(data_out.Cells(n_start, 2), data_out.Cells(n_end, 2)).Merge
+                If zonenum_pot = False Or Not this_sheet_option.Item("otd_by_type") Then Range(data_out.Cells(n_start, 2), data_out.Cells(n_end, 2)).Merge
                 Range(data_out.Cells(n_start, n_col), data_out.Cells(n_end, n_col)).Merge
                 For n_c = n_cst To n_col - 1
-                    r = FormatSpec_merge(data_out.Range(data_out.Cells(n_start, n_cst), data_out.Cells(n_end, n_col - 1)), n_c, True)
+
+                    n_start_ = n_start
+                    n_end_ = n_start
+                    temp_1 = data_out.Cells(n_start_, n_c).MergeArea.Cells(1, 1).Value
+                    temp_1 = Replace(temp_1, "'", vbNullString)
+                    temp_1 = Replace(temp_1, "-", vbNullString)
+                    temp_1 = Trim$(temp_1)
+                    For i_ = n_start To n_end
+                        temp_2 = data_out.Cells(i_, n_c).MergeArea.Cells(1, 1).Value
+                        temp_2 = Replace(temp_2, "'", vbNullString)
+                        temp_2 = Replace(temp_2, "-", vbNullString)
+                        temp_2 = Trim$(temp_2)
+                        If Len(temp_2) = 0 And i_ < n_end Then
+                            n_end_ = i_
+                        Else
+                            If i_ = n_end And Len(temp_2) = 0 Then n_end_ = i_
+                            If n_end_ > n_start_ Then Range(data_out.Cells(n_start_, n_c), data_out.Cells(n_end_, n_c)).Merge
+                            n_start_ = i_
+                        End If
+
+'                        If Len(temp_2) = 0 Then temp_1 = temp_2
+'                        If temp_1 <> temp_2 Or Len(temp_2) = 0 Or i_ = n_end Then
+'                            If i_ = n_end And temp_1 = temp_2 Then
+'                                n_end_ = i_
+'                            Else
+'                                temp_1 = temp_2
+'                            End If
+'                            'If n_end_ > n_start_ Then Range(data_out.Cells(n_start_, n_c), data_out.Cells(n_end_, n_c)).Merge
+'                            n_start_ = i_
+'                        Else
+'                            n_end_ = i_
+'                        End If
+                    Next i_
+
+                    
+'                    r = FormatSpec_merge(data_out.Range(data_out.Cells(n_start, n_cst), data_out.Cells(n_end, n_col - 1)), n_c, True)
                 Next n_c
                 inside_weight = xlThin
             Else
@@ -5684,69 +5716,71 @@ tfunctime = Timer
             'Смотрим - что за параметры прилетели
             arr = Split(tedizm, ";")
             For Each tel In arr
-                arr2 = Split(tel, "=")
-                tvalue = Trim$(arr2(1))
-                name_param = Trim$(LCase$(arr2(0)))
-                If InStr(name_param, "прим") > 0 Then tprim = tvalue
-                tvalue = Replace(LCase$(tvalue), " ", vbNullString)
-                name_param = Replace(LCase$(name_param), " ", vbNullString)
-                name_param = Replace(name_param, ",", vbNullString)
-                name_param = Replace(name_param, ".", vbNullString)
-                name_param = Replace(name_param, "\", vbNullString)
-                name_param = Replace(name_param, "/", vbNullString)
-                If InStr(name_param, "кзап") > 0 Then
-                    kzap_mat = ConvTxt2Num(tvalue)
-                    If IsNumeric(kzap_mat) Then
-                        If kzap_mat < 1 Then kzap_mat = 1
-                        If kzap_mat >= 2 Then kzap_mat = 1.5
-                    Else
-                        kzap_mat = 1
-                    End If
-                End If
-                If ignore_zap_material Then kzap_mat = 1
-                If InStr(name_param, "едизм") > 0 Then edizm = tvalue
-                If InStr(name_param, "расход") > 0 Then
-                    tvalue = Replace(tvalue, ":", "\")
-                    tvalue = Replace(tvalue, "/", "\")
-                    If InStr(tvalue, "\") > 0 Then
-                        trate_edizm_raw = tvalue
-                        arr3 = Split(tvalue, "\")
-                        trate_edizm_fist = arr3(0)
-                        trate_edizm = Replace(arr3(1), ",", vbNullString)
-                        trate_edizm = Replace(trate_edizm, ".", vbNullString)
-                        trate = Replace(arr3(0), "л", vbNullString)
-                        trate = Replace(trate, "кг", vbNullString)
-                        trate = Replace(trate, "шт", vbNullString)
-                        trate = Replace(trate, "ед", vbNullString)
-                        trate = Replace(trate, "пм", vbNullString)
-                        trate = ConvTxt2Num(trate)
-                        If Not IsNumeric(trate) Then
-                            trate = 0
-                            trate_edizm = vbNullString
+                If Len(tel) > 1 Then
+                    arr2 = Split(tel, "=")
+                    tvalue = Trim$(arr2(1))
+                    name_param = Trim$(LCase$(arr2(0)))
+                    If InStr(name_param, "прим") > 0 Then tprim = tvalue
+                    tvalue = Replace(LCase$(tvalue), " ", vbNullString)
+                    name_param = Replace(LCase$(name_param), " ", vbNullString)
+                    name_param = Replace(name_param, ",", vbNullString)
+                    name_param = Replace(name_param, ".", vbNullString)
+                    name_param = Replace(name_param, "\", vbNullString)
+                    name_param = Replace(name_param, "/", vbNullString)
+                    If InStr(name_param, "кзап") > 0 Then
+                        kzap_mat = ConvTxt2Num(tvalue)
+                        If IsNumeric(kzap_mat) Then
+                            If kzap_mat < 1 Then kzap_mat = 1
+                            If kzap_mat >= 2 Then kzap_mat = 1.5
+                        Else
+                            kzap_mat = 1
                         End If
                     End If
-                End If
-                If InStr(name_param, "t") > 0 Or InStr(name_param, "толщ") > 0 Then
-                    'Толщина нам нужна в мм. По умолчанию, если ничего не задано, предполагаем что это мм.
-                    edizm_thickness_in_param = 1
-                    If InStr(tvalue, "мм") > 0 Then
-                        edizm_thickness_in_param = 1
-                    Else
-                        If InStr(tvalue, "см") > 0 Then
-                            edizm_thickness_in_param = 10
-                        Else
-                            If InStr(tvalue, "м") > 0 Then
-                                edizm_thickness_in_param = 1000
-                            Else
-                                ' Если ничего не подошло
-                                edizm_thickness_in_param = 1
+                    If ignore_zap_material Then kzap_mat = 1
+                    If InStr(name_param, "едизм") > 0 Then edizm = tvalue
+                    If InStr(name_param, "расход") > 0 Then
+                        tvalue = Replace(tvalue, ":", "\")
+                        tvalue = Replace(tvalue, "/", "\")
+                        If InStr(tvalue, "\") > 0 Then
+                            trate_edizm_raw = tvalue
+                            arr3 = Split(tvalue, "\")
+                            trate_edizm_fist = arr3(0)
+                            trate_edizm = Replace(arr3(1), ",", vbNullString)
+                            trate_edizm = Replace(trate_edizm, ".", vbNullString)
+                            trate = Replace(arr3(0), "л", vbNullString)
+                            trate = Replace(trate, "кг", vbNullString)
+                            trate = Replace(trate, "шт", vbNullString)
+                            trate = Replace(trate, "ед", vbNullString)
+                            trate = Replace(trate, "пм", vbNullString)
+                            trate = ConvTxt2Num(trate)
+                            If Not IsNumeric(trate) Then
+                                trate = 0
+                                trate_edizm = vbNullString
                             End If
                         End If
                     End If
-                    tvalue = Replace(tvalue, "м", vbNullString)
-                    tvalue = Replace(tvalue, "c", vbNullString)
-                    tvalue = ConvTxt2Num(tvalue)
-                    If IsNumeric(tvalue) Then thickness_in_param = tvalue * edizm_thickness_in_param
+                    If InStr(name_param, "t") > 0 Or InStr(name_param, "толщ") > 0 Then
+                        'Толщина нам нужна в мм. По умолчанию, если ничего не задано, предполагаем что это мм.
+                        edizm_thickness_in_param = 1
+                        If InStr(tvalue, "мм") > 0 Then
+                            edizm_thickness_in_param = 1
+                        Else
+                            If InStr(tvalue, "см") > 0 Then
+                                edizm_thickness_in_param = 10
+                            Else
+                                If InStr(tvalue, "м") > 0 Then
+                                    edizm_thickness_in_param = 1000
+                                Else
+                                    ' Если ничего не подошло
+                                    edizm_thickness_in_param = 1
+                                End If
+                            End If
+                        End If
+                        tvalue = Replace(tvalue, "м", vbNullString)
+                        tvalue = Replace(tvalue, "c", vbNullString)
+                        tvalue = ConvTxt2Num(tvalue)
+                        If IsNumeric(tvalue) Then thickness_in_param = tvalue * edizm_thickness_in_param
+                    End If
                 End If
             Next
         End If
@@ -5939,7 +5973,7 @@ tfunctime = Timer
             out_data(n_row_out, col_m_naen) = naen
             out_data(n_row_out, col_m_weight) = Weight
             If Weight > 0 Then
-            hh = 1
+                hh = 1
             End If
             out_data(n_row_out, col_m_edizm) = edizm
         End If
@@ -10701,10 +10735,12 @@ Function Spec_AS(ByRef all_data As Variant, ByVal type_spec As Long) As Variant
                                 pos_out_floor(n_row, 1) = el_floor(i, 1)
                                 pos_out_floor(n_row, 2) = el_floor(i, 2)
                                 pos_out_floor(n_row, 3) = el_floor(i, 3)
-                                pos_out_floor(n_row, n_col_floor) = pos_out_floor(n_row, n_col_floor) + qty * nSubPos
-                                pos_out_floor(n_row, end_col - 2) = pos_out_floor(n_row, end_col - 2) + qty * nSubPos
+                                If IsNumeric(qty) Then
+                                    pos_out_floor(n_row, n_col_floor) = pos_out_floor(n_row, n_col_floor) + qty * nSubPos
+                                    pos_out_floor(n_row, end_col - 2) = pos_out_floor(n_row, end_col - 2) + qty * nSubPos
+                                End If
                                 pos_out_floor(n_row, end_col - 1) = el_floor(i, 5)
-                                If IsNumeric(el_floor(i, 5)) Then
+                                If IsNumeric(el_floor(i, 5)) And IsNumeric(qty) Then
                                     pos_out_floor(n_row, end_col) = pos_out_floor(n_row, end_col) + el_floor(i, 5) * qty * nSubPos
                                 Else
                                     pos_out_floor(n_row, end_col) = el_floor(i, 6)
@@ -11897,6 +11933,26 @@ Function Spec_Select(ByVal lastfilespec As String, ByVal suffix As String, Optio
     r = print_functime()
 End Function
 
+Function VedFinByDraft(ByRef mat_fin As String, ByRef mat_draft As String)
+ 'Если в черновой отделке есть % - добавит в чистовую разделение по типам
+ 'Если в чистовой % - разделения не будет
+    'Проверяем наличие модификатора для чистовой отделки
+    fin_modify = ""
+    If InStr(mat_draft, "%") And InStr(mat_fin, "%") = 0 Then
+        n = Split(mat_draft, ";")
+        For i = 0 To UBound(n)
+            If InStr(n(i), "%") Then
+                fin_modify = Trim(Replace(n(i), "%", ""))
+                mat_draft = Replace(mat_draft, n(i), "")
+                Exit For
+            End If
+        Next i
+    End If
+    If mat_fin <> "---" And Len(mat_fin) > 1 And Len(fin_modify) > 0 Then mat_fin = mat_fin + " " + fin_modify
+    mat_fin = Replace(mat_fin, "%", "")
+End Function
+
+
 Function VedAddAreaGR(ByVal area As Double, ByVal mat_fin As String, ByVal type_constr As String, ByVal type_name As String, ByVal mat_draft As String, ByRef rules_mod As Variant, ByRef materials_by_type As Variant, Optional ByVal num As String) As Long
     If area < 0.001 Then
         VedAddAreaGR = 0
@@ -11930,15 +11986,18 @@ tfunctime = Timer
     If mat_draft = "0" Or InStr(mat_draft, "е задан") > 0 Then flag_draft = 0
     If flag_draft Then
         'Черновая отделка с учётом исключений
+        r = VedFinByDraft(mat_fin, mat_draft)
         all_name_mat = Split(Replace(VedModMat(Replace(mat_fin, fin_str, vbNullString), mat_draft, rules_mod), "@", ";"), ";")
         For Each mat In all_name_mat
-            mat = Trim$(mat)
-            materials_by_type.Item(type_name + type_constr + mat) = materials_by_type.Item(type_name + type_constr + mat) + area
-            If InStr(type_constr, ";pot;") > 0 And zonenum_pot Then
-                If materials_by_type.Exists(type_name + ";pot_num" + mat) Then
-                    materials_by_type.Item(type_name + ";pot_num" + mat) = materials_by_type.Item(type_name + ";pot_num" + mat) + ";" + Trim$(num)
-                Else
-                    materials_by_type.Item(type_name + ";pot_num" + mat) = Trim$(num)
+            If InStr(mat, "%") = 0 Then
+                mat = Trim$(mat)
+                materials_by_type.Item(type_name + type_constr + mat) = materials_by_type.Item(type_name + type_constr + mat) + area
+                If InStr(type_constr, ";pot;") > 0 And zonenum_pot Then
+                    If materials_by_type.Exists(type_name + ";pot_num" + mat) Then
+                        materials_by_type.Item(type_name + ";pot_num" + mat) = materials_by_type.Item(type_name + ";pot_num" + mat) + ";" + Trim$(num)
+                    Else
+                        materials_by_type.Item(type_name + ";pot_num" + mat) = Trim$(num)
+                    End If
                 End If
             End If
         Next
@@ -11948,12 +12007,14 @@ tfunctime = Timer
         all_name_mat = Split(Replace(mat_fin, "@", ";"), ";")
         For ni = 0 To UBound(all_name_mat)
             mat = Trim$(all_name_mat(ni))
-            materials_by_type.Item(type_name + type_constr + mat) = materials_by_type.Item(type_name + type_constr + mat) + area
-            If InStr(type_constr, ";pot;") > 0 And zonenum_pot Then
-                If materials_by_type.Exists(type_name + ";pot_num" + mat) Then
-                    materials_by_type.Item(type_name + ";pot_num" + mat) = materials_by_type.Item(type_name + ";pot_num" + mat) + ";" + Trim$(num)
-                Else
-                    materials_by_type.Item(type_name + ";pot_num" + mat) = Trim$(num)
+            If InStr(mat, "%") = 0 Then
+                materials_by_type.Item(type_name + type_constr + mat) = materials_by_type.Item(type_name + type_constr + mat) + area
+                If InStr(type_constr, ";pot;") > 0 And zonenum_pot Then
+                    If materials_by_type.Exists(type_name + ";pot_num" + mat) Then
+                        materials_by_type.Item(type_name + ";pot_num" + mat) = materials_by_type.Item(type_name + ";pot_num" + mat) + ";" + Trim$(num)
+                    Else
+                        materials_by_type.Item(type_name + ";pot_num" + mat) = Trim$(num)
+                    End If
                 End If
             End If
         Next ni
@@ -12003,6 +12064,7 @@ tfunctime = Timer
         razd = "&"
         mat_fin = " " + mat_fin
     End If
+    r = VedFinByDraft(mat_fin, mat_draft)
     mat_fin = Replace(mat_fin, "@", ";a@")
     If Trim$(mat_fin) = "0" Then mat_fin = "---"
     mat_draft = VedModMat(Replace(mat_fin, fin_str, vbNullString), mat_draft, rules_mod)

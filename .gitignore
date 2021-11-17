@@ -2,10 +2,10 @@
 *.bak
 *.dwl
 desktop.ini
-~$*.*
-data/code/old/*
 
-data/code/git/*
+~$*.*
+
+data/code/old/*
 
 data/code/from_git/*
 
