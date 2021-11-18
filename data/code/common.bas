@@ -2,34 +2,12 @@ Attribute VB_Name = "common"
 Option Compare Text
 Option Base 1
 
-Public Const common_version As String = "4.02"
+Public Const common_version As String = "4.03"
 Public Const Pi As Double = 3.141592653589
 Public ank_data As Variant
 Public Function GetLeghtByID(id As String, table As Range, n_col_id As Long, n_col_l As Long) As Variant
     GetLeghtByID = Сумма_ПоИД(id, table, n_col_id, n_col_l)
 End Function
-'
-'Public Function Сумма_ПоСтолбцуиАрхикад(id As String, col_name As String) As Variant
-'    'Сумма значений заданного столбца для заданного ID
-'    Sum_l = 0
-'    id = Trim$(LCase$(id))
-'    col_name = Replace(Trim$(LCase$(col_name)), "ё", "е")
-'    For Each objWh In th.Worksheets
-'        NameLst = objWh.Name
-'        If InStr(objWh.Name, "из архикада") > 0 Then
-'
-'
-'        End If
-'    Next objWh
-'    For i = 1 To table.Rows.Count
-'        If Trim$(table(i, n_col_id)) = id Then
-'            ll = table(i, n_col_l)
-'            If IsNumeric(ll) Then Sum_l = Sum_l + ll
-'        End If
-'    Next i
-'    Сумма_ПоСтолбцуиИД = Sum_l
-'End Function
-'
 
 '@Description "Суммирует элементов с одинаковым ID из таблицы. Ввод в формате ID, Таблица, Номер столбца ID, Номер столбца суммируемой величины"
 Public Function Сумма_ПоИД(id As String, table As Range, n_col_id As Long, n_col_l As Long) As Variant
@@ -323,14 +301,14 @@ Public Function Арм_Длина_ПМ(ByVal L As Variant, ByVal lnahl As Variant, Optiona
     Арм_Длина_ПМ = lout
 End Function
 
-Public Function Арм_ПоПлощади(S As Variant, shag As Variant, ByVal lnahl As Long, Optional ByVal led As Long = 11700) As Long
-    L = Sqr(S) + (S / shag)
+Public Function Арм_ПоПлощади(S As Variant, Shag As Variant, ByVal lnahl As Long, Optional ByVal led As Long = 11700) As Long
+    L = Sqr(S) + (S / Shag)
     lout = Арм_Длина_ПМ(L, lnahl, led)
     Арм_ПоПлощади = lout
 End Function
 
-Public Function Арм_ОдинСлойПоПлощади(S As Variant, shag As Variant, ByVal lnahl As Long, Optional ByVal led As Long = 11700) As Long
-    Арм_ОдинСлойПоПлощади = Арм_ПоПлощади(S, shag, lnahl, led)
+Public Function Арм_ОдинСлойПоПлощади(S As Variant, Shag As Variant, ByVal lnahl As Long, Optional ByVal led As Long = 11700) As Long
+    Арм_ОдинСлойПоПлощади = Арм_ПоПлощади(S, Shag, lnahl, led)
 End Function
 
 Public Function SetPlast_Razm(diam As Long) As String
@@ -347,4 +325,14 @@ End Function
 Public Function Арм_Элемент_Z(ByVal L As Variant, ByVal H As Variant, ByVal diam As Long, ByVal class As String, Optional ByVal Lniz As Long = 0) As Double
     lout = Арм_Элемент_П(L, H, diam, class, Lniz)
     Арм_Элемент_Z = lout
+End Function
+
+
+Public Function Арм_Элемент_Спираль(ByVal H As Long, ByVal Shag As Long, ByVal D As Long) As Double
+    n_vitkov = H / Shag
+    sum_angle = 360 * n_vitkov
+    l_vitka = (Sqr(((Pi * D) ^ 2) + ((H / n_vitkov) ^ 2)))
+    lout = l_vitka * n_vitkov
+    lout = Арм_Округление(lout)
+    Арм_Элемент_Спираль = lout
 End Function

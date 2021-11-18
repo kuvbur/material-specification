@@ -1,7 +1,7 @@
 Attribute VB_Name = "calc"
 Option Compare Text
 Option Base 1
-Public Const macro_version As String = "4.05"
+Public Const macro_version As String = "4.06"
 '-------------------------------------------------------
 'Типы элементов (столбец col_type_el)
 Public Const t_arm As Long = 10
@@ -11944,12 +11944,14 @@ Function VedFinByDraft(ByRef mat_fin As String, ByRef mat_draft As String)
             If InStr(n(i), "%") Then
                 fin_modify = Trim(Replace(n(i), "%", ""))
                 mat_draft = Replace(mat_draft, n(i), "")
+                If (Right(Trim(mat_draft), 1) = UCase(";")) Then
+                    mat_draft = Left(mat_draft, Len(mat_draft) - 1)
+                End If
                 Exit For
             End If
         Next i
     End If
-    If mat_fin <> "---" And Len(mat_fin) > 1 And Len(fin_modify) > 0 Then mat_fin = mat_fin + " " + fin_modify
-    mat_fin = Replace(mat_fin, "%", "")
+    If mat_fin <> "---" And Len(mat_fin) > 1 And Len(fin_modify) > 0 Then mat_fin = mat_fin + "%" + fin_modify
 End Function
 
 
@@ -11988,15 +11990,18 @@ tfunctime = Timer
         'Черновая отделка с учётом исключений
         r = VedFinByDraft(mat_fin, mat_draft)
         all_name_mat = Split(Replace(VedModMat(Replace(mat_fin, fin_str, vbNullString), mat_draft, rules_mod), "@", ";"), ";")
+        mat_fin = Replace(mat_fin, "%", " ")
         For Each mat In all_name_mat
             If InStr(mat, "%") = 0 Then
                 mat = Trim$(mat)
-                materials_by_type.Item(type_name + type_constr + mat) = materials_by_type.Item(type_name + type_constr + mat) + area
-                If InStr(type_constr, ";pot;") > 0 And zonenum_pot Then
-                    If materials_by_type.Exists(type_name + ";pot_num" + mat) Then
-                        materials_by_type.Item(type_name + ";pot_num" + mat) = materials_by_type.Item(type_name + ";pot_num" + mat) + ";" + Trim$(num)
-                    Else
-                        materials_by_type.Item(type_name + ";pot_num" + mat) = Trim$(num)
+                If Len(mat) > 0 Then
+                    materials_by_type.Item(type_name + type_constr + mat) = materials_by_type.Item(type_name + type_constr + mat) + area
+                    If InStr(type_constr, ";pot;") > 0 And zonenum_pot Then
+                        If materials_by_type.Exists(type_name + ";pot_num" + mat) Then
+                            materials_by_type.Item(type_name + ";pot_num" + mat) = materials_by_type.Item(type_name + ";pot_num" + mat) + ";" + Trim$(num)
+                        Else
+                            materials_by_type.Item(type_name + ";pot_num" + mat) = Trim$(num)
+                        End If
                     End If
                 End If
             End If
@@ -12068,6 +12073,7 @@ tfunctime = Timer
     mat_fin = Replace(mat_fin, "@", ";a@")
     If Trim$(mat_fin) = "0" Then mat_fin = "---"
     mat_draft = VedModMat(Replace(mat_fin, fin_str, vbNullString), mat_draft, rules_mod)
+    mat_fin = Replace(mat_fin, "%", " ")
     mat_draft = Trim$(mat_draft)
     mat_draft = "b@" & Replace(mat_draft, razd, ";b@")
     mat_draft = Replace(mat_draft, "@ ", "@")
@@ -12105,7 +12111,7 @@ tfunctime = Timer
             naen_mat = Trim$(Replace(Replace(mat, "b@", vbNullString), "a@", vbNullString))
             If Left$(naen_mat, 1) <> vbNullString Then naen_mat = StrConv(Left$(naen_mat, 1), vbUpperCase) + Right$(naen_mat, Len(naen_mat) - 1)
             If Left$(naen_mat, 1) = ";" Then naen_mat = Trim$(Right$(naen_mat, Len(naen_mat) - 1))
-            If naen_mat <> vbNullString And Not IsEmpty(naen_mat) And InStr(naen_mat, "--") = 0 And InStr(naen_mat, "УНИВЕРСАЛЬНОЕ") = 0 And InStr(naen_mat, "е задан") = 0 Then
+            If InStr(naen_mat, "%") = 0 And naen_mat <> vbNullString And Not IsEmpty(naen_mat) And InStr(naen_mat, "--") = 0 And InStr(naen_mat, "УНИВЕРСАЛЬНОЕ") = 0 And InStr(naen_mat, "е задан") = 0 Then
                 If Not zone.Exists(num) Then
                     Set mat_collect = CreateObject("Scripting.Dictionary")
                     mat_collect.Item(mat) = 1
@@ -13617,9 +13623,14 @@ End Function
 Function VedModMat(ByVal fin_material As String, ByVal all_material As String, ByRef rules_mod As Variant) As String
 Dim tfunctime As Double
 tfunctime = Timer
+    fin_material_t = fin_material
+    If InStr(fin_material, "%") > 0 Then
+        n = Split(fin_material, "%")
+        fin_material_t = n(0)
+    End If
     If Not IsEmpty(rules_mod) Then
         For i = 1 To UBound(rules_mod, 1)
-            If Trim$(fin_material) = Trim$(rules_mod(i, 2)) Or (InStr(fin_material, "Выше") > 0 And InStr(fin_material, rules_mod(i, 2)) > 0) Then
+            If Trim$(fin_material_t) = Trim$(rules_mod(i, 2)) Or (InStr(fin_material_t, "Выше") > 0 And InStr(fin_material_t, rules_mod(i, 2)) > 0) Then
                 If rules_mod(i, 1) = "-" Then
                     arr_mat = Split(all_material, ";")
                     arr_mod = Split(rules_mod(i, 3), ";")
