@@ -2,7 +2,7 @@ Attribute VB_Name = "update"
 Option Compare Text
 Option Base 1
 
-Public Const update_version As String = "4.04"
+Public Const update_version As String = "4.05"
 
 Public code_path As String
 Public sortament_path As String
@@ -237,7 +237,8 @@ Function Download_Sortament() As Boolean
 End Function
 
 Function Download_Code() As Boolean
-    If Not CreateObject("Scripting.FileSystemObject").FolderExists(ThisWorkbook.path & "\data") Then
+    r = set_path()
+    If Not CreateObject("Scripting.FileSystemObject").FolderExists(ThisWorkbook.path & "data") Then
         On Error Resume Next
         MkDir (ThisWorkbook.path & "\data")
     End If
@@ -245,9 +246,9 @@ Function Download_Code() As Boolean
         On Error Resume Next
         MkDir (code_path)
     End If
-    If Not CreateObject("Scripting.FileSystemObject").FolderExists(code_path & "\from_git") Then
+    If Not CreateObject("Scripting.FileSystemObject").FolderExists(code_path & "from_git") Then
         On Error Resume Next
-        MkDir (code_path & "\from_git")
+        MkDir (code_path & "from_git")
     End If
     code_filepath = ThisWorkbook.path & "\data\code"
     myURL = "https://raw.githubusercontent.com/kuvbur/material-specification/master/data/code/from_git.zip"
@@ -276,7 +277,7 @@ Function Download_Code() As Boolean
         oStream.Close
         Set oApp = CreateObject("Shell.Application")
         For Each it In oApp.Namespace(code_filepath & "\from_git.zip").items: DoEvents: DoEvents: Next
-        oApp.Namespace(code_filepath & "\from_git").CopyHere oApp.Namespace(code_filepath & "\from_git.zip").items
+        oApp.Namespace(code_filepath).CopyHere oApp.Namespace(code_filepath & "\from_git.zip").items
         Download_Code = True
     Else
         Download_Code = False
@@ -390,5 +391,7 @@ Function ConvTxt2Ver(ByVal x As Variant) As Variant
     End If
     ConvTxt2Ver = out
 End Function
+
+
 
 
