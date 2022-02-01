@@ -1,7 +1,7 @@
 Attribute VB_Name = "calc"
 Option Compare Text
 Option Base 1
-Public Const macro_version As String = "4.06"
+Public Const macro_version As String = "4.08"
 '-------------------------------------------------------
 'Типы элементов (столбец col_type_el)
 Public Const t_arm As Long = 10
@@ -1514,10 +1514,12 @@ tfunctime = Timer
     If ArrayIsSecondDim(array_in) Then flag_twodim = 1
     If flag_twodim Then
         n_row = UBound(array_in, 1)
+        n_start = LBound(array_in, 1)
     Else
         n_row = UBound(array_in)
+        n_start = LBound(array_in)
     End If
-    For i = 1 To n_row
+    For i = n_start To n_row
         If flag_twodim Then
             var = array_in(i, cols)
         Else
@@ -5030,6 +5032,11 @@ Function FormatSpec_Ved(ByVal data_out As Range, ByVal n_row As Long, ByVal n_co
     End With
     FormatSpec_Ved = True
 End Function
+
+Function FormatSpec_VOR(ByVal data_out As Range, ByVal n_row As Long, ByVal n_col As Long) As Boolean
+
+End Function
+
 
 Function FormatSpec_WIN(ByVal data_out As Range, ByVal n_row As Long, ByVal n_col As Long) As Boolean
     s1 = 1.5
