@@ -2,7 +2,7 @@ Attribute VB_Name = "update"
 Option Compare Text
 Option Base 1
 
-Public Const update_version As String = "4.05"
+Public Const update_version As String = "4.06"
 
 Public code_path As String
 Public sortament_path As String
@@ -269,6 +269,18 @@ Function Download_Code() As Boolean
         r = Delete_file(code_filepath & "\from_git" & "\UserForm2.frm")
         r = Delete_file(code_filepath & "\from_git" & "\UserForm2.frx")
         r = Delete_file(code_filepath & "\from_git" & "\UserForm2.bas")
+        
+        r = Delete_file(code_filepath & "\calc.bas")
+        r = Delete_file(code_filepath & "\update.bas")
+        r = Delete_file(code_filepath & "\common.bas")
+        r = Delete_file(code_filepath & "\changelog.txt")
+        r = Delete_file(code_filepath & "\UserForm1.frm")
+        r = Delete_file(code_filepath & "\UserForm1.frx")
+        r = Delete_file(code_filepath & "\UserForm1.bas")
+        r = Delete_file(code_filepath & "\UserForm2.frm")
+        r = Delete_file(code_filepath & "\UserForm2.frx")
+        r = Delete_file(code_filepath & "\UserForm2.bas")
+        
         Set oStream = CreateObject("ADODB.Stream")
         oStream.Open
         oStream.Type = 1
@@ -278,6 +290,7 @@ Function Download_Code() As Boolean
         Set oApp = CreateObject("Shell.Application")
         For Each it In oApp.Namespace(code_filepath & "\from_git.zip").items: DoEvents: DoEvents: Next
         oApp.Namespace(code_filepath).CopyHere oApp.Namespace(code_filepath & "\from_git.zip").items
+        oApp.Namespace(code_filepath & "\from_git").CopyHere oApp.Namespace(code_filepath & "\from_git.zip").items
         Download_Code = True
     Else
         Download_Code = False
