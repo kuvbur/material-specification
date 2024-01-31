@@ -3,8 +3,8 @@ Begin {C62A69F0-16DC-11CE-9E98-00AA00574A4F} UserForm1
    Caption         =   "Фильтрация элементов"
    ClientHeight    =   5310
    ClientLeft      =   120
-   ClientTop       =   465
-   ClientWidth     =   3645
+   ClientTop       =   470
+   ClientWidth     =   3650
    OleObjectBlob   =   "UserForm1.frx":0000
    StartUpPosition =   1  'CenterOwner
 End

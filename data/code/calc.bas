@@ -1,7 +1,7 @@
 Attribute VB_Name = "calc"
 Option Compare Text
 Option Base 1
-Public Const macro_version As String = "4.08"
+Public Const macro_version As String = "4.10"
 '-------------------------------------------------------
 'Типы элементов (столбец col_type_el)
 Public Const t_arm As Long = 10
@@ -54,6 +54,7 @@ Public Const col_w_obozn As Long = 5
 Public Const col_w_naen As Long = 6
 Public Const col_w_weight As Long = 7
 Public Const col_w_prim As Long = 9
+Public Const col_w_guid As Long = 11
 'Общее количество столбцов во входном массиве
 Public Const max_col As Long = 19
 '-------------------------------------------------------
@@ -260,7 +261,7 @@ Public this_sheet_option As Variant 'хранилище значений форм
 Public set_sheet_option As Variant 'хранилище значений листа
 Public spec_type_suffix As Variant
 Public defult_values_ini As Variant 'Значения по умолчанию
-
+Public fontname As String
 
 Function dprint(ByVal msg As String, Optional ByVal type_msg As Integer = 0)
     If type_msg = 1 Then msg = "ERROR      !!!!! " & msg
@@ -345,6 +346,7 @@ Function INISet()
     defult_values_ini.Item("clear_bet_name") = False
     defult_values_ini.Item("zap_only_mp") = False
     defult_values_ini.Item("checktxt_on_load") = False
+    defult_values_ini.Item("fontname") = "ISOCPEUR"
     sIniFile = UserForm2.CodePath & "setting.ini"
     If Not CBool(Len(Dir$(sIniFile))) Then r = Download_Settings()
     If CBool(Len(Dir$(sIniFile))) Then
@@ -392,6 +394,7 @@ Function INISet()
     zap_only_mp = INIReadKeyVal("РАСЧЁТЫ", "zap_only_mp")
     checktxt_on_load = INIReadKeyVal("ЛИСТЫ", "checktxt_on_load")
     izd_sheet_name = izd_sheet_name + "_спец.И"
+    fontname = INIReadKeyVal("ЛИСТЫ", "fontname")
     '----Принудительное включение
     delim_by_sheet = True
     isINIset = True
@@ -2025,7 +2028,10 @@ tfunctime = Timer
                 array_in(i, col_m_weight) = "-"
             End If
             If type_el = t_wind Then
-                If IsNumeric(array_in(i, col_m_weight)) = False Then array_in(i, col_m_weight) = 0
+                If IsNumeric(array_in(i, col_w_weight)) = False Then array_in(i, col_w_weight) = 0
+                array_in(i, col_w_naen) = Replace(array_in(i, col_w_naen), "  ", " ")
+                array_in(i, col_w_naen) = Replace(array_in(i, col_w_naen), "  ", " ")
+                array_in(i, col_w_naen) = Replace(array_in(i, col_w_naen), "  ", " ")
             End If
             If type_el <> t_arm And type_el <> t_prokat Then array_in(i, col_m_obozn) = CheckGost(array_in(i, col_m_obozn))
             If type_el = t_mat Then
@@ -2200,6 +2206,51 @@ tfunctime = Timer
     add_row = 0: If DataIsShort(array_in) Then add_row = 1
     n_row = UBound(array_in, 1)
     Dim pos_out(): ReDim pos_out(n_row, max_col + add_row)
+    
+    'Обработаем данные по окнам/дверям с длинным именем
+    If spec_version = 3 Then
+        wind_1 = ArraySelectParam(array_in, 61, 4)
+        If Not IsEmpty(wind_1) Then
+            wind_2 = ArraySelectParam(array_in, 62, 4)
+            If Not IsEmpty(wind_2) Then
+                For i = 1 To UBound(wind_1, 1)
+                    GUID_w = wind_1(i, 15)
+                        par_ = wind_1(i, 2)
+                        pos_ = wind_1(i, 3)
+                        qty_ = wind_1(i, 1)
+                    wind = ArraySelectParam(wind_2, GUID_w, 7)
+                    If Not IsEmpty(wind) Then
+                        naen = wind(1, 5)
+                        par = wind(1, 2)
+                        pos = wind(1, 3)
+                        qty = wind(1, 1)
+                        If par = par_ And pos_ = pos And qty_ = qty Then
+                            wind_1(i, 10) = naen
+                            wind_1(i, 15) = wind_1(i, 15) + par + pos + str(qty)
+                        Else
+                            MsgBox ("Проверь окна/двери с длинным названием")
+                        End If
+                    End If
+                    hh = 1
+                Next i
+                For i = 1 To n_row
+                    If array_in(i, 4) = 61 Then
+                        GUID_w = array_in(i, 15)
+                        par_ = array_in(i, 2)
+                        pos_ = array_in(i, 3)
+                        qty_ = array_in(i, 1)
+                        find_str = GUID_w + par + pos + str(qty)
+                        wind = ArraySelectParam(wind_1, find_str, 15)
+                        If Not IsEmpty(wind) Then
+                            array_in(i, 4) = 60
+                            array_in(i, 10) = wind(1, 10)
+                        End If
+                    End If
+                Next i
+            End If
+        End If
+    End If
+
     For i = 1 To n_row
         If spec_version = 2 Then
             For j = 1 To col_pos + add_row
@@ -3255,7 +3306,7 @@ tfunctime = Timer
         .Weight = xlThin
     End With
     With data_out.Font
-        .Name = "ISOCPEUR"
+        .Name = fontname
         .FontStyle = "обычный"
         .Size = 12
         .Strikethrough = False
@@ -3668,6 +3719,7 @@ Function FormatSpec_AS(ByVal data_out As Range, ByVal n_row As Long, ByVal n_col
     For i = start_row + 1 To n_row
         If InStr(data_out(i, 1), ", на ") > 0 Or InStr(data_out(i, 1), ",**") > 0 Then
             data_out(i, 1) = Replace(data_out(i, 1), ",**", vbNullString)
+            If InStr(data_out(i, 1), "_") > 0 Then data_out(i, 1) = Split(data_out(i, 1), "_")(1)
             If this_sheet_option.Item("qty_one_floor") And spec_version > 1 Then
                  If InStr(data_out(i, 1), ", на ") > 0 Then data_out(i, 1) = Split(data_out(i, 1), ", на ")(0)
             End If
@@ -4202,7 +4254,7 @@ Function FormatSpec_Split(ByVal data_out As Range) As Boolean
         .MergeCells = False
     End With
     With data_out.Font
-        .Name = "ISOCPEUR"
+        .Name = fontname
         .FontStyle = "обычный"
         .Size = 11
         .Strikethrough = False
@@ -4290,7 +4342,7 @@ Function FormatSpec_Rule(ByVal data_out As Range) As Boolean
         .MergeCells = False
     End With
     With Selection.Font
-        .Name = "ISOCPEUR"
+        .Name = fontname
         .FontStyle = "обычный"
         .Size = 11
         .Strikethrough = False
@@ -4940,7 +4992,7 @@ Function FormatSpec_Ved(ByVal data_out As Range, ByVal n_row As Long, ByVal n_co
         End With
         
     With data_out.Font
-        .Name = "ISOCPEUR"
+        .Name = fontname
         .FontStyle = "обычный"
         .Size = 10
         .Strikethrough = False
@@ -4966,7 +5018,7 @@ Function FormatSpec_Ved(ByVal data_out As Range, ByVal n_row As Long, ByVal n_co
     End With
     
      With Range(data_out.Cells(1, 1), data_out.Cells(2, n_col)).Font
-        .Name = "ISOCPEUR"
+        .Name = fontname
         .FontStyle = "обычный"
         .Size = 12
         .Strikethrough = False
@@ -5174,7 +5226,7 @@ tfunctime = Timer
                 .ReadingOrder = xlContext
             End With
             With Sh.Range(Sh.Cells(1, 1), Sh.Cells(1, n_col)).Font
-                .Name = "ISOCPEUR"
+                .Name = fontname
                 .FontStyle = "обычный"
                 .Size = 14
                 .Strikethrough = False
@@ -5197,7 +5249,7 @@ tfunctime = Timer
         If Not IsEmpty(str_kzap) Then
             Sh.Cells(n_row + 1, 1).Value = str_kzap
             With Sh.Cells(n_row + 1, 1).Font
-                .Name = "ISOCPEUR"
+                .Name = fontname
                 .Size = 3
                 .Strikethrough = False
                 .Superscript = False
@@ -10801,7 +10853,7 @@ Function Spec_AS(ByRef all_data As Variant, ByVal type_spec As Long) As Variant
         Dim pos_out_sort_end
         ReDim pos_out_sort_end(UBound(pos_out, 1) - istart + 1, UBound(pos_out, 2))
         Dim pos_out_head
-        ReDim pos_out_head(istart - 1, UBound(pos_out, 2))
+        ReDim pos_out_head(Application.WorksheetFunction.Max(1, istart - 1), UBound(pos_out, 2))
         For i = 1 To istart - 1
             For j = 1 To UBound(pos_out, 2)
                 pos_out_head(i, j) = pos_out(i, j)
@@ -10870,17 +10922,18 @@ End Function
 
 Function Spec_WIN(ByRef all_data As Variant) As Variant
     all_data_perem = ArraySelectParam_2(all_data, Array(t_perem, t_perem_m), col_type_el)
-    'all_data_perem_tot = ArraySelectParam_2(all_data, "Перемычки?", col_sub_pos)
     all_data = ArraySelectParam(all_data, t_wind, col_type_el)
     If IsEmpty(all_data) And IsEmpty(all_data_perem) Then Spec_WIN = Empty: Exit Function
     Dim out_data(): ReDim out_data(2)
+    Dim myRegExp As Object
+    Dim myObj As Object
     If Not IsEmpty(all_data) Then
         un_chsum = ArrayUniqValColumn(all_data, col_chksum)
         pos_chsum = UBound(un_chsum, 1)
         un_floor = ArrayUniqValColumn(all_data, col_floor)
-        For i = 1 To pos_chsum
-            un_chsum(i) = Split(un_chsum(i), "_")(0)
-        Next i
+'        For i = 1 To pos_chsum
+'            un_chsum(i) = Split(un_chsum(i), "_")(0)
+'        Next i
         un_chsum = ArrayUniqValColumn(un_chsum, 1)
         pos_chsum = UBound(un_chsum, 1)
         Dim pos_zag
@@ -10921,13 +10974,15 @@ Function Spec_WIN(ByRef all_data As Variant) As Variant
         Dim pos_out(): ReDim pos_out(pos_chsum, UBound(pos_zag, 2))
         pos_wind = "окно"
         pos_door = "дверь"
+        pos_wind1 = "о"
+        pos_door1 = "д"
         n_row_out = 0
-        For Each t In Array(pos_wind, pos_door)
+        For Each t In Array(pos_wind, pos_wind1, pos_door, pos_door1)
             el_data = ArraySelectParam(all_data, t, col_pos)
-            un_sub_pos_el = ArrayUniqValColumn(el_data, col_sub_pos)
+            un_sub_pos_el = ArrayUniqValColumn(el_data, col_chksum)
             If Not IsEmpty(un_sub_pos_el) Then
-                For Each sub_pos In un_sub_pos_el
-                    pos_dat = ArraySelectParam(all_data, sub_pos, col_sub_pos)
+                For Each chksum In un_sub_pos_el
+                    pos_dat = ArraySelectParam(all_data, chksum, col_chksum)
                     'Поставим заполнение впереди
                     un_pos = ArrayDelElement(ArrayUniqValColumn(pos_dat, col_pos), t)
                     un_pos = ArrayCombine(Array(t), un_pos)
@@ -10949,11 +11004,35 @@ Function Spec_WIN(ByRef all_data As Variant) As Variant
                                 qty = pos_dat(i, col_qty)
                                 Weight = pos_dat(i, col_w_weight)
                                 prim = pos_dat(i, col_w_prim)
+                                If prim = "-" Then prim = vbNullString
                                 If prim = "п.м." Then
                                     naen = naen + " L=п.м."
                                     prim = vbNullString
                                 End If
                                 area = GetZoneParam(pos_dat(i, col_param), "S")
+                                'Проверка площади
+                                Set myRegExp = CreateObject("VBScript.RegExp")
+                                myStr2 = ""
+                                myRegExp.Global = True
+                                myRegExp.Pattern = "[0-9]{2,6}\(h\)x[0-9]{2,6}"
+                                Set myObj = myRegExp.Execute(naen)
+                                For Each myStr1 In myObj
+                                    myStr2 = myStr2 & myStr1 & vbNewLine
+                                Next
+                                If Len(myStr2) > 0 Then
+                                    razm = Split(myStr2, "(h)x")
+                                    If UBound(razm) > 0 Then
+                                        a = 0
+                                        b = 0
+                                        If IsNumeric(Trim(razm(0))) Then a = CDbl(Trim(razm(0))) / 1000
+                                        If IsNumeric(Trim(razm(1))) Then b = CDbl(Trim(razm(1))) / 1000
+                                        If a > 0 And b > 0 Then
+                                            area_temp = a * b
+                                            If Abs(area_temp - area) > 0.01 Then area = 0
+                                        End If
+                                    End If
+                                End If
+                                
                                 pos_out(n_row_out, 1) = sub_pos
                                 pos_out(n_row_out, 2) = obozn
                                 pos_out(n_row_out, 3) = naen
@@ -10966,7 +11045,7 @@ Function Spec_WIN(ByRef all_data As Variant) As Variant
                                 pos_out(n_row_out, n_col_qty) = pos_out(n_row_out, n_col_qty) + qty
                                 pos_out(n_row_out, n_col_qty + 1) = Weight
                                 pos_out(n_row_out, n_col_qty + 2)(1) = pos_out(n_row_out, n_col_qty + 2)(1) + qty * Weight
-                                pos_out(n_row_out, n_col_qty + 2)(2) = pos_out(n_row_out, n_col_qty + 2)(2) + area
+                                pos_out(n_row_out, n_col_qty + 2)(2) = pos_out(n_row_out, n_col_qty + 2)(2) + area * qty
                                 If Len(pos_out(n_row_out, n_col_qty + 2)(3)) = 0 Then pos_out(n_row_out, n_col_qty + 2)(3) = prim
                             End If
                         Next i
@@ -10995,7 +11074,6 @@ Function Spec_WIN(ByRef all_data As Variant) As Variant
                 Next i
             Next k
         End If
-        'pos_out = ArraySort(pos_out, 1)
         out_data(1) = ArrayCombine(pos_zag, pos_out)
     Else
         out_data(1) = Empty
@@ -11010,7 +11088,6 @@ Function Spec_WIN(ByRef all_data As Variant) As Variant
             If all_data_perem(i, col_type_el) = t_perem_m Then all_data_perem(i, col_type_el) = t_subpos
         Next i
     End If
-    'If Not IsEmpty(all_data_perem_tot) Then all_data_perem = ArrayCombine(all_data_perem, all_data_perem_tot)
     If Not IsEmpty(all_data_perem) Then
         all_data_perem = DataPrepare(all_data_perem)
         out_data(2) = Spec_AS(all_data_perem, type_spec)
@@ -11102,7 +11179,8 @@ Function Spec_KM(ByRef all_data As Variant) As Variant
                 konstr = unique_prof(L) 'Текущий типоразмер профиля
                 el = ArraySelectParam(prof, konstr, col_pr_prof) 'Выбираем все элементы с этим профилем
                 unique_konstr = ArrayUniqValColumn(el, col_pr_type_konstr) 'Какие типы конструкций
-                n_t_konstr = UBound(unique_konstr)
+                n_t_konstr = 0
+                If Not IsEmpty(unique_konstr) Then n_t_konstr = UBound(unique_konstr)
                 For k = 1 To n_t_konstr
                     'Все элементы с заданной конструкцией
                     type_konstr = unique_konstr(k) 'Текущий тип конструкции
