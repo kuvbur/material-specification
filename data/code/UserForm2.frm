@@ -426,11 +426,11 @@ Function set_sheet(ByVal sheetn As String) As Boolean
         not_same_sheetn = Not (sheetn = lastfilespec)
         is_emty_last = (IsEmpty(lastfilespec) Or Len(lastfilespec) = 0)
         If not_same_list Or not_same_sheetn Or not_same_val Or is_emty_last Then
-            'ListBoxFileSpec.Value = sheetn
+            ListBoxFileSpec.Value = sheetn
             lastfilespec = sheetn
         End If
     Else
-        'ListBoxFileSpec.Value = lastfilespec
+        ListBoxFileSpec.Value = lastfilespec
     End If
 End Function
 

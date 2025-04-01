@@ -1,7 +1,7 @@
 Attribute VB_Name = "calc"
 Option Compare Text
 Option Base 1
-Public Const macro_version As String = "4.12"
+Public Const macro_version As String = "4.10"
 '-------------------------------------------------------
 '“ипы элементов (столбец col_type_el)
 Public Const t_arm As Long = 10
@@ -498,7 +498,7 @@ Function INIWriteKeyVal(ByVal sSection As String, ByVal sKey As String, ByVal sV
     sIniFileContent = vbNullString
     bSectionExists = False
     bKeyExists = False
-    If IsEmpty(aIniLines) Then aIniLines = INIReadFile(sIniFile)
+    aIniLines = INIReadFile(sIniFile)    'Read the file into memory
     sIniFileContent = vbNullString    'Reset it
     sIniFileContent_before = vbNullString
     sIniFileContent_after = vbNullString
@@ -525,6 +525,7 @@ End Function
 
 Function INIReadFile(ByVal strFile As String) As Variant
     On Error Resume Next
+    If IsEmpty(aIniLines) Then r = INISet()
     Set FSO = CreateObject("scripting.filesystemobject")
     Set ts = FSO.OpenTextFile(strFile$, 1, True): sFile$ = ts.ReadAll: ts.Close
     sFile = Replace(sFile, " = ", "=")
@@ -533,7 +534,7 @@ Function INIReadFile(ByVal strFile As String) As Variant
     taIniLines = Split(sFile, vbCrLf)
     If UBound(taIniLines) < 1 Then taIniLines = Split(sFile, vbLf)
     For i = 0 To UBound(taIniLines)
-        taIniLines(i) = Trim$(taIniLines(i))
+        aIniLines(i) = Trim$(aIniLines(i))
     Next i
     INIReadFile = taIniLines
 End Function
@@ -1970,7 +1971,7 @@ tfunctime = Timer
         If InStr(array_in(i, col_sub_pos), ignore_pos) Then ignore_flag = True
         If InStr(array_in(i, col_parent), ignore_pos) Then ignore_flag = True
         If InStr(array_in(i, col_marka), ignore_pos) Then ignore_flag = True
-        If ignore_flag = False And Not IsEmpty(this_sheet_option) Then
+        If ignore_flag = False Then
             subpos_filter = True
             subpos_filter = DataFilter(array_in(i, col_sub_pos), this_sheet_option.Item("arr_subpos_add"), this_sheet_option.Item("arr_subpos_del"))
             If subpos_filter = True And Len(array_in(i, col_parent)) > 0 And array_in(i, col_parent) <> "-" Then subpos_filter = DataFilter(array_in(i, col_parent), this_sheet_option.Item("arr_subpos_add"), this_sheet_option.Item("arr_subpos_del"))
@@ -2305,7 +2306,7 @@ Function DataIsWall(ByVal nm As String) As Variant
             naen = t_start & " " & t_end
         End If
         t_sl = array_in(i, 3)
-        If t_sl > 0.1 And InStr(naen, "t=") = 0 Then naen = naen & " t=" & ConvNum2Txt(t_sl) & "мм."
+        If t_sl > 0.1 Then naen = naen & " t=" & ConvNum2Txt(t_sl) & "мм."
         qty = array_in(i, 4)
         prim = "кв.м."
         
@@ -5944,7 +5945,7 @@ tfunctime = Timer
             array_add_th = Array("“≈’Ќќ–”‘", "кладка", "азобетон", "CARBON PROF", "“≈’Ќќ¬≈Ќ“")
             flag_add_th = 1
             For jj = 1 To UBound(array_add_th)
-                If InStr(naen, array_add_th(jj)) > 0 And flag_add_th And InStr(naen, "t=") = 0 Then
+                If InStr(naen, array_add_th(jj)) > 0 And flag_add_th Then
                     naen = naen + ", t=" + ConvNum2Txt(tthickness * 1000) + "мм."
                     flag_add_th = 0
                 End If
@@ -5961,7 +5962,7 @@ tfunctime = Timer
                         tqty = tvolume
                     Case "квм", "мкв", "м2"
                         tqty = tarea
-                        If tthickness > 0.005 And InStr(naen, "t=") = 0 Then naen = naen + ", t=" + ConvNum2Txt(tthickness * 1000) + "мм."
+                        If tthickness > 0.005 Then naen = naen + ", t=" + ConvNum2Txt(tthickness * 1000) + "мм."
                 End Select
                 trate = 1
             Else
@@ -6356,10 +6357,6 @@ Function ManualAddAuto(ByVal nm As String) As Boolean
         Exit Function
     End If
     Set arm_data = CreateObject("Scripting.Dictionary")
-    If Not SheetExist(nm) Then
-        ManualAddAuto = False
-        Exit Function
-    End If
     Set data_out = wbk.Sheets(nm)
     n_row = SheetGetSize(data_out)(1)
     col = max_col_man
@@ -6838,10 +6835,6 @@ Function ManualCheck(ByVal nm As String) As Boolean
 Dim tfunctime As Double
 tfunctime = Timer
     r = SetWorkbook()
-    If Not SheetExist(nm) Then
-        MsgBox ("Ћист не найден" & vbLf & nm)
-        Exit Function
-    End If
     Set data_out = wbk.Sheets(nm)
     n_row = SheetGetSize(data_out)(1)
     col = max_col_man
@@ -7650,7 +7643,6 @@ Function ManualSpec(ByVal nm As String, Optional ByVal add_array As Variant) As 
         flag_add = 0
         mod_array = Empty
     End If
-    If Not SheetExist(nm) Then Exit Function
     r = ManualAddAuto(nm)
     Set spec_sheet = wbk.Sheets(nm)
     sheet_size = SheetGetSize(spec_sheet)
@@ -10939,9 +10931,9 @@ Function Spec_WIN(ByRef all_data As Variant) As Variant
         un_chsum = ArrayUniqValColumn(all_data, col_chksum)
         pos_chsum = UBound(un_chsum, 1)
         un_floor = ArrayUniqValColumn(all_data, col_floor)
-        For i = 1 To pos_chsum
-            un_chsum(i) = Split(un_chsum(i), "_")(0)
-        Next i
+'        For i = 1 To pos_chsum
+'            un_chsum(i) = Split(un_chsum(i), "_")(0)
+'        Next i
         un_chsum = ArrayUniqValColumn(un_chsum, 1)
         pos_chsum = UBound(un_chsum, 1)
         Dim pos_zag
@@ -10987,10 +10979,10 @@ Function Spec_WIN(ByRef all_data As Variant) As Variant
         n_row_out = 0
         For Each t In Array(pos_wind, pos_wind1, pos_door, pos_door1)
             el_data = ArraySelectParam(all_data, t, col_pos)
-            un_sub_pos_el = ArrayUniqValColumn(el_data, col_sub_pos)
+            un_sub_pos_el = ArrayUniqValColumn(el_data, col_chksum)
             If Not IsEmpty(un_sub_pos_el) Then
-                For Each sub_pos In un_sub_pos_el
-                    pos_dat = ArraySelectParam(all_data, sub_pos, col_sub_pos)
+                For Each chksum In un_sub_pos_el
+                    pos_dat = ArraySelectParam(all_data, chksum, col_chksum)
                     'ѕоставим заполнение впереди
                     un_pos = ArrayDelElement(ArrayUniqValColumn(pos_dat, col_pos), t)
                     un_pos = ArrayCombine(Array(t), un_pos)
@@ -14372,7 +14364,5 @@ Function VedSplitFile(ByVal lastfilespec As String)
     split_data = ArrayRedim(split_data, n_row)
     VedSplitFile = split_data
 End Function
-
-
 
 
